@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:,">
+  <title>3DSS — Kaltos System</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="brackets"></div>
+  <div id="reticle"><div class="ring"></div><div class="dot"></div></div>
+  <div id="stick"></div>
+  <div id="prograde"></div>
+  <div id="lead"></div>
+  <div id="offarrow"></div>
+
+  <div id="sysinfo" class="panel">
+    <div class="sys"><span id="sysname">Kaltos</span> <span class="sec">0.4</span></div>
+    <div id="locname" class="sub">—</div>
+    <div class="sub"><span id="credits">0</span> ISK · Kills <span id="kills">0</span></div>
+  </div>
+
+  <div id="log" class="panel"></div>
+  <div id="notice"></div>
+  <div id="warning"></div>
+
+  <div id="target" class="panel hidden">
+    <div class="tname" id="tname">—</div>
+    <div class="tsub" id="tsub">—</div>
+    <div class="bars">
+      <div class="bar s"><i id="tsh"></i></div>
+      <div class="bar a"><i id="tar"></i></div>
+      <div class="bar h"><i id="thu"></i></div>
+    </div>
+    <div class="tlock" id="tlock">LOCKING</div>
+  </div>
+
+  <div id="overview" class="panel">
+    <div class="ohead">OVERVIEW <span class="tabs"><b data-tab="all" class="on">All</b><b data-tab="hostile">Hostile</b><b data-tab="nav">Nav</b></span></div>
+    <table><thead><tr><th></th><th>Name</th><th>Type</th><th>Dist</th></tr></thead><tbody id="ovbody"></tbody></table>
+    <div id="selinfo">
+      <div id="selname">No selection</div>
+      <div class="acts">
+        <button data-act="warp" title="J">Warp To</button>
+        <button data-act="lock" title="T">Lock</button>
+        <button data-act="dock" title="G">Dock</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="status">
+    <canvas id="gauge" width="300" height="170"></canvas>
+    <div id="speed">0 m/s</div>
+    <div id="flags"></div>
+  </div>
+  <div id="modules">
+    <div class="mod" id="m-laser"><div class="cd"></div><div class="ic">◈</div><div class="lb">Pulse Lasers</div><div class="key">LMB</div></div>
+    <div class="mod" id="m-rail"><div class="cd"></div><div class="ic">═</div><div class="lb">Railgun <span id="railammo"></span></div><div class="key">RMB</div></div>
+    <div class="mod" id="m-missile"><div class="cd"></div><div class="ic">➤</div><div class="lb">Missiles <span id="misammo"></span></div><div class="key">F</div></div>
+    <div class="mod" id="m-ab"><div class="cd"></div><div class="ic">»</div><div class="lb">Afterburner</div><div class="key">SHIFT</div></div>
+    <div class="mod" id="m-warp"><div class="cd"></div><div class="ic">⟫</div><div class="lb">Warp Drive</div><div class="key">J</div></div>
+  </div>
+  <div id="cursorhint">Cursor mode — click the viewport (or press M) to resume flight control</div>
+</div>
+
+<div id="warpfx" class="hidden"><div class="wt">WARP DRIVE ACTIVE</div><div id="warpdest"></div></div>
+<div id="fade"></div>
+
+<div id="menu" class="screen">
+  <div class="box">
+    <h1>3DSS <span>KALTOS SYSTEM</span></h1>
+    <p class="tag">You are the pilot of the <b>Valkyrie</b>, a Caldera-class assault frigate docked at Ardent Relay Station. Corsair pirates have been raiding the asteroid belt. Hunt them down.</p>
+    <div class="cols">
+      <div>
+        <h3>Flight</h3>
+        <p><kbd>Mouse</kbd> pitch / yaw (virtual stick)</p>
+        <p><kbd>W</kbd><kbd>S</kbd> throttle · <kbd>X</kbd> full stop</p>
+        <p><kbd>Q</kbd><kbd>E</kbd> roll · <kbd>A</kbd><kbd>D</kbd> strafe · <kbd>R</kbd><kbd>F</kbd> lift</p>
+        <p><kbd>Shift</kbd> afterburner · <kbd>Z</kbd> flight assist</p>
+        <p><kbd>V</kbd> camera · hold <kbd>C</kbd> free look</p>
+      </div>
+      <div>
+        <h3>Combat &amp; Nav</h3>
+        <p><kbd>LMB</kbd> pulse lasers · <kbd>RMB</kbd> railgun</p>
+        <p><kbd>T</kbd> lock target near reticle · <kbd>Tab</kbd> next hostile</p>
+        <p><kbd>F</kbd> missile salvo (needs lock)</p>
+        <p><kbd>1</kbd>–<kbd>6</kbd> select destination · <kbd>J</kbd> warp</p>
+        <p><kbd>G</kbd> dock · <kbd>M</kbd> cursor · <kbd>H</kbd> help</p>
+      </div>
+    </div>
+    <button id="start" disabled>Loading…</button>
+    <div id="loadmsg"></div>
+  </div>
+</div>
+
+<div id="docked" class="screen hidden">
+  <div class="box">
+    <h1>ARDENT RELAY STATION <span>DOCKED</span></h1>
+    <div id="dockinfo"></div>
+    <div class="row">
+      <button id="repair">Repair</button>
+      <button id="rearm">Rearm</button>
+      <button id="undock" class="primary">Undock</button>
+    </div>
+  </div>
+</div>
+
+<div id="dead" class="screen hidden">
+  <div class="box">
+    <h1 class="red">SHIP DESTROYED</h1>
+    <p>Your capsule was recovered and a replacement Valkyrie has been issued at Ardent Relay Station.</p>
+    <button id="respawn" class="primary">Wake up in clone bay</button>
+  </div>
+</div>
+
+<div id="help" class="screen hidden"><div class="box" id="helpbox"></div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
