@@ -774,12 +774,14 @@ function lockRange() { return G.player.stats.lockRange || 30000; }
 
 function pickNearPointer(radius) {
   const w = window.innerWidth, h = window.innerHeight, pp = G.player.obj.position;
+  // with the pointer captured (mouse flight / MMB drag) the cursor is hidden, so target around the reticle
+  const px = G.mouseLocked ? w / 2 : G.mouse.x, py = G.mouseLocked ? h / 2 : G.mouse.y;
   let best = null, bd = radius;
   for (const e of G.entities) {
     if (e === G.player || !e.alive || e.obj.position.distanceTo(pp) > lockRange()) continue;
     if (_v.copy(e.obj.position).applyMatrix4(camera.matrixWorldInverse).z >= 0) continue;
     _v.copy(e.obj.position).project(camera);
-    const d = Math.hypot((_v.x * 0.5 + 0.5) * w - G.mouse.x, (-_v.y * 0.5 + 0.5) * h - G.mouse.y);
+    const d = Math.hypot((_v.x * 0.5 + 0.5) * w - px, (-_v.y * 0.5 + 0.5) * h - py);
     if (d < bd) { bd = d; best = e; }
   }
   return best;

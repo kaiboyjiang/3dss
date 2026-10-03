@@ -272,16 +272,17 @@ export class HUD {
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(m.x + dx * 10, m.y + dy * 10); g.lineTo(m.x + dx * 15, m.y + dy * 15); g.stroke(); }
       }
       if (G.ctrlTargeting) {
+        const tx = G.mouseLocked ? cx : m.x, ty = G.mouseLocked ? cy : m.y;
         g.strokeStyle = 'rgba(255,176,64,0.6)'; g.setLineDash([6, 6]);
-        g.beginPath(); g.arc(m.x, m.y, G.ctrlRadius, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+        g.beginPath(); g.arc(tx, ty, G.ctrlRadius, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
         const hv = G.ctrlHover;
         if (hv && hv.alive && !isBehind(hv.obj.position)) {
           const [hx, hy] = proj(hv.obj.position);
           g.strokeStyle = 'rgba(255,176,64,0.9)';
-          g.beginPath(); g.moveTo(m.x, m.y); g.lineTo(hx, hy); g.stroke();
+          g.beginPath(); g.moveTo(tx, ty); g.lineTo(hx, hy); g.stroke();
         }
         g.fillStyle = '#ffb040'; g.font = '10px monospace'; g.textAlign = 'left';
-        g.fillText('TARGETING', m.x + 18, m.y - 12);
+        g.fillText('TARGETING', tx + 18, ty - 12);
       }
     }
   }
