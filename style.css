@@ -11,7 +11,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 #reticle .ring::before { left: 15px; top: -8px; width: 1px; height: 6px; box-shadow: 0 40px 0 rgba(160, 230, 255, 0.7); }
 #reticle .ring::after { top: 15px; left: -8px; height: 1px; width: 6px; box-shadow: 40px 0 0 rgba(160, 230, 255, 0.7); }
 #reticle .dot { position: absolute; left: -1.5px; top: -1.5px; width: 3px; height: 3px; background: #bff; border-radius: 50%; }
-#stick { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 1px solid rgba(255, 210, 120, 0.85); transform: rotate(45deg); }
+#stick { display: none; position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 1px solid rgba(255, 210, 120, 0.85); transform: rotate(45deg); }
 #prograde { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border: 2px solid rgba(120, 255, 160, 0.7); border-radius: 50%; }
 #prograde::before, #prograde::after { content: ""; position: absolute; background: rgba(120, 255, 160, 0.7); top: 5px; width: 6px; height: 2px; }
 #prograde::before { left: -9px; } #prograde::after { right: -9px; }
@@ -108,3 +108,7 @@ button.primary { background: rgba(30, 110, 160, 0.7); border-color: #6cf; }
 kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 1px; border: 1px solid #456; border-bottom-width: 2px; border-radius: 3px; font: 11px monospace; color: #dff; text-align: center; background: #0d1a22; }
 #dockinfo p { margin: 4px 0; }
 @media (max-width: 900px) { #overview { width: 280px; font-size: 11px; } #log { width: 260px; } }
+
+#pause { background: rgba(0, 5, 10, 0.82); backdrop-filter: blur(8px); }
+#pause .box { width: min(780px, 92vw); }
+#resume { margin-top: 12px; font-size: 15px; padding: 9px 28px; }

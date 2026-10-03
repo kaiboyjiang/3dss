@@ -19,7 +19,7 @@ const Z = new THREE.Vector3(0, 0, 1), Y = new THREE.Vector3(0, 1, 0), ORIGIN = n
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -37,14 +37,13 @@ composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.42, 0.45, 0.92);
 composer.addPass(bloom);
 const lensPass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uWarp: { value: 0 }, uHit: { value: 0 }, uAspect: { value: 1 } },
+  uniforms: { tDiffuse: { value: null }, uWarp: { value: 0 }, uHit: { value: 0 }, uAspect: { value: 1 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uTime, uWarp, uHit, uAspect; varying vec2 vUv;
-    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    uniform sampler2D tDiffuse; uniform float uWarp, uHit, uAspect; varying vec2 vUv;
     void main(){
       vec2 c = vUv - 0.5;
-      float ca = 0.0012 + uWarp * 0.006 + uHit * 0.008;
+      float ca = uWarp * 0.004 + uHit * 0.004;
       vec2 uvW = vUv - c * uWarp * 0.03 * dot(c, c);
       vec3 col;
       col.r = texture2D(tDiffuse, uvW + c * ca).r;
@@ -53,7 +52,6 @@ const lensPass = new ShaderPass({
       vec2 cc = c * vec2(uAspect, 1.0);
       col *= 1.0 - smoothstep(0.35, 1.05, length(cc)) * 0.55;
       col = mix(col, col * vec3(1.5, 0.55, 0.45) + vec3(0.04, 0.0, 0.0), uHit * 0.45 * smoothstep(0.2, 0.9, length(cc)));
-      col += (hash(vUv * 1000.0 + fract(uTime)) - 0.5) * 0.018;
       gl_FragColor = vec4(max(col, 0.0), 1.0);
     }`,
 });
@@ -78,7 +76,7 @@ let world, fx, bolts, missiles;
 
 const G = {
   state: 'menu', camera, entities: [], locations: LOCATIONS, player: null,
-  selected: null, lock: null, leadPoint: null, warp: null, scrambled: false,
+  selected: null, navTarget: LOCATIONS[1], lock: null, leadPoint: null, warp: null, scrambled: false,
   stick: new THREE.Vector2(), pointerLocked: false, freeLook: false, look: new THREE.Vector2(),
   input: { fire1: false, fire2: false, keys: {} }, flightAssist: true, boosting: false, camMode: 0,
   credits: 250000, kills: 0, ammo: { rail: 40, missile: 24 }, cool: { rail: 0, missile: 0 },
@@ -522,14 +520,14 @@ function updatePlayer(dt) {
   const tgt = _v.set(sy * S.turn[0], -sx * S.turn[1], roll * S.turn[2]);
   const boostTurnPenalty = G.boosting ? 0.75 : 1;
   tgt.multiplyScalar(boostTurnPenalty);
-  playerAngVel.lerp(tgt, 1 - Math.exp(-dt * 4));
+  playerAngVel.lerp(tgt, 1 - Math.exp(-dt * 9));
   _q.setFromEuler(_e.set(playerAngVel.x * dt, playerAngVel.y * dt, playerAngVel.z * dt));
   p.obj.quaternion.multiply(_q).normalize();
   // stick auto-centres slowly
-  if (!G.freeLook) G.stick.multiplyScalar(Math.exp(-dt * 0.6));
+  if (!G.freeLook) G.stick.multiplyScalar(Math.exp(-dt * 12));
   // translation
   const strafeX = (K.KeyA ? 1 : 0) - (K.KeyD ? 1 : 0);
-  const strafeY = (K.KeyR ? 1 : 0) - (K.KeyF ? 1 : 0);
+  const strafeY = (K.KeyR ? 1 : 0) - ((K.ControlLeft || K.ControlRight) ? 1 : 0);
   const invQ = _q2.copy(p.obj.quaternion).invert();
   const vLocal = _v2.copy(p.vel).applyQuaternion(invQ);
   const maxF = G.boosting ? S.boost : S.speed;
@@ -632,7 +630,7 @@ function updateWarp(dt) {
 function lockNearestToReticle() {
   const p = G.player;
   const cd = camera.getWorldDirection(new THREE.Vector3());
-  let best = null, bestA = 0.2;
+  let best = null, bestA = 0.42;
   for (const e of G.entities) {
     if (e === p || !e.alive) continue;
     const to = _v.subVectors(e.obj.position, camera.position);
@@ -648,7 +646,7 @@ function lockNearestToReticle() {
 function startLock(e) {
   if (e.obj.position.distanceTo(G.player.obj.position) > 30000) { hud.notice('TARGET OUT OF LOCK RANGE (30 km)', 1.6); return; }
   if (G.lock && G.lock.ent === e) return;
-  G.lock = { ent: e, progress: 0, time: 1.8 / Math.sqrt(e.stats.sig) };
+  G.lock = { ent: e, progress: 0, time: 0.7 / Math.sqrt(e.stats.sig) };
   G.selected = e;
   audio.beep(990, 0.05);
 }
@@ -756,11 +754,21 @@ $('respawn').onclick = () => {
 
 // ---------------------------------------------------------------- input
 function requestLock() { if (G.state === 'flying') canvas.requestPointerLock?.(); }
-document.addEventListener('pointerlockchange', () => { G.pointerLocked = document.pointerLockElement === canvas; if (!G.pointerLocked) { G.input.fire1 = G.input.fire2 = false; } });
+let cursorUnlock = false;
+document.addEventListener('pointerlockchange', () => {
+  const wasLocked = G.pointerLocked;
+  G.pointerLocked = document.pointerLockElement === canvas;
+  if (!G.pointerLocked) {
+    G.input.fire1 = G.input.fire2 = false;
+    if (wasLocked && G.state === 'flying' && !cursorUnlock) togglePause();
+    cursorUnlock = false;
+  }
+});
 canvas.addEventListener('mousedown', (ev) => {
   if (G.state !== 'flying') return;
   if (!G.pointerLocked) { requestLock(); return; }
-  if (ev.button === 0) G.input.fire1 = true;
+  if (ev.button === 0) { if (!G.lock) lockNearestToReticle(); G.input.fire1 = true; }
+  if (ev.button === 1) lockNearestToReticle();
   if (ev.button === 2) G.input.fire2 = true;
 });
 window.addEventListener('mouseup', (ev) => { if (ev.button === 0) G.input.fire1 = false; if (ev.button === 2) G.input.fire2 = false; });
@@ -772,14 +780,37 @@ window.addEventListener('mousemove', (ev) => {
     G.look.y = THREE.MathUtils.clamp(G.look.y + ev.movementY * 0.004, -1.2, 1.2);
     return;
   }
-  G.stick.x += ev.movementX / 260; G.stick.y += ev.movementY / 260;
-  if (G.stick.length() > 1) G.stick.normalize();
+  const mx = THREE.MathUtils.clamp(ev.movementX, -80, 80);
+  const my = THREE.MathUtils.clamp(ev.movementY, -80, 80);
+  G.stick.set(mx / 80, my / 80);
+  if (G.state === 'flying' && !G.warp && G.player) {
+    _q.setFromEuler(_e.set(my * 0.0018, -mx * 0.0018, 0, 'XYZ'));
+    G.player.obj.quaternion.multiply(_q).normalize();
+  }
 });
+function togglePause() {
+  if (G.state !== 'flying' && G.state !== 'paused') return;
+  const paused = G.state === 'paused';
+  G.state = paused ? 'flying' : 'paused';
+  $('pause').classList.toggle('hidden', paused);
+  G.input.keys = {}; G.input.fire1 = G.input.fire2 = false;
+  if (paused) {
+    audio.ctx?.resume();
+    requestLock();
+  } else {
+    document.exitPointerLock?.();
+    audio.ctx?.suspend();
+  }
+}
+$('pausecontrols').innerHTML = document.querySelector('#menu .cols').outerHTML;
+$('resume').addEventListener('click', togglePause);
+
 window.addEventListener('keydown', (ev) => {
-  if (ev.code === 'Tab') ev.preventDefault();
+  if (ev.code === 'Tab' || ev.code === 'Space') ev.preventDefault();
+  if (ev.code === 'Escape') { togglePause(); return; }
   if (ev.repeat) return;
   G.input.keys[ev.code] = true;
-  if (G.state === 'docked' || G.state === 'menu') return;
+  if (G.state === 'docked' || G.state === 'menu' || G.state === 'paused') return;
   switch (ev.code) {
     case 'KeyX': G.player.throttle = 0; break;
     case 'KeyZ': G.flightAssist = !G.flightAssist; hud.notice(G.flightAssist ? 'FLIGHT ASSIST ON' : 'FLIGHT ASSIST OFF — NEWTONIAN', 1.5); audio.ui(); break;
@@ -788,29 +819,30 @@ window.addEventListener('keydown', (ev) => {
     case 'KeyT': lockNearestToReticle(); break;
     case 'Tab': cycleHostile(); break;
     case 'KeyF': fireMissiles(); break;
-    case 'KeyJ': warpTo(G.selected && G.selected.pos ? G.selected : null); break;
+    case 'KeyJ':
+    case 'Space': warpTo(G.navTarget); break;
     case 'KeyG': tryDock(); break;
-    case 'KeyM': if (G.pointerLocked) document.exitPointerLock(); else requestLock(); break;
+    case 'KeyM': if (G.pointerLocked) { cursorUnlock = true; document.exitPointerLock(); } else requestLock(); break;
     case 'KeyH': toggleHelp(); break;
     default:
-      if (/^Digit[1-6]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(5) - 1]; G.selected = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — J TO WARP`, 1.8); }
+      if (/^(Digit|Numpad)[1-6]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(-1) - 1]; G.selected = l; G.navTarget = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — SPACE TO WARP`, 1.8); }
   }
 });
 window.addEventListener('keyup', (ev) => { G.input.keys[ev.code] = false; if (ev.code === 'KeyC') { G.freeLook = false; } });
 window.addEventListener('blur', () => { G.input.keys = {}; G.input.fire1 = G.input.fire2 = false; });
 
-hud.onSelect = (ref) => { G.selected = ref; hud.ovT = 0; audio.ui(); };
+hud.onSelect = (ref) => { G.selected = ref; if (ref.pos) G.navTarget = ref; else if (ref.ship) startLock(ref); hud.ovT = 0; audio.ui(); };
 document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('mousedown', (ev) => {
   ev.stopPropagation();
   const s = G.selected;
-  if (b.dataset.act === 'warp') warpTo(s && s.pos ? s : null);
+  if (b.dataset.act === 'warp') { if (s && s.pos) G.navTarget = s; warpTo(G.navTarget); }
   if (b.dataset.act === 'lock') { if (s && s.ship) startLock(s); else hud.notice('SELECT A SHIP TO LOCK', 1.2); }
   if (b.dataset.act === 'dock') tryDock();
 }));
 function toggleHelp() {
   const h = $('help');
   if (h.classList.contains('hidden')) {
-    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Shields regenerate after 4 s without damage. Lasers drain capacitor; railgun uses slugs + capacitor; missiles need a full lock. Dock at the station (G within 3.5 km) to repair and rearm. Pirates spawn at the asteroid belt (2) and the Corsair Hideout (3). Press H to close.</p>';
+    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Shields regenerate after 4 s without damage. Lasers drain capacitor; railgun uses slugs + capacitor; missiles need a full lock. Dock at the station (G within 3.5 km) to repair and rearm. Pirates spawn at the asteroid belt (2) and the Corsair Hideout (3). Press H to close. Press Esc to pause.</p>';
     h.classList.remove('hidden');
   } else h.classList.add('hidden');
 }
@@ -868,7 +900,7 @@ function aimPoint() {
   if (L && G.leadPoint) {
     const to = _v.subVectors(G.leadPoint, camera.position);
     const ang = to.angleTo(dir);
-    if (ang < 0.06) return G.leadPoint.clone();
+    if (ang < 0.1) return G.leadPoint.clone();
     dist = THREE.MathUtils.clamp(to.length(), 300, 6000);
   }
   return camera.position.clone().addScaledVector(dir, dist);
@@ -883,6 +915,7 @@ function frame(now) {
   if (!world || !G.player) return;
   G.time += dt;
   const p = G.player;
+  if (G.state === 'paused') { composer.render(0); return; }
   if (G.state === 'flying' || G.state === 'dead' || G.state === 'docking') {
     updatePlayer(dt);
     // capacitor and shield regeneration
@@ -925,7 +958,6 @@ function frame(now) {
   world.warp.update(dt, warpI, 2500 + warpI * 9000);
   fx.update(dt, camera);
   G.hitFlash *= Math.exp(-dt * 3);
-  lensPass.uniforms.uTime.value = G.time;
   lensPass.uniforms.uWarp.value = warpI;
   lensPass.uniforms.uHit.value = G.hitFlash;
   audio.update(p.throttle, G.boosting ? 1 : 0, warpI);
@@ -969,7 +1001,7 @@ async function boot() {
       audio.init();
       $('menu').classList.add('hidden');
       hud.log('Welcome to Kaltos. Pirates reported at Asteroid Belt 1.', 'i');
-      hud.log('Press 2 then J to warp to the belt. H for help.', 'i');
+      hud.log('Press 2 then Space to warp to the belt. Esc pauses and shows controls.', 'i');
       undock();
     };
   } catch (err) {

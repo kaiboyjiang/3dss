@@ -68,7 +68,7 @@
     <div class="mod" id="m-rail"><div class="cd"></div><div class="ic">═</div><div class="lb">Railgun <span id="railammo"></span></div><div class="key">RMB</div></div>
     <div class="mod" id="m-missile"><div class="cd"></div><div class="ic">➤</div><div class="lb">Missiles <span id="misammo"></span></div><div class="key">F</div></div>
     <div class="mod" id="m-ab"><div class="cd"></div><div class="ic">»</div><div class="lb">Afterburner</div><div class="key">SHIFT</div></div>
-    <div class="mod" id="m-warp"><div class="cd"></div><div class="ic">⟫</div><div class="lb">Warp Drive</div><div class="key">J</div></div>
+    <div class="mod" id="m-warp"><div class="cd"></div><div class="ic">⟫</div><div class="lb">Warp Drive</div><div class="key">SPACE</div></div>
   </div>
   <div id="cursorhint">Cursor mode — click the viewport (or press M) to resume flight control</div>
 </div>
@@ -83,23 +83,31 @@
     <div class="cols">
       <div>
         <h3>Flight</h3>
-        <p><kbd>Mouse</kbd> pitch / yaw (virtual stick)</p>
+        <p><kbd>Mouse</kbd> direct pitch / yaw · <kbd>LMB</kbd> fire</p>
         <p><kbd>W</kbd><kbd>S</kbd> throttle · <kbd>X</kbd> full stop</p>
-        <p><kbd>Q</kbd><kbd>E</kbd> roll · <kbd>A</kbd><kbd>D</kbd> strafe · <kbd>R</kbd><kbd>F</kbd> lift</p>
+        <p><kbd>Q</kbd><kbd>E</kbd> roll · <kbd>A</kbd><kbd>D</kbd> strafe · <kbd>R</kbd>/<kbd>Ctrl</kbd> lift</p>
         <p><kbd>Shift</kbd> afterburner · <kbd>Z</kbd> flight assist</p>
         <p><kbd>V</kbd> camera · hold <kbd>C</kbd> free look</p>
       </div>
       <div>
         <h3>Combat &amp; Nav</h3>
         <p><kbd>LMB</kbd> pulse lasers · <kbd>RMB</kbd> railgun</p>
-        <p><kbd>T</kbd> lock target near reticle · <kbd>Tab</kbd> next hostile</p>
+        <p><kbd>MMB</kbd> / <kbd>T</kbd> lock target · <kbd>Tab</kbd> next hostile</p>
         <p><kbd>F</kbd> missile salvo (needs lock)</p>
-        <p><kbd>1</kbd>–<kbd>6</kbd> select destination · <kbd>J</kbd> warp</p>
-        <p><kbd>G</kbd> dock · <kbd>M</kbd> cursor · <kbd>H</kbd> help</p>
+        <p><kbd>1</kbd>–<kbd>6</kbd> destination · <kbd>Space</kbd> / <kbd>J</kbd> warp</p>
+        <p><kbd>G</kbd> dock · <kbd>M</kbd> cursor · <kbd>Esc</kbd> pause</p>
       </div>
     </div>
     <button id="start" disabled>Loading…</button>
     <div id="loadmsg"></div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="box">
+    <h1>PAUSED <span>KALTOS FLIGHT MANUAL</span></h1>
+    <div id="pausecontrols"></div>
+    <button id="resume" class="primary">Resume Flight</button>
   </div>
 </div>
 
