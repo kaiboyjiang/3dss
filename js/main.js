@@ -665,7 +665,7 @@ function updatePlayer(dt) {
   const tgt = _v.set(wx, wy, roll * S.turn[2]);
   const boostTurnPenalty = G.boosting ? 0.75 : 1;
   tgt.multiplyScalar(boostTurnPenalty);
-  playerAngVel.lerp(tgt, 1 - Math.exp(-dt * 9));
+  playerAngVel.lerp(tgt, 1 - Math.exp(-dt * (3 + 6 * S.turn[1])));
   _q.setFromEuler(_e.set(playerAngVel.x * dt, playerAngVel.y * dt, playerAngVel.z * dt));
   p.obj.quaternion.multiply(_q).normalize();
   if (!G.aimActive) G.aimDir.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
@@ -677,7 +677,8 @@ function updatePlayer(dt) {
   const maxF = G.boosting ? S.boost : S.speed;
   const acc = G.boosting ? S.accel * 2.2 : S.accel;
   if (G.flightAssist) {
-    const want = _v3.set(strafeX * 90, strafeY * 90, G.boosting ? S.boost : p.throttle * S.speed);
+    const strafeMax = S.speed * 0.35;
+    const want = _v3.set(strafeX * strafeMax, strafeY * strafeMax, G.boosting ? S.boost : p.throttle * S.speed);
     const dv = want.sub(vLocal);
     dv.x = THREE.MathUtils.clamp(dv.x, -acc * 0.6 * dt, acc * 0.6 * dt);
     dv.y = THREE.MathUtils.clamp(dv.y, -acc * 0.6 * dt, acc * 0.6 * dt);
@@ -1065,7 +1066,7 @@ function hangarShow(hullId, keepView) {
 
 function statRows(s, cmp) {
   const rows = [['Shield', s.shield, 'HP'], ['Armor', s.armor, 'HP'], ['Hull', s.hull, 'HP'], ['Max velocity', s.speed, 'm/s'], ['Afterburner', s.boost, 'm/s'],
-    ['Agility', Math.round(s.turn[1] * 100), '°/s'], ['Capacitor', s.cap, 'GJ'], ['Cap recharge', Math.round(s.capRegen * 10) / 10, 'GJ/s'],
+    ['Agility', Math.round(THREE.MathUtils.radToDeg(s.turn[1])), '°/s'], ['Capacitor', s.cap, 'GJ'], ['Cap recharge', Math.round(s.capRegen * 10) / 10, 'GJ/s'],
     ['Shield regen', Math.round(s.shieldRegen * 10) / 10, 'HP/s'], ['Lock range', Math.round(s.lockRange / 1000), 'km'], ['Signature', s.sig, '']];
   const keys = ['shield', 'armor', 'hull', 'speed', 'boost', null, 'cap', 'capRegen', 'shieldRegen', 'lockRange', null];
   return `<table class="st">${rows.map(([n, v, u], i) => {
