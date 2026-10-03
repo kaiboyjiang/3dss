@@ -49,11 +49,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 .bars .bar { height: 5px; background: rgba(255, 255, 255, 0.08); margin: 3px 0; }
 .bars .bar i { display: block; height: 100%; transition: width 0.15s; }
 .bar.s i { background: #4ab3ff; } .bar.a i { background: #e9c46a; } .bar.h i { background: #e85d4a; }
-#tholo { position: absolute; left: 30px; right: 30px; top: calc(100% + 6px); height: 140px; pointer-events: none;
-  background: linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 1px 12px,
-    linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 1px 12px,
-    linear-gradient(#a4a9b0, #a4a9b0) 0 100% / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 100% / 1px 12px,
-    linear-gradient(#a4a9b0, #a4a9b0) 100% 100% / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 100% / 1px 12px;
+#tholo { position: absolute; right: calc(100% + 6px); top: 0; width: 96px; height: 72px; pointer-events: none;
+  background: linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 8px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 1px 8px,
+    linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 8px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 1px 8px,
+    linear-gradient(#a4a9b0, #a4a9b0) 0 100% / 8px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 100% / 1px 8px,
+    linear-gradient(#a4a9b0, #a4a9b0) 100% 100% / 8px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 100% / 1px 8px;
   background-repeat: no-repeat; opacity: 0.6; }
 #target .tlock { margin-top: 5px; font-size: 11px; letter-spacing: 2px; color: #ffb040; }
 
@@ -78,7 +78,7 @@ button:hover:not(:disabled) { background: rgba(98, 104, 112, 0.7); }
 button:disabled { opacity: 0.4; cursor: default; }
 button.primary { background: rgba(88, 94, 102, 0.7); border-color: #adb2b8; }
 
-#status { position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%); width: 300px; height: 170px; }
+#status { position: absolute; right: 14px; bottom: 20px; width: 300px; height: 170px; }
 #gauge { position: absolute; inset: 0; }
 #speed { position: absolute; left: 0; right: 0; bottom: 34px; text-align: center; font-size: 18px; color: #fff; font-variant-numeric: tabular-nums; text-shadow: 0 0 6px #000; }
 #flags { position: absolute; left: 0; right: 0; bottom: 16px; text-align: center; font-size: 10px; letter-spacing: 2px; color: #9ba0a8; }
