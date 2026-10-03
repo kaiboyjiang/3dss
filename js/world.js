@@ -434,6 +434,51 @@ export function beaconSprite(color, size) {
   return s;
 }
 
+// ---------------------------------------------------------------- enclosed docking bay
+// a hollow hangar pod at angle a whose back wall sits at radius r0 and whose mouth opens outward
+function bayPod(k, a, r0, y, W, H, D) {
+  const c = Math.cos(a), s = Math.sin(a), ry = Math.atan2(c, s);
+  const Z = new THREE.Vector3(c, 0, s), X = new THREE.Vector3(s, 0, -c);
+  const mouth = new THREE.Vector3(c * (r0 + D), y, s * (r0 + D));
+  const at = (x, yy, z) => mouth.clone().addScaledVector(X, x).addScaledVector(Z, z).setY(y + yy);
+  const put = (key, geo, x, yy, z) => k.add(key, geo, mat(at(x, yy, z).toArray(), [0, ry, 0]));
+  const t = 10;
+  put('dark', G.box(W + 2 * t, t, D), 0, -H / 2 - t / 2, -D / 2);
+  put('hull', G.box(W + 2 * t, t, D), 0, H / 2 + t / 2, -D / 2);
+  put('dark', G.box(W, H, t), 0, 0, -D - t / 2);
+  put('hangar', G.box(W * 0.45, H * 0.55, 2), 0, -H * 0.12, -D + 1);
+  put('light', G.box(W * 0.5, 2, 2), 0, H * 0.2, -D + 1.5);
+  for (const sx of [-1, 1]) {
+    put('hull', G.box(t, H, D), sx * (W / 2 + t / 2), 0, -D / 2);
+    put('window', G.box(t + 1, 8, D * 0.7), sx * (W / 2 + t / 2), H * 0.28, -D * 0.55);
+    put('light', G.box(3, 2, D - 20), sx * (W / 2 - 8), H / 2 - 3, -D / 2);
+    put('light', G.box(2, 1.5, D - 20), sx * (W / 2 - 2), -H / 2 + 6, -D / 2);
+    put('hangar', G.box(2, 0.6, D - 10), sx * W * 0.22, -H / 2 + 0.4, -D / 2);
+    put('dark', G.box(t + 12, H + 2 * t + 24, 16), sx * (W / 2 + t / 2), 0, 0);
+  }
+  for (const sy of [-1, 1]) put('dark', G.box(W + 2 * t + 24, t + 12, 16), 0, sy * (H / 2 + t / 2), 0);
+  for (let z = -D + 30; z < -20; z += 55) {
+    put('dark', G.box(W, 8, 8), 0, H / 2 - 4, z);
+    put('light', G.box(W * 0.4, 1.5, 3), 0, H / 2 - 8.5, z);
+    for (const sx of [-1, 1]) put('dark', G.box(8, H, 8), sx * (W / 2 - 4), 0, z);
+  }
+  const beacons = [], colliders = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) beacons.push([at(sx * (W / 2 + t + 6), sy * (H / 2 + t + 6), 9), sy > 0 ? 0xffe0a0 : 0xff4030]);
+  for (let z = -D; z <= 0; z += 40) {
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) colliders.push(at(sx * (W / 2 + 22), sy * H / 4, z));
+    for (const sx of [-1, 0, 1]) for (const sy of [-1, 1]) colliders.push(at(sx * W / 3, sy * (H / 2 + 22), z));
+  }
+  for (const sx of [-1, 0, 1]) colliders.push(at(sx * W / 3, 0, -D - 22));
+  return { bay: { pos: mouth, dir: Z, depth: D, h: H }, beacons, colliders };
+}
+function finishPods(pods, addBeacon, colliders) {
+  pods.forEach((pd, i) => {
+    pd.beacons.forEach(([p, col], j) => addBeacon(p, col, 34, i * 0.13 + j * 0.25, 1.2));
+    for (const p of pd.colliders) colliders.push({ p, r: 26 });
+  });
+  return pods.map((pd) => pd.bay);
+}
+
 // ---------------------------------------------------------------- station
 function buildStation(M) {
   const root = new THREE.Group();
@@ -464,10 +509,6 @@ function buildStation(M) {
     k.add('window', G.box(71, 10, L - 60), mat([c * (L / 2 + 60), -235, s * (L / 2 + 60)], [0, Math.atan2(c, s), 0]));
     // docking collar at end
     k.add('dark', G.cyl(48, 48, 40, 24), mat([c * (L + 70), -230, s * (L + 70)], [Math.PI / 2, 0, -a + Math.PI / 2]));
-    k.add('hangar', G.box(56, 30, 4), mat([c * (L + 92), -230, s * (L + 92)], [0, Math.atan2(c, s), 0]));
-    k.add('dark', G.box(40, 6, 120), mat([c * (L + 60), -262, s * (L + 60)], [0, Math.atan2(c, s), 0]));
-    // floodlights
-    for (const dy of [-30, 30]) k.add('light', G.box(6, 3, 3), mat([c * (L + 88), -230 + dy, s * (L + 88)], [0, Math.atan2(c, s), 0]));
   }
   // habitat ring (rotates)
   const ringK = new Kit();
@@ -521,6 +562,7 @@ function buildStation(M) {
     k.add('dark', G.cyl(1.5, 1.5, 120, 6), mat([Math.cos(a) * 60, 380 + r() * 40, Math.sin(a) * 60], [r() * 0.3, 0, r() * 0.3]));
   }
   k.add('dark', G.cyl(60, 4, 30, 32), mat([90, 470, 40], [0.6, 0, 0.4]));
+  const pods = [0, 1, 2, 3].map((i) => bayPod(k, Math.PI / 4 + i * Math.PI / 2, 478, -230, 220, 110, 340));
   const body = k.build(M, { uvTile: { hull: 40, dark: 30, window: 60 } });
   root.add(body);
 
@@ -536,8 +578,6 @@ function buildStation(M) {
   for (const side of [-1, 1]) addBeacon(new THREE.Vector3(side * 975, 430, 0), side < 0 ? 0xff2a1a : 0x20ff60, 50, 0.25, 0.8);
   for (let i = 0; i < 4; i++) {
     const a = i * Math.PI / 2 + Math.PI / 4;
-    addBeacon(new THREE.Vector3(Math.cos(a) * 470, -230, Math.sin(a) * 470), 0xffe0a0, 60, i * 0.1, 0);
-    addBeacon(new THREE.Vector3(Math.cos(a) * 470, -190, Math.sin(a) * 470), 0x60a0ff, 30, i * 0.25, 2);
   }
   root.userData = { ring, beacons };
   // collision proxies (local space)
@@ -551,7 +591,7 @@ function buildStation(M) {
     const a = i * Math.PI / 2 + Math.PI / 4;
     for (let d = 100; d <= 460; d += 45) colliders.push({ p: new THREE.Vector3(Math.cos(a) * d, -230, Math.sin(a) * d), r: 45 });
   }
-  return { root, colliders };
+  return { root, colliders, bays: finishPods(pods, addBeacon, colliders) };
 }
 
 // ---------------------------------------------------------------- high-tech orbital shipyard
@@ -666,6 +706,7 @@ function buildShipyard(M) {
     const m4 = new THREE.Matrix4().lookAt(p, new THREE.Vector3(), new THREE.Vector3(0, 1, 0)).setPosition(p);
     k.add(r() < 0.5 ? 'dark' : 'hull', g, m4);
   }
+  const pods = [Math.PI / 2, Math.PI, Math.PI * 1.5].map((a) => bayPod(k, a, 396, -120, 220, 110, 320));
   root.add(k.build(M, { uvTile: { hull: 40, dark: 30, window: 60 } }));
   // rotating habitat ring
   const ringK = new Kit();
@@ -703,7 +744,7 @@ function buildShipyard(M) {
     addBeacon(new THREE.Vector3(Math.cos(a) * 392, -120, Math.sin(a) * 392), 0x80d0ff, 30, i / 8, 0.5);
   }
   root.userData = { ring, beacons };
-  return { root, colliders };
+  return { root, colliders, bays: finishPods(pods, addBeacon, colliders) };
 }
 
 // ---------------------------------------------------------------- stargate
@@ -1086,11 +1127,7 @@ export function buildWorld(renderer, scene) {
       structures.push({ obj: b.root, colliders: b.colliders, loc });
       spinners.push({ o: b.root.userData.ring, s: yard ? -0.025 : 0.03 });
       beaconSets.push(b.root.userData.beacons);
-      const bay = (a, r, y) => ({ pos: new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) });
-      docks[S.id] = {
-        root: b.root,
-        bays: yard ? [Math.PI / 2, Math.PI, Math.PI * 1.5].map((a) => bay(a, 390, -120)) : [0, 1, 2, 3].map((i) => bay(Math.PI / 4 + i * Math.PI / 2, 474, -230)),
-      };
+      docks[S.id] = { root: b.root, bays: b.bays };
       LOCATIONS.push(loc);
     }
     def.belts.forEach((B, i) => {

@@ -108,5 +108,10 @@ export const G = {
     g.translate(0, 0, -depth / 2);
     return g;
   },
-  lathe: (pts, seg = 32) => new THREE.LatheGeometry(pts.map(([x, y]) => new THREE.Vector2(x, y)), seg),
+  // profiles may be listed in either direction; LatheGeometry faces outward only when y increases
+  lathe: (pts, seg = 32) => {
+    const v = pts.map(([x, y]) => new THREE.Vector2(x, y));
+    if (v[0].y > v[v.length - 1].y) v.reverse();
+    return new THREE.LatheGeometry(v, seg);
+  },
 };
