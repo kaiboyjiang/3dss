@@ -25,9 +25,9 @@ function signTexture(text, sub) {
   c.width = 1024; c.height = 256;
   const g = c.getContext('2d');
   g.fillStyle = '#121315'; g.fillRect(0, 0, 1024, 256);
-  g.fillStyle = '#e9eaec'; g.font = '600 120px "Chakra Petch", Arial, sans-serif'; g.textBaseline = 'middle';
+  g.fillStyle = '#e9eaec'; g.font = '600 120px "Mono Digits", "Chakra Petch", Arial, sans-serif'; g.textBaseline = 'middle';
   g.fillText(text, 40, 110);
-  g.fillStyle = '#9a9ea4'; g.font = '44px "Chakra Petch", Arial, sans-serif';
+  g.fillStyle = '#9a9ea4'; g.font = '44px "Mono Digits", "Chakra Petch", Arial, sans-serif';
   g.fillText(sub, 44, 205);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;

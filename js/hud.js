@@ -342,7 +342,7 @@ export class HUD {
     };
     const track = metal(0, [34, 36, 39]);
     const gap = 44, x0 = W / 2 - ((cols.length - 1) * gap) / 2;
-    g.font = '10px "Chakra Petch", sans-serif'; g.textAlign = 'center';
+    g.font = '10px "Mono Digits", "Chakra Petch", sans-serif'; g.textAlign = 'center';
     cols.forEach(([lb, f, col, v], i) => {
       const x = x0 + i * gap - bw / 2, fr = Math.max(0, Math.min(1, f));
       g.save(); g.translate(x, 0); g.fillStyle = track; g.fillRect(0, top, bw, bh); g.restore();

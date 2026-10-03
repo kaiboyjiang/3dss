@@ -111,7 +111,7 @@ export class StarMap {
       const [x, y] = S(s.end);
       g.strokeStyle = s.id === this.sel ? '#ffb040' : 'rgba(180,184,190,0.5)'; g.lineWidth = 1.5;
       g.strokeRect(x - 6, y - 6, 12, 12);
-      g.fillStyle = 'rgba(180,184,190,0.7)'; g.font = '10px "Chakra Petch", sans-serif'; g.textAlign = 'center'; g.fillText('?', x, y + 3.5);
+      g.fillStyle = 'rgba(180,184,190,0.7)'; g.font = '10px "Mono Digits", "Chakra Petch", sans-serif'; g.textAlign = 'center'; g.fillText('?', x, y + 3.5);
     }
     // plotted route
     const path = G.routeTo && route(G.system, G.routeTo, G.explored);
@@ -137,8 +137,8 @@ export class StarMap {
       }
       if (n.id === this.sel) { g.strokeStyle = '#ffb040'; g.lineWidth = 2; g.strokeRect(x - 17, y - 17, 34, 34); }
       g.textAlign = 'center';
-      g.fillStyle = '#fff'; g.font = '13px "Chakra Petch", sans-serif'; g.fillText(n.name, x, y + 30);
-      g.fillStyle = `rgb(${GOV_RGB[n.gov]})`; g.font = '9px "Chakra Petch", sans-serif'; g.fillText(`${GOVS[n.gov].short} · ${n.sec.toFixed(1)}`, x, y + 42);
+      g.fillStyle = '#fff'; g.font = '13px "Mono Digits", "Chakra Petch", sans-serif'; g.fillText(n.name, x, y + 30);
+      g.fillStyle = `rgb(${GOV_RGB[n.gov]})`; g.font = '9px "Mono Digits", "Chakra Petch", sans-serif'; g.fillText(`${GOVS[n.gov].short} · ${n.sec.toFixed(1)}`, x, y + 42);
       if (n.id === G.system) { g.fillStyle = '#dbdddf'; g.fillText('YOU ARE HERE', x, y - 22); }
     }
   }
