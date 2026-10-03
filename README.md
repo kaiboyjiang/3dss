@@ -6,27 +6,28 @@ GVCSG is a procedural browser-based space combat simulator built with Three.js. 
 
 Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a desktop browser with WebGL enabled.
 
-- Hold middle mouse and drag: set a heading marker; the ship turns to it and stops there (K toggles mouse flight without holding)
+- Hold middle mouse and drag: set a heading marker; the ship turns to it and stops there (N toggles mouse flight without holding)
 - The reticle compass shows the direction of the target and other ships
-- Arrow Up / Down: thrust and throttle
-- Arrow Left / Right: strafe
+- I / K or Arrow Up / Down: thrust and throttle
+- J / L or Arrow Left / Right: strafe
 - W / S: throttle
 - Q / E: roll
 - A / D: strafe
 - R / B: vertical thrust up / down
 - Shift: afterburner
-- Left mouse: fixed forward guns (auto-aim when the locked target's lead pip is near the reticle)
-- Right mouse: heavy fixed guns (railgun / plasma lance)
-- Turrets: engage hostiles automatically; L toggles hold fire
+- Left mouse or U: fixed forward guns (auto-aim when the locked target's lead pip is near the reticle)
+- Right mouse or O: heavy fixed guns (railgun / plasma lance)
+- Turrets: engage hostiles automatically; Y toggles hold fire
 - Hold right Ctrl: lock the ship nearest the pointer
 - T: lock target near the pointer / reticle
 - Tab: cycle hostiles
-- F: missile salvo after locking
+- ; or F: missile salvo after locking
 - 1–9: select navigation destination
 - Space: warp to the selected destination
-- J: jump through a gate within 3.5 km (plays a jump cutscene); otherwise warp to the selected or next route gate and jump on arrival
+- H: jump through a gate within 3.5 km (plays a jump cutscene); otherwise warp to the selected or next route gate and jump on arrival
 - M: star map (only charted systems are shown; click a system to plot a route)
-- O: collapse / expand overview
+- P: collapse / expand overview
+- F1: help
 - G: dock at the nearest station (plays a docking cutscene; Space or Esc skips docking, undocking and jump cutscenes)
 - V: cycle cameras
 - Esc: pause and show controls

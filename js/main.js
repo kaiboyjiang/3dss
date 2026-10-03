@@ -316,7 +316,7 @@ function playerWeapons(dt) {
       }
       aimTurret(t, target, dt, 4, -GUN_ASSIST * 1.2, GUN_ASSIST * 1.2);
       if (O.group === 'primary') { pri = Math.max(pri, t.next / O.rof); priOff = priOff && blocked; } else { sec = Math.max(sec, t.next / O.rof); secOff = secOff && blocked; }
-      fire = O.group === 'primary' ? G.input.fire1 : G.input.fire2;
+      fire = O.group === 'primary' ? G.input.fire1 || !!G.input.keys.KeyU : G.input.fire2 || !!G.input.keys.KeyO;
     }
     if (G.warp || G.state !== 'flying' || !fire || t.next > 0 || blocked) continue;
     t.next = O.rof * (0.94 + Math.random() * 0.12);
@@ -646,8 +646,8 @@ function updatePlayer(dt) {
   if (G.state !== 'flying') return;
   if (G.warp) { G.aimActive = false; updateWarp(dt); return; }
   // throttle
-  if (K.KeyW || K.ArrowUp) p.throttle = Math.min(1, p.throttle + dt * 0.6);
-  if (K.KeyS || K.ArrowDown) p.throttle = Math.max(0, p.throttle - dt * 0.6);
+  if (K.KeyW || K.ArrowUp || K.KeyI) p.throttle = Math.min(1, p.throttle + dt * 0.6);
+  if (K.KeyS || K.ArrowDown || K.KeyK) p.throttle = Math.max(0, p.throttle - dt * 0.6);
   G.boosting = !!K.ShiftLeft && p.cap > 10 || (!!K.ShiftRight && p.cap > 10);
   if (G.boosting) p.cap -= 45 * dt;
   // rotation (local axes): +X left, +Y up, +Z forward
@@ -669,7 +669,7 @@ function updatePlayer(dt) {
   p.obj.quaternion.multiply(_q).normalize();
   if (!G.aimActive) G.aimDir.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
   // translation
-  const strafeX = ((K.KeyA || K.ArrowLeft) ? 1 : 0) - ((K.KeyD || K.ArrowRight) ? 1 : 0);
+  const strafeX = ((K.KeyA || K.ArrowLeft || K.KeyJ) ? 1 : 0) - ((K.KeyD || K.ArrowRight || K.KeyL) ? 1 : 0);
   const strafeY = ((K.KeyR || K.PageUp) ? 1 : 0) - ((K.KeyB || K.PageDown) ? 1 : 0);
   const invQ = _q2.copy(p.obj.quaternion).invert();
   const vLocal = _v2.copy(p.vel).applyQuaternion(invQ);
@@ -685,7 +685,7 @@ function updatePlayer(dt) {
   } else {
     vLocal.x += strafeX * acc * 0.6 * dt;
     vLocal.y += strafeY * acc * 0.6 * dt;
-    vLocal.z += (((K.KeyW || K.ArrowUp) ? 1 : 0) - ((K.KeyS || K.ArrowDown) ? 1 : 0) + (G.boosting ? 2 : 0)) * acc * dt;
+    vLocal.z += (((K.KeyW || K.ArrowUp || K.KeyI) ? 1 : 0) - ((K.KeyS || K.ArrowDown || K.KeyK) ? 1 : 0) + (G.boosting ? 2 : 0)) * acc * dt;
     if (vLocal.length() > S.boost) vLocal.setLength(S.boost);
   }
   p.vel.copy(vLocal.applyQuaternion(p.obj.quaternion));
@@ -1076,7 +1076,7 @@ function statRows(s, cmp) {
 
 function weaponLine(O) {
   if (O.type !== 'weapon') return '';
-  return `${O.mount === 'turret' ? 'Turret — auto-engages hostiles' : O.group === 'primary' ? 'Fixed gun (LMB)' : 'Fixed gun (RMB)'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
+  return `${O.mount === 'turret' ? 'Turret — auto-engages hostiles' : O.group === 'primary' ? 'Fixed gun (LMB / U)' : 'Fixed gun (RMB / O)'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
 }
 
 function renderDock() {
@@ -1135,7 +1135,7 @@ function renderDock() {
     }
     R.innerHTML = `<h3>${isHigh() ? 'Helion outfitter' : 'Basic outfitter'} — ${type}s</h3>${list.map(([id, O]) => {
       const avail = O.tech === 'basic' || isHigh();
-      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${O.type === 'weapon' ? (O.mount === 'turret' ? 'Auto turret' : O.group === 'primary' ? 'Fixed gun · LMB' : 'Fixed gun · RMB') : 'Utility'}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
+      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${O.type === 'weapon' ? (O.mount === 'turret' ? 'Auto turret' : O.group === 'primary' ? 'Fixed gun · LMB / U' : 'Fixed gun · RMB / O') : 'Utility'}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
         <span class="pr${G.inventory[id] ? ' own' : ''}">${G.inventory[id] ? `×${G.inventory[id]} in cargo` : fmtIsk(O.price)}</span></div>`;
     }).join('')}${det}`;
   }
@@ -1386,7 +1386,7 @@ $('pausecontrols').innerHTML = document.querySelector('#menu .cols').outerHTML;
 $('resume').addEventListener('click', togglePause);
 
 window.addEventListener('keydown', (ev) => {
-  if (ev.code === 'Tab' || ev.code === 'Space' || ev.code.startsWith('Arrow') || ev.code.startsWith('Page') || (ev.ctrlKey && G.state === 'flying')) ev.preventDefault();
+  if (ev.code === 'Tab' || ev.code === 'Space' || ev.code.startsWith('Arrow') || ev.code.startsWith('Page') || ev.code === 'F1' || (ev.ctrlKey && G.state === 'flying')) ev.preventDefault();
   if (cine.mode) { if ((ev.code === 'Space' || ev.code === 'Escape') && !ev.repeat) skipCine(); return; }
   if (ev.code === 'Escape') { if (starmap.isOpen) starmap.toggle(false); else togglePause(); return; }
   if (ev.repeat) return;
@@ -1400,14 +1400,15 @@ window.addEventListener('keydown', (ev) => {
     case 'KeyC': G.freeLook = true; break;
     case 'KeyT': lockNearestToReticle(); break;
     case 'Tab': cycleHostile(); break;
-    case 'KeyF': fireMissiles(); break;
-    case 'KeyJ': jumpKey(); break;
+    case 'KeyU': if (!G.lock && !G.ctrlTargeting) lockNearestToReticle(true); break;
+    case 'KeyF': case 'Semicolon': fireMissiles(); break;
+    case 'KeyH': jumpKey(); break;
     case 'Space': warpKey(); break;
     case 'KeyG': tryDock(); break;
-    case 'KeyK': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (K)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
-    case 'KeyL': G.turretsAuto = !G.turretsAuto; hud.notice(G.turretsAuto ? 'TURRETS: AUTO-ENGAGE HOSTILES' : 'TURRETS: HOLD FIRE', 1.6); audio.ui(); break;
-    case 'KeyH': toggleHelp(); break;
-    case 'KeyO': hud.toggleOverview(); break;
+    case 'KeyN': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (N)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
+    case 'KeyY': G.turretsAuto = !G.turretsAuto; hud.notice(G.turretsAuto ? 'TURRETS: AUTO-ENGAGE HOSTILES' : 'TURRETS: HOLD FIRE', 1.6); audio.ui(); break;
+    case 'F1': toggleHelp(); break;
+    case 'KeyP': hud.toggleOverview(); break;
     default:
       if (/^(Digit|Numpad)[1-9]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(-1) - 1]; if (!l) break; G.selected = l; G.navTarget = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — SPACE TO WARP`, 1.8); }
   }
@@ -1426,7 +1427,7 @@ document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('
 function toggleHelp() {
   const h = $('help');
   if (h.classList.contains('hidden')) {
-    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (K toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (L toggles hold fire). Hold right Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; J jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press H to close. Press Esc to pause.</p>';
+    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (N toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB or U/O) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (Y toggles hold fire). Hold right Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; H jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press F1 to close. Press Esc to pause.</p>';
     h.classList.remove('hidden');
   } else h.classList.add('hidden');
 }
@@ -1585,7 +1586,7 @@ function frame(now) {
   if (G.state === 'flying' || G.state === 'dead') hud.update(dt, G);
   if (G.autoJump && !G.warp) { const g = G.autoJump; G.autoJump = null; if (G.state === 'flying' && nearJump() === g) startJump(g); }
   const jp = G.state === 'flying' && !G.warp && nearJump();
-  const jh = jp ? `JUMP GATE IN RANGE — J TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
+  const jh = jp ? `JUMP GATE IN RANGE — H TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
   if ($('jumphint').textContent !== jh) $('jumphint').textContent = jh;
   composer.render(dt);
 }
@@ -1638,7 +1639,7 @@ starmap.onRoute = () => {
   const hop = nextHop();
   if (!hop) return;
   G.navTarget = hop; G.selected = hop; hud.ovT = 0;
-  hud.notice(`ROUTE SET: ${hop.name.toUpperCase()} — J TO JUMP`, 2.5);
+  hud.notice(`ROUTE SET: ${hop.name.toUpperCase()} — H TO JUMP`, 2.5);
 };
 
 function updateSysInfo(def) {
@@ -1698,7 +1699,7 @@ function nearJump() {
 function warpKey() {
   if (G.state !== 'flying' || G.warp) return;
   const jp = nearJump();
-  if (jp && (!G.navTarget || G.navTarget === jp)) { hud.notice('IN JUMP RANGE — PRESS J TO JUMP', 1.6); return; }
+  if (jp && (!G.navTarget || G.navTarget === jp)) { hud.notice('IN JUMP RANGE — PRESS H TO JUMP', 1.6); return; }
   warpTo(G.navTarget);
 }
 
@@ -1824,7 +1825,7 @@ async function boot() {
       $('newgame').classList.add('hidden');
       if (save) {
         hud.log(`Save loaded: ${G.dockedAt.name}, ${SYSTEMS[G.system].name}. ${G.explored.size} system${G.explored.size > 1 ? 's' : ''} charted, ${fmtIsk(G.credits)}.`, 'i');
-        hud.log('Space warps, J jumps at a gate, M opens the star map. The game saves while you are docked.', 'i');
+        hud.log('Space warps, H jumps at a gate, M opens the star map. The game saves while you are docked.', 'i');
         undock();
         return;
       }
@@ -1832,7 +1833,7 @@ async function boot() {
       const num = (f) => LOCATIONS.findIndex(f) + 1;
       hud.log('Welcome to GVCSG - Generic Vibe Coded Space Game. Pirates reported at Kaltos III - Asteroid Belt 1.', 'i');
       hud.log(`Press ${num((l) => l.icon === 'belt')} then Space to warp to the belt. Hold MMB and drag to steer, hold R-Ctrl to target.`, 'i');
-      hud.log(`New hulls and high-tech outfits: Helion Orbital Shipyard (${num((l) => l.id === 'shipyard')}). Jump gates lead to other systems; M opens the star map, J jumps.`, 'i');
+      hud.log(`New hulls and high-tech outfits: Helion Orbital Shipyard (${num((l) => l.id === 'shipyard')}). Jump gates lead to other systems; M opens the star map, H jumps.`, 'i');
       undock();
     };
   } catch (err) {

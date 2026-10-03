@@ -53,7 +53,7 @@
     <div id="selinfo">
       <div id="selname">No selection</div>
       <div class="acts">
-        <button data-act="warp" title="J">Warp To</button>
+        <button data-act="warp" title="Space">Warp To</button>
         <button data-act="lock" title="T">Lock</button>
         <button data-act="dock" title="G">Dock</button>
       </div>
@@ -66,10 +66,10 @@
     <div id="flags"></div>
   </div>
   <div id="modules">
-    <div class="mod" id="m-laser"><div class="cd"></div><div class="ic">◈</div><div class="lb"><span id="priname">Pulse Lasers</span></div><div class="key">LMB</div></div>
-    <div class="mod" id="m-rail"><div class="cd"></div><div class="ic">═</div><div class="lb"><span id="secname">Railgun</span> <span id="railammo"></span></div><div class="key">RMB</div></div>
-    <div class="mod" id="m-turret"><div class="cd"></div><div class="ic">⌖</div><div class="lb"><span id="turname">Turrets</span> <span id="turstate">AUTO</span></div><div class="key">L</div></div>
-    <div class="mod" id="m-missile"><div class="cd"></div><div class="ic">➤</div><div class="lb">Missiles <span id="misammo"></span></div><div class="key">F</div></div>
+    <div class="mod" id="m-laser"><div class="cd"></div><div class="ic">◈</div><div class="lb"><span id="priname">Pulse Lasers</span></div><div class="key">LMB · U</div></div>
+    <div class="mod" id="m-rail"><div class="cd"></div><div class="ic">═</div><div class="lb"><span id="secname">Railgun</span> <span id="railammo"></span></div><div class="key">RMB · O</div></div>
+    <div class="mod" id="m-turret"><div class="cd"></div><div class="ic">⌖</div><div class="lb"><span id="turname">Turrets</span> <span id="turstate">AUTO</span></div><div class="key">Y</div></div>
+    <div class="mod" id="m-missile"><div class="cd"></div><div class="ic">➤</div><div class="lb">Missiles <span id="misammo"></span></div><div class="key">; · F</div></div>
     <div class="mod" id="m-ab"><div class="cd"></div><div class="ic">»</div><div class="lb">Afterburner</div><div class="key">SHIFT</div></div>
     <div class="mod" id="m-warp"><div class="cd"></div><div class="ic">⟫</div><div class="lb">Warp Drive</div><div class="key">SPACE</div></div>
   </div>
@@ -94,8 +94,8 @@
     <div class="cols">
       <div>
         <h3>Flight</h3>
-        <p>hold <kbd>MMB</kbd> + drag: set heading · <kbd>K</kbd> mouse flight</p>
-        <p><kbd>↑</kbd><kbd>↓</kbd> thrust · <kbd>←</kbd><kbd>→</kbd> strafe</p>
+        <p>hold <kbd>MMB</kbd> + drag: set heading · <kbd>N</kbd> mouse flight</p>
+        <p><kbd>I</kbd><kbd>K</kbd> or <kbd>↑</kbd><kbd>↓</kbd> thrust · <kbd>J</kbd><kbd>L</kbd> or <kbd>←</kbd><kbd>→</kbd> strafe</p>
         <p><kbd>W</kbd><kbd>S</kbd> throttle · <kbd>X</kbd> full stop</p>
         <p><kbd>Q</kbd><kbd>E</kbd> roll · <kbd>A</kbd><kbd>D</kbd> strafe · <kbd>R</kbd>/<kbd>B</kbd> lift up / down</p>
         <p><kbd>Shift</kbd> afterburner · <kbd>Z</kbd> flight assist</p>
@@ -103,14 +103,14 @@
       </div>
       <div>
         <h3>Combat &amp; Nav</h3>
-        <p><kbd>LMB</kbd> forward guns · <kbd>RMB</kbd> heavy guns</p>
-        <p>turrets auto-fire at hostiles · <kbd>L</kbd> turrets hold fire</p>
+        <p><kbd>LMB</kbd>/<kbd>U</kbd> forward guns · <kbd>RMB</kbd>/<kbd>O</kbd> heavy guns</p>
+        <p>turrets auto-fire at hostiles · <kbd>Y</kbd> turrets hold fire</p>
         <p>hold <kbd>R-Ctrl</kbd> target under pointer · <kbd>T</kbd> lock · <kbd>Tab</kbd> next hostile</p>
-        <p><kbd>F</kbd> missile salvo (needs lock)</p>
+        <p><kbd>;</kbd> or <kbd>F</kbd> missile salvo (needs lock)</p>
         <p><kbd>1</kbd>–<kbd>9</kbd> select destination</p>
-        <p><kbd>Space</kbd> warp · <kbd>J</kbd> jump (warps to the route gate first)</p>
+        <p><kbd>Space</kbd> warp · <kbd>H</kbd> jump (warps to the route gate first)</p>
         <p><kbd>M</kbd> star map (click a system to plot a route)</p>
-        <p><kbd>G</kbd> dock · <kbd>O</kbd> overview · <kbd>Esc</kbd> pause</p>
+        <p><kbd>G</kbd> dock · <kbd>P</kbd> overview · <kbd>F1</kbd> help · <kbd>Esc</kbd> pause</p>
       </div>
     </div>
     <div class="opts"></div>
