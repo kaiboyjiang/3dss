@@ -25,9 +25,9 @@ function signTexture(text, sub) {
   c.width = 1024; c.height = 256;
   const g = c.getContext('2d');
   g.fillStyle = '#121315'; g.fillRect(0, 0, 1024, 256);
-  g.fillStyle = '#e9eaec'; g.font = 'bold 120px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'middle';
+  g.fillStyle = '#e9eaec'; g.font = '600 120px "Chakra Petch", Arial, sans-serif'; g.textBaseline = 'middle';
   g.fillText(text, 40, 110);
-  g.fillStyle = '#9a9ea4'; g.font = '44px "Segoe UI", Arial, sans-serif';
+  g.fillStyle = '#9a9ea4'; g.font = '44px "Chakra Petch", Arial, sans-serif';
   g.fillText(sub, 44, 205);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -71,9 +71,9 @@ function slotLabel(text, on, kind) {
   g.fillStyle = on ? 'rgba(60,36,4,0.85)' : 'rgba(14,15,17,0.78)';
   g.strokeStyle = on ? '#ffc060' : kind === 'w' ? '#d4d7db' : '#80f0a8';
   g.lineWidth = 4;
-  g.beginPath(); g.roundRect(6, 8, 116, 48, 10); g.fill(); g.stroke();
+  g.beginPath(); g.rect(6, 8, 116, 48); g.fill(); g.stroke();
   g.fillStyle = on ? '#ffe0a0' : '#f2f3f4';
-  g.font = 'bold 30px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '30px "Share Tech Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText(text, 64, 33);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;

@@ -110,8 +110,8 @@ export class StarMap {
     for (const s of stubs) {
       const [x, y] = S(s.end);
       g.strokeStyle = s.id === this.sel ? '#ffb040' : 'rgba(180,184,190,0.5)'; g.lineWidth = 1.5;
-      g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke();
-      g.fillStyle = 'rgba(180,184,190,0.7)'; g.font = '10px sans-serif'; g.textAlign = 'center'; g.fillText('?', x, y + 3.5);
+      g.strokeRect(x - 6, y - 6, 12, 12);
+      g.fillStyle = 'rgba(180,184,190,0.7)'; g.font = '10px "Chakra Petch", sans-serif'; g.textAlign = 'center'; g.fillText('?', x, y + 3.5);
     }
     // plotted route
     const path = G.routeTo && route(G.system, G.routeTo, G.explored);
@@ -128,17 +128,17 @@ export class StarMap {
       glow.addColorStop(0, `rgba(${c.map((v) => Math.round(v * 255)).join(',')},0.55)`); glow.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = glow; g.beginPath(); g.arc(x, y, 16, 0, Math.PI * 2); g.fill();
       g.fillStyle = `rgb(${c.map((v) => Math.round(v * 255)).join(',')})`;
-      g.beginPath(); g.arc(x, y, 5.5, 0, Math.PI * 2); g.fill();
+      g.fillRect(x - 5, y - 5, 10, 10);
       g.strokeStyle = `rgb(${GOV_RGB[n.gov]})`; g.lineWidth = 2;
-      g.beginPath(); g.arc(x, y, 9, 0, Math.PI * 2); g.stroke();
+      g.strokeRect(x - 9, y - 9, 18, 18);
       if (n.id === G.system) {
         g.strokeStyle = `rgba(255,255,255,${0.5 + 0.5 * Math.sin(t * 4)})`; g.lineWidth = 1.5;
-        g.beginPath(); g.arc(x, y, 14, 0, Math.PI * 2); g.stroke();
+        g.strokeRect(x - 13, y - 13, 26, 26);
       }
-      if (n.id === this.sel) { g.strokeStyle = '#ffb040'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 18, 0, Math.PI * 2); g.stroke(); }
+      if (n.id === this.sel) { g.strokeStyle = '#ffb040'; g.lineWidth = 2; g.strokeRect(x - 17, y - 17, 34, 34); }
       g.textAlign = 'center';
-      g.fillStyle = '#fff'; g.font = '13px sans-serif'; g.fillText(n.name, x, y + 30);
-      g.fillStyle = `rgb(${GOV_RGB[n.gov]})`; g.font = '9px sans-serif'; g.fillText(`${GOVS[n.gov].short} · ${n.sec.toFixed(1)}`, x, y + 42);
+      g.fillStyle = '#fff'; g.font = '13px "Chakra Petch", sans-serif'; g.fillText(n.name, x, y + 30);
+      g.fillStyle = `rgb(${GOV_RGB[n.gov]})`; g.font = '9px "Chakra Petch", sans-serif'; g.fillText(`${GOVS[n.gov].short} · ${n.sec.toFixed(1)}`, x, y + 42);
       if (n.id === G.system) { g.fillStyle = '#dbdddf'; g.fillText('YOU ARE HERE', x, y - 22); }
     }
   }

@@ -204,14 +204,16 @@ export class HUD {
     // compass ring around the reticle: centre = dead ahead, outer edge = directly behind
     g.lineWidth = 1;
     g.strokeStyle = 'rgba(204,207,211,0.22)';
-    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
+    const sq = (ph, r) => { const c = Math.cos(ph), s = Math.sin(ph), k = r / Math.max(Math.abs(c), Math.abs(s)); return [cx + c * k, cy + s * k]; };
+    g.strokeRect(cx - R, cy - R, R * 2, R * 2);
     g.setLineDash([2, 4]);
     g.strokeStyle = 'rgba(204,207,211,0.14)';
-    g.beginPath(); g.arc(cx, cy, (R0 + R) / 2, 0, Math.PI * 2); g.stroke();
+    const Rm = (R0 + R) / 2;
+    g.strokeRect(cx - Rm, cy - Rm, Rm * 2, Rm * 2);
     g.setLineDash([]);
     for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4, l = i % 2 ? 3 : 6;
-      g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + l), cy + Math.sin(a) * (R + l)); g.stroke();
+      const a = i * Math.PI / 4, l = i % 2 ? 4 : 6, [x0, y0] = sq(a, R), [x1, y1] = sq(a, R + l);
+      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
     }
     const inv = cam.matrixWorldInverse;
     const tgt = G.lock ? G.lock.ent : (G.selected && G.selected.ship && G.selected.alive ? G.selected : null);
@@ -230,25 +232,24 @@ export class HUD {
       const D = dirOf(e.obj.position);
       if (e === tgt) { tdir = D; continue; }
       const col = COLORS[factionCls(e)];
-      const x = cx + Math.cos(D.ph) * D.r, y = cy + Math.sin(D.ph) * D.r;
-      const a = d < 15000 ? 0.95 : 0.5;
-      g.beginPath();
-      g.arc(x, y, e.ship.radius > 30 ? 3.2 : 2.4, 0, Math.PI * 2);
-      if (D.th > Math.PI / 2) { g.strokeStyle = `rgba(${col},${a})`; g.stroke(); } else { g.fillStyle = `rgba(${col},${a})`; g.fill(); }
+      const [x, y] = sq(D.ph, D.r);
+      const a = d < 15000 ? 0.95 : 0.5, hs = e.ship.radius > 30 ? 3 : 2.2;
+      if (D.th > Math.PI / 2) { g.strokeStyle = `rgba(${col},${a})`; g.strokeRect(x - hs, y - hs, hs * 2, hs * 2); } else { g.fillStyle = `rgba(${col},${a})`; g.fillRect(x - hs, y - hs, hs * 2, hs * 2); }
     }
     if (tdir && tgt) {
       const locked = G.lock && G.lock.ent === tgt && G.lock.progress >= 1;
       const col = locked ? '#ff4a30' : G.lock && G.lock.ent === tgt ? '#ffb040' : '#f6f6f7';
-      const x = cx + Math.cos(tdir.ph) * tdir.r, y = cy + Math.sin(tdir.ph) * tdir.r;
+      const [x, y] = sq(tdir.ph, tdir.r);
       g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5;
       g.strokeRect(x - 4.5, y - 4.5, 9, 9);
       if (tdir.th > 0.03) {
-        const ax = cx + Math.cos(tdir.ph) * (R + 12), ay = cy + Math.sin(tdir.ph) * (R + 12);
+        const [ax, ay] = sq(tdir.ph, R + 12);
         g.save(); g.translate(ax, ay); g.rotate(tdir.ph);
         g.beginPath(); g.moveTo(9, 0); g.lineTo(-3, -7); g.lineTo(-1, 0); g.lineTo(-3, 7); g.closePath(); g.fill();
         g.restore();
-        g.font = '11px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
-        g.fillText(fmtDist(tgt.obj.position.distanceTo(pp)), cx + Math.cos(tdir.ph) * (R + 30), cy + Math.sin(tdir.ph) * (R + 30));
+        g.font = '11px "Share Tech Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        const [lx, ly] = sq(tdir.ph, R + 30);
+        g.fillText(fmtDist(tgt.obj.position.distanceTo(pp)), lx, ly);
       }
       g.lineWidth = 1;
     }
@@ -265,24 +266,24 @@ export class HUD {
       }
       if (G.gunAssist) {
         g.strokeStyle = 'rgba(255,90,72,0.85)';
-        g.beginPath(); g.arc(cx, cy, 13, 0, Math.PI * 2); g.stroke();
+        g.strokeRect(cx - 13, cy - 13, 26, 26);
       }
       if (!G.mouseLocked) {
         g.strokeStyle = 'rgba(220,222,225,0.8)';
-        g.beginPath(); g.arc(m.x, m.y, 7, 0, Math.PI * 2); g.stroke();
+        g.strokeRect(m.x - 6, m.y - 6, 12, 12);
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(m.x + dx * 10, m.y + dy * 10); g.lineTo(m.x + dx * 15, m.y + dy * 15); g.stroke(); }
       }
       if (G.ctrlTargeting) {
         const tx = G.mouseLocked ? cx : m.x, ty = G.mouseLocked ? cy : m.y;
         g.strokeStyle = 'rgba(255,176,64,0.6)'; g.setLineDash([6, 6]);
-        g.beginPath(); g.arc(tx, ty, G.ctrlRadius, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+        g.strokeRect(tx - G.ctrlRadius, ty - G.ctrlRadius, G.ctrlRadius * 2, G.ctrlRadius * 2); g.setLineDash([]);
         const hv = G.ctrlHover;
         if (hv && hv.alive && !isBehind(hv.obj.position)) {
           const [hx, hy] = proj(hv.obj.position);
           g.strokeStyle = 'rgba(255,176,64,0.9)';
           g.beginPath(); g.moveTo(tx, ty); g.lineTo(hx, hy); g.stroke();
         }
-        g.fillStyle = '#ffb040'; g.font = '10px monospace'; g.textAlign = 'left';
+        g.fillStyle = '#ffb040'; g.font = '10px "Share Tech Mono", monospace'; g.textAlign = 'left';
         g.fillText('TARGETING', tx + 18, ty - 12);
       }
     }
@@ -340,7 +341,7 @@ export class HUD {
     };
     const track = metal(0, [34, 36, 39]);
     const gap = 44, x0 = W / 2 - ((cols.length - 1) * gap) / 2;
-    g.font = '10px sans-serif'; g.textAlign = 'center';
+    g.font = '10px "Chakra Petch", sans-serif'; g.textAlign = 'center';
     cols.forEach(([lb, f, col, v], i) => {
       const x = x0 + i * gap - bw / 2, fr = Math.max(0, Math.min(1, f));
       g.save(); g.translate(x, 0); g.fillStyle = track; g.fillRect(0, top, bw, bh); g.restore();
