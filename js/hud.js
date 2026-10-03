@@ -106,7 +106,7 @@ export class HUD {
         b.hp.style.top = `${px / 2 + 4}px`;
         const tot = e.shield + e.armor + e.hull, max = e.maxShield + e.maxArmor + e.maxHull;
         b.hpi.style.width = `${(tot / max) * 100}%`;
-        b.hpi.style.background = e.shield > 0 ? '#4ab3ff' : e.armor > 0 ? '#e9c46a' : '#e85d4a';
+        b.hpi.style.background = e.shield > 0 ? '#7896ae' : e.armor > 0 ? '#9a9fa5' : '#a86a67';
       } else b.hp.style.display = 'none';
     }
     for (let i = n; i < this.pool.length; i++) this.pool[i].d.style.display = 'none';
@@ -325,23 +325,33 @@ export class HUD {
     const W = 300, H = 170, top = 18, bh = 78, bw = 10;
     g.clearRect(0, 0, W, H);
     const cols = [
-      ['SHD', p.shield / p.maxShield, '#2f6f9e', Math.round(p.shield)],
-      ['ARM', p.armor / p.maxArmor, '#8a7440', Math.round(p.armor)],
-      ['HUL', p.hull / p.maxHull, '#8e3b2f', Math.round(p.hull)],
-      ['CAP', p.cap / p.maxCap, '#8f7a4a', Math.round(p.cap)],
-      ['THR', Math.min(1, p.throttle), G.boosting ? '#a8742e' : '#6c7178', Math.round(p.throttle * 100) + '%'],
+      ['SHD', p.shield / p.maxShield, [96, 128, 152], Math.round(p.shield)],
+      ['ARM', p.armor / p.maxArmor, [124, 129, 135], Math.round(p.armor)],
+      ['HUL', p.hull / p.maxHull, [140, 88, 86], Math.round(p.hull)],
+      ['CAP', p.cap / p.maxCap, [150, 156, 162], Math.round(p.cap)],
+      ['THR', Math.min(1, p.throttle), G.boosting ? [156, 124, 82] : [104, 109, 116], Math.round(p.throttle * 100) + '%'],
     ];
+    const shade = (c, k) => `rgb(${c.map((v) => Math.round(Math.min(255, v * k))).join(',')})`;
+    const metal = (x, c) => {
+      const gr = g.createLinearGradient(x, 0, x + bw, 0);
+      gr.addColorStop(0, shade(c, 0.5)); gr.addColorStop(0.3, shade(c, 1.35));
+      gr.addColorStop(0.55, shade(c, 0.95)); gr.addColorStop(1, shade(c, 0.45));
+      return gr;
+    };
+    const track = metal(0, [34, 36, 39]);
     const gap = 44, x0 = W / 2 - ((cols.length - 1) * gap) / 2;
     g.font = '10px sans-serif'; g.textAlign = 'center';
     cols.forEach(([lb, f, col, v], i) => {
       const x = x0 + i * gap - bw / 2, fr = Math.max(0, Math.min(1, f));
-      g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(x, top, bw, bh);
-      g.fillStyle = col;
+      g.save(); g.translate(x, 0); g.fillStyle = track; g.fillRect(0, top, bw, bh); g.restore();
+      g.strokeStyle = 'rgba(190,196,204,0.18)'; g.lineWidth = 1; g.strokeRect(x - 0.5, top - 0.5, bw + 1, bh + 1);
+      g.fillStyle = metal(x, col);
       if (lb === 'CAP') {
         const segs = 16, sh = bh / segs;
         for (let k = 0; k < segs; k++) if (k / segs < fr) g.fillRect(x, top + bh - (k + 1) * sh + 1, bw, sh - 2);
       } else {
         const h = bh * fr; g.fillRect(x, top + bh - h, bw, h);
+        if (h > 1) { g.fillStyle = shade(col, 1.6); g.fillRect(x, top + bh - h, bw, 1); }
       }
       g.shadowColor = '#000'; g.shadowBlur = 4;
       g.fillStyle = '#8a9098'; g.fillText(String(v), x + bw / 2, top - 6);

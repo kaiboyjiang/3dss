@@ -48,7 +48,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 #target .tsub { color: #a4a9b0; margin: 2px 0 6px; }
 .bars .bar { height: 5px; background: rgba(255, 255, 255, 0.08); margin: 3px 0; }
 .bars .bar i { display: block; height: 100%; transition: width 0.15s; }
-.bar.s i { background: #4ab3ff; } .bar.a i { background: #e9c46a; } .bar.h i { background: #e85d4a; }
+.bar.s i { background: linear-gradient(#a3bfd3, #6080a0 45%, #3e5468); } .bar.a i { background: linear-gradient(#c3c7cc, #7c8187 45%, #4e5257); } .bar.h i { background: linear-gradient(#cf9d9a, #8c5856 45%, #5a3634); }
 #tholo { position: absolute; right: calc(100% + 6px); top: 0; width: 96px; height: 72px; pointer-events: none;
   background: linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 8px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 1px 8px,
     linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 8px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 1px 8px,
