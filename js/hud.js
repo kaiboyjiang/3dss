@@ -202,10 +202,10 @@ export class HUD {
     const cx = w / 2, cy = h / 2, R0 = 24, R = 68;
     // compass ring around the reticle: centre = dead ahead, outer edge = directly behind
     g.lineWidth = 1;
-    g.strokeStyle = 'rgba(160,230,255,0.22)';
+    g.strokeStyle = 'rgba(204,207,211,0.22)';
     g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
     g.setLineDash([2, 4]);
-    g.strokeStyle = 'rgba(160,230,255,0.14)';
+    g.strokeStyle = 'rgba(204,207,211,0.14)';
     g.beginPath(); g.arc(cx, cy, (R0 + R) / 2, 0, Math.PI * 2); g.stroke();
     g.setLineDash([]);
     for (let i = 0; i < 8; i++) {
@@ -237,7 +237,7 @@ export class HUD {
     }
     if (tdir && tgt) {
       const locked = G.lock && G.lock.ent === tgt && G.lock.progress >= 1;
-      const col = locked ? '#ff4a30' : G.lock && G.lock.ent === tgt ? '#ffb040' : '#eef6ff';
+      const col = locked ? '#ff4a30' : G.lock && G.lock.ent === tgt ? '#ffb040' : '#f6f6f7';
       const x = cx + Math.cos(tdir.ph) * tdir.r, y = cy + Math.sin(tdir.ph) * tdir.r;
       g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5;
       g.strokeRect(x - 4.5, y - 4.5, 9, 9);
@@ -267,7 +267,7 @@ export class HUD {
         g.beginPath(); g.arc(cx, cy, 13, 0, Math.PI * 2); g.stroke();
       }
       if (!G.mouseLocked) {
-        g.strokeStyle = 'rgba(190,240,255,0.8)';
+        g.strokeStyle = 'rgba(220,222,225,0.8)';
         g.beginPath(); g.arc(m.x, m.y, 7, 0, Math.PI * 2); g.stroke();
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(m.x + dx * 10, m.y + dy * 10); g.lineTo(m.x + dx * 15, m.y + dy * 15); g.stroke(); }
       }
@@ -343,8 +343,8 @@ export class HUD {
     }
     // throttle bar
     g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(cx - 50, cy - 58 + 20, 100, 3);
-    g.fillStyle = G.boosting ? '#ffb040' : '#7cf'; g.fillRect(cx - 50, cy - 38, 100 * Math.min(1, p.throttle), 3);
-    g.font = '10px sans-serif'; g.fillStyle = '#8ab'; g.textAlign = 'center';
+    g.fillStyle = G.boosting ? '#ffb040' : '#b6bac0'; g.fillRect(cx - 50, cy - 38, 100 * Math.min(1, p.throttle), 3);
+    g.font = '10px sans-serif'; g.fillStyle = '#9ba0a8'; g.textAlign = 'center';
     g.fillText(`S ${Math.round(p.shield)} · A ${Math.round(p.armor)} · H ${Math.round(p.hull)}`, cx, cy - 64);
     g.fillText(`CAP ${Math.round(p.cap)} GJ`, cx, cy - 44);
   }

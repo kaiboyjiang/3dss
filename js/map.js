@@ -97,21 +97,21 @@ export class StarMap {
     const S = this.xf();
     const { nodes, edges, stubs } = this.graph();
     // faint grid
-    g.strokeStyle = 'rgba(100,160,200,0.06)'; g.lineWidth = 1;
+    g.strokeStyle = 'rgba(143,149,157,0.06)'; g.lineWidth = 1;
     const step = 50 * this.zoom, [ox, oy] = S([0, 0]);
     for (let x = ((ox % step) + step) % step; x < w; x += step) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
     for (let y = ((oy % step) + step) % step; y < h; y += step) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
     const line = (a, b) => { const [x1, y1] = S(a), [x2, y2] = S(b); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
-    g.lineWidth = 2; g.strokeStyle = 'rgba(150,190,220,0.45)';
+    g.lineWidth = 2; g.strokeStyle = 'rgba(180,184,190,0.45)';
     for (const [a, b] of edges) line(a.map, b.map);
-    g.setLineDash([5, 5]); g.strokeStyle = 'rgba(150,190,220,0.3)';
+    g.setLineDash([5, 5]); g.strokeStyle = 'rgba(180,184,190,0.3)';
     for (const s of stubs) line(s.from.map, s.end);
     g.setLineDash([]);
     for (const s of stubs) {
       const [x, y] = S(s.end);
-      g.strokeStyle = s.id === this.sel ? '#ffb040' : 'rgba(150,190,220,0.5)'; g.lineWidth = 1.5;
+      g.strokeStyle = s.id === this.sel ? '#ffb040' : 'rgba(180,184,190,0.5)'; g.lineWidth = 1.5;
       g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.stroke();
-      g.fillStyle = 'rgba(150,190,220,0.7)'; g.font = '10px sans-serif'; g.textAlign = 'center'; g.fillText('?', x, y + 3.5);
+      g.fillStyle = 'rgba(180,184,190,0.7)'; g.font = '10px sans-serif'; g.textAlign = 'center'; g.fillText('?', x, y + 3.5);
     }
     // plotted route
     const path = G.routeTo && route(G.system, G.routeTo, G.explored);
@@ -139,7 +139,7 @@ export class StarMap {
       g.textAlign = 'center';
       g.fillStyle = '#fff'; g.font = '13px sans-serif'; g.fillText(n.name, x, y + 30);
       g.fillStyle = `rgb(${GOV_RGB[n.gov]})`; g.font = '9px sans-serif'; g.fillText(`${GOVS[n.gov].short} · ${n.sec.toFixed(1)}`, x, y + 42);
-      if (n.id === G.system) { g.fillStyle = '#cde'; g.fillText('YOU ARE HERE', x, y - 22); }
+      if (n.id === G.system) { g.fillStyle = '#dbdddf'; g.fillText('YOU ARE HERE', x, y - 22); }
     }
   }
 }

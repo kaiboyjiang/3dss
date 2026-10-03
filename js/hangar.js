@@ -427,5 +427,14 @@ export class Hangar {
     this.field.material.opacity = 0.15 + Math.sin(this.time * 2) * 0.03;
   }
 
+  setQuality(q) {
+    const k = this.key;
+    k.castShadow = q.shadow > 0;
+    const n = Math.min(4096, (q.shadow || 256) * 2);
+    k.shadow.mapSize.set(n, n);
+    if (k.shadow.map) { k.shadow.map.dispose(); k.shadow.map = null; }
+    for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) if (t.samples !== q.msaa) { t.samples = q.msaa; t.dispose(); }
+  }
+
   render() { this.composer.render(); }
 }

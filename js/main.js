@@ -22,9 +22,18 @@ const Z = new THREE.Vector3(0, 0, 1), Y = new THREE.Vector3(0, 1, 0), ORIGIN = n
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('c');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
-const PR_MAX = Math.min(window.devicePixelRatio, 1.25);
-let pixelRatio = Math.min(PR_MAX, 1);
+// MSAA happens in the composer's render target, so the canvas itself needs none
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
+const GFX = {
+  min: { label: 'Min', desc: 'For low-end hardware: lower resolution, no shadows or anti-aliasing, thinner asteroid belts and dust.', prMax: 0.75, prMin: 0.5, msaa: 0, shadow: 0, soft: false, sky: 256, detail: -2, clouds: false, belt: 0.45, rockLod: 0.35, dust: 0.35, stars: 0.6 },
+  normal: { label: 'Normal', desc: 'A balance of looks and speed.', prMax: 1, prMin: 0.6, msaa: 4, shadow: 1024, soft: false, sky: 512, detail: 0, clouds: true, belt: 0.8, rockLod: 1, dust: 0.7, stars: 1 },
+  max: { label: 'Max', desc: 'Maximum graphics: full display resolution, 8× MSAA, soft high-resolution shadows, full asteroid belts.', prMax: 2, prMin: 0.85, msaa: 8, shadow: 2048, soft: true, sky: 1024, detail: 1, clouds: true, belt: 1, rockLod: 2.5, dust: 1, stars: 1 },
+};
+const SETTINGS_KEY = 'gvcsg-settings-v1';
+const settings = (() => { try { return { gfx: 'normal', fps: false, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { gfx: 'normal', fps: false }; } })();
+if (!GFX[settings.gfx]) settings.gfx = 'normal';
+let prMax = Math.min(window.devicePixelRatio || 1, GFX[settings.gfx].prMax), prMin = Math.min(prMax, GFX[settings.gfx].prMin);
+let pixelRatio = prMax;
 renderer.setPixelRatio(pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -36,7 +45,7 @@ renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.3, 3e6);
 
-const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: 4 });
+const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: GFX[settings.gfx].msaa });
 const composer = new EffectComposer(renderer, rt);
 composer.addPass(new RenderPass(scene, camera));
 const lensPass = new ShaderPass({
@@ -72,6 +81,7 @@ function resize() {
   camera.updateProjectionMatrix();
   lensPass.uniforms.uAspect.value = w / h;
   if (hangar) hangar.resize(w, h);
+  staticDrawn = false;
 }
 window.addEventListener('resize', resize);
 
@@ -1367,14 +1377,17 @@ function updateCamera(dt) {
 let last = performance.now();
 // 60 fps cap plus adaptive render resolution
 const perf = { acc: 0, n: 0 };
+const fpsMeter = { n: 0, t: 0 };
+// menu and pause screens only redraw when something changed
+let staticDrawn = false, menuAcc = 0;
 function adaptResolution(ms) {
   perf.acc += ms; perf.n++;
   if (perf.acc < 2000) return;
   const avg = perf.acc / perf.n;
   perf.acc = perf.n = 0;
   let pr = pixelRatio;
-  if (avg > 21 && pr > 0.6) pr = Math.max(0.6, pr - 0.1);
-  else if (avg < 17.5 && pr < PR_MAX) pr = Math.min(PR_MAX, pr + 0.05);
+  if (avg > 21 && pr > prMin) pr = Math.max(prMin, pr - 0.1);
+  else if (avg < 17.5 && pr < prMax) pr = Math.min(prMax, pr + 0.05);
   if (pr === pixelRatio) return;
   pixelRatio = pr;
   renderer.setPixelRatio(pr);
@@ -1385,9 +1398,15 @@ function frame(now) {
   requestAnimationFrame(frame);
   if (now - last < 1000 / 62) return;
   const ms = now - last;
-  const dt = Math.min(0.05, ms / 1000);
+  let dt = Math.min(0.05, ms / 1000);
   last = now;
-  adaptResolution(ms);
+  fpsMeter.n++; fpsMeter.t += ms;
+  if (fpsMeter.t >= 500) {
+    if (settings.fps) $('fps').textContent = `${Math.round(fpsMeter.n * 1000 / fpsMeter.t)} FPS · ${Math.round(pixelRatio * 100)}%`;
+    fpsMeter.n = fpsMeter.t = 0;
+  }
+  if (G.state === 'menu' || G.state === 'paused') perf.acc = perf.n = 0;
+  else adaptResolution(ms);
   if (world) world.stars.material.uniforms.uPixel.value = pixelRatio;
   if (!world || !G.player) return;
   G.time += dt;
@@ -1396,7 +1415,12 @@ function frame(now) {
   if (document.body.dataset.state !== G.state) document.body.dataset.state = G.state;
   G.following = G.state === 'flying' && (G.input.mmb || G.followToggle);
   if (G.state === 'docked') { hangar.update(dt); hangar.render(); return; }
-  if (G.state === 'paused') { composer.render(0); return; }
+  if (G.state === 'paused') { if (!staticDrawn) { composer.render(0); staticDrawn = true; } return; }
+  if (G.state === 'menu') {
+    menuAcc += dt;
+    if (staticDrawn && menuAcc < 0.1) return;
+    dt = Math.min(0.1, menuAcc); menuAcc = 0; staticDrawn = true;
+  }
   if (G.state === 'flying' || G.state === 'dead' || G.state === 'docking' || G.state === 'undocking') {
     updatePlayer(dt);
     // capacitor and shield regeneration
@@ -1631,6 +1655,7 @@ async function boot() {
     renderer.compile(scene, camera);
     await step('Pressurising hangar bay…');
     hangar = new Hangar(renderer);
+    applyGfx(settings.gfx);
     composer.render(0.016);
     msg.textContent = 'Systems online.';
     const start = $('start');
@@ -1660,6 +1685,45 @@ async function boot() {
   }
 }
 
+// ---------------------------------------------------------------- settings: graphics preset and FPS counter
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* storage unavailable */ } }
+function applyGfx(name) {
+  const q = GFX[name] || GFX.normal;
+  settings.gfx = GFX[name] ? name : 'normal';
+  prMax = Math.min(window.devicePixelRatio || 1, q.prMax); prMin = Math.min(prMax, q.prMin);
+  pixelRatio = prMax;
+  renderer.setPixelRatio(pixelRatio);
+  const type = q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+  const recompile = renderer.shadowMap.enabled !== q.shadow > 0 || renderer.shadowMap.type !== type;
+  renderer.shadowMap.enabled = q.shadow > 0;
+  renderer.shadowMap.type = type;
+  for (const t of [composer.renderTarget1, composer.renderTarget2]) if (t.samples !== q.msaa) { t.samples = q.msaa; t.dispose(); }
+  if (world) world.setQuality(q);
+  if (hangar) hangar.setQuality(q);
+  if (recompile) for (const s of [scene, hangar && hangar.scene]) s?.traverse((o) => { for (const m of [].concat(o.material || [])) m.needsUpdate = true; });
+  perf.acc = perf.n = 0;
+  resize();
+  saveSettings();
+  for (const b of document.querySelectorAll('[data-gfx]')) b.classList.toggle('on', b.dataset.gfx === settings.gfx);
+  for (const d of document.querySelectorAll('.opts .odesc')) d.textContent = q.desc;
+}
+function setFps(on) {
+  settings.fps = on;
+  $('fps').classList.toggle('hidden', !on);
+  $('fps').textContent = '';
+  for (const c of document.querySelectorAll('[data-fps]')) c.checked = on;
+  saveSettings();
+}
+for (const el of document.querySelectorAll('.opts')) {
+  el.innerHTML = `<span class="ol">Graphics</span><span class="seg">${Object.entries(GFX).map(([k, q]) => `<b data-gfx="${k}">${q.label}</b>`).join('')}</span>`
+    + '<label class="chk"><input type="checkbox" data-fps> Show FPS</label><div class="odesc"></div>';
+}
+document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-gfx]'); if (b) applyGfx(b.dataset.gfx); });
+document.addEventListener('change', (ev) => { if (ev.target.matches('[data-fps]')) { setFps(ev.target.checked); ev.target.blur(); } });
+setFps(settings.fps);
+for (const b of document.querySelectorAll('[data-gfx]')) b.classList.toggle('on', b.dataset.gfx === settings.gfx);
+for (const d of document.querySelectorAll('.opts .odesc')) d.textContent = GFX[settings.gfx].desc;
+
 function undockPose() {
   const st = (world.docks[G.dockedAt?.id] || Object.values(world.docks)[0]).root;
   const a = Math.PI / 4;
@@ -1672,6 +1736,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, cine, camera, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
+window.__game = { G, cine, camera, renderer, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
 requestAnimationFrame(frame);
 boot();
