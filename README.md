@@ -1,6 +1,6 @@
 # Generic Vibe Coded Space Game
 
-GVCSG is a procedural browser-based space combat simulator built with Three.js. Pilot the Valkyrie assault frigate out of the Kaltos system, engage Corsair raiders, navigate asteroid fields, warp between landmarks, and jump through gates to chart eleven star systems, each with its own star, planets, stations and belts. Federation systems are patrolled by the Helion Navy; Corsair Clan systems are lawless. Dock at stations such as Ardent Relay Station or the high-tech Helion Orbital Shipyard, where you can inspect and buy hulls (Kestrel, Corvid, Valkyrie, Mantis, Warden, Bastion, Paladin) in a 3D hangar and fit weapons and modules in the outfitter.
+GVCSG is a procedural browser-based space combat simulator built with Three.js. Pilot the Valkyrie assault frigate out of the Kaltos system, engage Corsair raiders, navigate asteroid fields, warp between landmarks, and jump through gates to chart eleven star systems, each with its own star, planets, stations and belts. Federation systems are patrolled by the Helion Navy; Corsair Clan systems are lawless. Dock at stations such as Ardent Relay Station or the high-tech Helion Orbital Shipyard, where you can inspect and buy hulls in a 3D hangar (scouts, fighters, freighters, a passenger liner and warships from the Kestrel interceptor up to the Leviathan superheavy dreadnought) and fit weapons and modules in the outfitter.
 
 ## Play
 

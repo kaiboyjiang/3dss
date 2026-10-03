@@ -301,7 +301,7 @@ export class Hangar {
       this.ringGeo = new THREE.RingGeometry(0.9, 1.15, 48); this.ringGeo.userData.shared = true;
       this.stemGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6); this.stemGeo.translate(0, 0.5, 0); this.stemGeo.userData.shared = true;
     }
-    const R = this.ship.radius, ls = 0.55 + R * 0.025;
+    const R = this.viewR, ls = 0.55 + this.ship.radius * 0.025;
     const g = new THREE.Group();
     let selPos = null;
     for (const s of list) {
@@ -345,12 +345,16 @@ export class Hangar {
     const g = ship.group;
     g.position.set(0, 0, 0);
     g.rotation.set(0, 0, 0);
+    // capital hulls are shown as a scale model so they fit inside the bay
+    const sc = Math.min(1, 68 / ship.radius);
+    g.scale.setScalar(sc);
     g.traverse((o) => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) { o.castShadow = true; o.receiveShadow = true; } });
     this.swapEnv(g);
     this.scene.add(g);
     g.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(g, true);
-    const R = ship.radius;
+    const R = ship.radius * sc;
+    this.viewR = R;
     const lift = 1.5 + R * 0.05;
     g.position.y = lift - box.min.y;
     // landing cradle sized to the hull
@@ -380,7 +384,7 @@ export class Hangar {
     this.scene.add(cradle);
     const cy = lift + (box.max.y - box.min.y) * 0.45;
     this.shipCenter = new THREE.Vector3(0, cy, 0);
-    this.shipDist = R * 2.7 + 8;
+    this.shipDist = Math.min(185, R * 2.7 + 8);
     this.pedestal.position.set(-(R * 1.2 + 10), 0, R * 0.55 + 4);
     const sh = this.key.shadow.camera;
     const ext = R * 1.8 + 30;
@@ -424,7 +428,7 @@ export class Hangar {
     this.pitch = THREE.MathUtils.clamp(this.pitch + dy * 0.004, 0.02, 1.25);
   }
   zoom(dy) {
-    const R = this.ship ? this.ship.radius : 20;
+    const R = this.ship ? this.viewR : 20;
     const min = this.focus === 'outfit' ? 7 : R * 1.2 + 4;
     const max = this.focus === 'outfit' ? 40 : Math.min(185, R * 5 + 30);
     this.distWant = THREE.MathUtils.clamp(this.distWant * Math.pow(1.0015, dy), min, max);

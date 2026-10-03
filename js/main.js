@@ -112,9 +112,10 @@ const STATS = {
   navyKestrel: { cls: 'Helion Navy Kestrel', shield: 520, armor: 380, hull: 340, speed: 330, accel: 130, turn: 1.1, bounty: 0, sig: 0.6 },
   navyWarden: { cls: 'Helion Navy Warden', shield: 1800, armor: 1700, hull: 1300, speed: 175, accel: 50, turn: 0.4, bounty: 0, sig: 1.8 },
   navyBastion: { cls: 'Helion Navy Bastion', shield: 2700, armor: 2900, hull: 2100, speed: 140, accel: 36, turn: 0.3, bounty: 0, sig: 2.4 },
+  navySabre: { cls: 'Helion Navy Sabre', shield: 2200, armor: 2100, hull: 1600, speed: 150, accel: 36, turn: 0.38, bounty: 0, sig: 2.0 },
   navyMantis: { cls: 'Helion Navy Mantis', shield: 1150, armor: 1150, hull: 850, speed: 210, accel: 72, turn: 0.75, bounty: 0, sig: 1.2 },
 };
-const NAVY_HULL = { navyKestrel: 'kestrel', navyWarden: 'warden', navyBastion: 'bastion', navyMantis: 'mantis' };
+const NAVY_HULL = { navyKestrel: 'kestrel', navyWarden: 'warden', navyBastion: 'bastion', navyMantis: 'mantis', navySabre: 'sabre' };
 const PIRATE_NAMES = ['Corsair Raider', 'Corsair Cutthroat', 'Corsair Wrecker', 'Corsair Outlaw', 'Corsair Plunderer', 'Corsair Despoiler'];
 const PROFILES = { em: { s: 1.25, a: 0.7, h: 1 }, kinetic: { s: 0.85, a: 1.2, h: 1 }, explosive: { s: 0.9, a: 1.1, h: 1.2 }, thermal: { s: 1.0, a: 0.95, h: 1.1 } };
 
@@ -124,7 +125,7 @@ function setShadows(obj) {
   });
 }
 
-function makeEntity(kind, faction, pos, name) {
+function makeEntity(kind, faction, pos, name, civHull) {
   const env = world.env;
   let ship, s = STATS[kind];
   if (kind === 'player') {
@@ -132,12 +133,13 @@ function makeEntity(kind, faction, pos, name) {
     ship = buildFitted(G.hull, fit, env);
     s = fittedStats(G.hull, fit);
   } else if (NAVY_HULL[kind]) ship = buildFitted(NAVY_HULL[kind], emptyFit(NAVY_HULL[kind]), env, 'navy');
+  else if (civHull) ship = buildFitted(civHull, { w: [], u: [] }, env);
   else ship = kind === 'raider' ? buildRaider(env) : kind === 'cruiser' ? buildCruiser(env) : buildHauler(env, 1 + Math.floor(Math.random() * 50));
   setShadows(ship.group);
   ship.group.position.copy(pos);
   scene.add(ship.group);
   const e = {
-    kind, faction, ship, obj: ship.group, name: name || s.cls, className: s.cls,
+    kind, faction, ship, obj: ship.group, name: name || s.cls, className: civHull ? HULLS[civHull].cls : s.cls,
     vel: new THREE.Vector3(), angVel: new THREE.Vector3(), throttle: 0,
     shield: s.shield, armor: s.armor, hull: s.hull, maxShield: s.shield, maxArmor: s.armor, maxHull: s.hull,
     cap: s.cap || 0, maxCap: s.cap || 0, lastHit: -99, alive: true, stats: s,
@@ -1597,6 +1599,9 @@ function frame(now) {
 const starmap = new StarMap(G);
 const NAVY_NAMES = ['HNS Vigilant', 'HNS Swift', 'HNS Harrier', 'HNS Bulwark', 'HNS Talon', 'HNS Resolute', 'HNS Aegis', 'HNS Lancer', 'HNS Sentinel', 'HNS Valor'];
 const HAULER_LINES = ['Orca Logistics', 'Kaltos Freight', 'Vexal Trading Co.', 'Helion Supply', 'Aster Bulk Lines'];
+// civilian traffic: the classic hauler plus catalogue freighters and liners
+const CIVIL_TYPES = [[null, 'Hauler'], ['mule', 'Freighter'], ['atlas', 'Bulk Freighter'], ['aurora', 'Liner']];
+const LINER_LINES = ['Aurora Starlines', 'Helion Spaceways', 'Mirel Cruise Lines', 'Tessaly Interstellar'];
 const jitter = (s) => new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s * 0.3, (Math.random() - 0.5) * s);
 
 function populate(def, from) {
@@ -1604,7 +1609,7 @@ function populate(def, from) {
   if (def.gov === 'gov') {
     let ni = 0;
     for (const st of LOCATIONS.filter((l) => l.dock)) {
-      const kinds = st.dock === 'high' ? ['navyWarden', 'navyKestrel', 'navyKestrel', 'navyBastion', 'navyMantis'] : ['navyKestrel', 'navyMantis', 'navyWarden'].slice(0, Math.round(def.sec * 3));
+      const kinds = st.dock === 'high' ? ['navyWarden', 'navyKestrel', 'navyKestrel', 'navyBastion', 'navyMantis', 'navySabre'] : ['navyKestrel', 'navyMantis', 'navyWarden'].slice(0, Math.round(def.sec * 3));
       for (const kind of kinds) {
         const n = makeEntity(kind, 'navy', st.pos.clone().add(jitter(6000)), NAVY_NAMES[ni++ % NAVY_NAMES.length]);
         n.ai.seed = Math.random(); n.ai.home.copy(st.pos);
@@ -1614,7 +1619,9 @@ function populate(def, from) {
     if (hub) for (let i = 0; i < (def.sec >= 0.6 ? 3 : 2); i++) {
       const gate = gates[i % gates.length];
       const pos = new THREE.Vector3().lerpVectors(hub.pos, gate.pos, 0.15 + i * 0.3).add(jitter(3000));
-      const h = makeEntity('hauler', 'civil', pos, `${HAULER_LINES[Math.floor(Math.random() * HAULER_LINES.length)]} Hauler`);
+      const [civ, label] = CIVIL_TYPES[Math.floor(Math.random() * CIVIL_TYPES.length)];
+      const lines = civ === 'aurora' ? LINER_LINES : HAULER_LINES;
+      const h = makeEntity('hauler', 'civil', pos, `${lines[Math.floor(Math.random() * lines.length)]} ${label}`, civ);
       h.ai.a = hub.pos; h.ai.b = gate.pos; h.ai.dir = i % 2 ? 1 : -1; h.ai.state = 'cruise';
       h.obj.lookAt(h.ai.dir > 0 ? h.ai.b : h.ai.a);
     }

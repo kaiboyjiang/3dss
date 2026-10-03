@@ -1,7 +1,29 @@
-import { buildFrigate, buildKestrel, buildWarden, buildPaladin, buildMantis, buildCorvid, buildBastion, buildTurret, buildOutfitModel } from './ships.js';
+import {
+  buildFrigate, buildKestrel, buildWarden, buildPaladin, buildMantis, buildCorvid, buildBastion,
+  buildHornet, buildWisp, buildMule, buildAtlas, buildAurora, buildSabre, buildSovereign, buildLeviathan,
+  buildTurret, buildOutfitModel,
+} from './ships.js';
 import { Kit, G, mat } from './geo.js';
 
 export const HULLS = {
+  hornet: {
+    name: 'Hornet', cls: 'Hornet Light Fighter', price: 160000, build: buildHornet,
+    desc: 'Cheap split-wing space-superiority fighter. The smallest warship in the catalogue: two hardpoints, wingtip cannons and the fastest turn rate of any hull.',
+    stats: { shield: 420, armor: 300, hull: 280, speed: 400, boost: 1080, accel: 200, turn: [2.4, 1.85, 3.8], cap: 650, capRegen: 22, shieldRegen: 16, sig: 0.5 },
+    fit: { w: ['blaster', 'auto'], u: [null] },
+  },
+  wisp: {
+    name: 'Wisp', cls: 'Wisp Pathfinder Scout', price: 150000, build: buildWisp,
+    desc: 'Long-range survey scout with outrigger sensor booms and a dorsal dish. Lightly armed, but the fastest hull in the catalogue with a 45 km lock range.',
+    stats: { shield: 380, armor: 220, hull: 240, speed: 430, boost: 1200, accel: 190, turn: [2.2, 1.75, 3.6], cap: 900, capRegen: 30, shieldRegen: 18, sig: 0.35, lockRange: 45000 },
+    fit: { w: ['pulse', null], u: [null, null] },
+  },
+  mule: {
+    name: 'Mule', cls: 'Mule Light Freighter', price: 260000, build: buildMule,
+    desc: 'Sixteen-container short-haul freighter with a forward cab. Two defensive turrets and four utility slots; no missile launchers.',
+    stats: { shield: 700, armor: 900, hull: 900, speed: 230, boost: 600, accel: 60, turn: [0.9, 0.7, 1.5], cap: 900, capRegen: 24, shieldRegen: 16, sig: 1.6 },
+    fit: { w: ['pulse', 'flak'], u: [null, null, null, null] },
+  },
   kestrel: {
     name: 'Kestrel', cls: 'Kestrel Interceptor', price: 220000, build: buildKestrel,
     desc: 'Twin-nacelle interceptor built around raw speed and agility. Light on armour, quick to lock and almost impossible to track.',
@@ -32,6 +54,24 @@ export const HULLS = {
     stats: { shield: 1800, armor: 1700, hull: 1300, speed: 165, boost: 410, accel: 42, turn: [0.62, 0.5, 1.1], cap: 1800, capRegen: 40, shieldRegen: 32, sig: 1.8 },
     fit: { w: ['pulse', 'pulse', 'rail', 'auto', 'auto'], u: [null, null, null, null] },
   },
+  sabre: {
+    name: 'Sabre', cls: 'Sabre-class Light Cruiser', price: 1050000, build: buildSabre,
+    desc: 'Wedge-hulled light cruiser bridging destroyers and heavy cruisers. Five hardpoints including twin flank sponsons, quick for its size.',
+    stats: { shield: 2200, armor: 2100, hull: 1600, speed: 150, boost: 380, accel: 36, turn: [0.54, 0.43, 0.95], cap: 2100, capRegen: 44, shieldRegen: 36, sig: 2.0 },
+    fit: { w: ['heavypulse', 'pulse', 'pulse', 'gauss', 'auto'], u: [null, null, null, null] },
+  },
+  aurora: {
+    name: 'Aurora', cls: 'Aurora Starlines Passenger Liner', price: 1100000, build: buildAurora,
+    desc: 'Luxury passenger liner with three lit decks and an observation dome. Huge shields for its class, two point-defence turrets and no missile launchers.',
+    stats: { shield: 2600, armor: 1300, hull: 1600, speed: 140, boost: 360, accel: 28, turn: [0.42, 0.34, 0.75], cap: 2000, capRegen: 45, shieldRegen: 50, sig: 2.4 },
+    fit: { w: ['pulse', 'pulse'], u: [null, null, null, null, null] },
+  },
+  atlas: {
+    name: 'Atlas', cls: 'Atlas Bulk Freighter', price: 950000, build: buildAtlas,
+    desc: 'Deep-space bulk hauler: a truss spine racked with sixty-odd containers behind a command module. Tough and slow, three turrets, six utility slots, no launchers.',
+    stats: { shield: 1600, armor: 2600, hull: 2800, speed: 120, boost: 290, accel: 20, turn: [0.36, 0.29, 0.6], cap: 1600, capRegen: 32, shieldRegen: 24, sig: 3.2 },
+    fit: { w: ['flak', 'pulse', 'flak'], u: [null, null, null, null, null, null] },
+  },
   bastion: {
     name: 'Bastion', cls: 'Bastion-class Heavy Cruiser', price: 1450000, build: buildBastion,
     desc: 'Armour-ringed heavy cruiser with twin hangar pods. Six hardpoints and five utility slots — a flying fortress that still turns faster than a battlecruiser.',
@@ -44,8 +84,20 @@ export const HULLS = {
     stats: { shield: 3600, armor: 3800, hull: 2800, speed: 110, boost: 270, accel: 22, turn: [0.34, 0.28, 0.6], cap: 3200, capRegen: 65, shieldRegen: 55, sig: 3 },
     fit: { w: ['heavypulse', 'heavypulse', 'rail', 'rail', 'blaster', 'blaster', 'auto'], u: [null, null, null, null, null] },
   },
+  sovereign: {
+    name: 'Sovereign', cls: 'Sovereign-class Battleship', price: 4200000, build: buildSovereign,
+    desc: 'Ship-of-the-line battleship with a dorsal gun deck, armoured belts and a towering command bridge. Nine hardpoints, six utility slots.',
+    stats: { shield: 5200, armor: 5600, hull: 4200, speed: 90, boost: 220, accel: 15, turn: [0.24, 0.2, 0.42], cap: 4600, capRegen: 85, shieldRegen: 75, sig: 4 },
+    fit: { w: ['heavypulse', 'heavypulse', 'heavypulse', 'rail', 'rail', 'beam', 'beam', 'flak', 'flak'], u: [null, null, null, null, null, null] },
+  },
+  leviathan: {
+    name: 'Leviathan', cls: 'Leviathan-class Superheavy Dreadnought', price: 9500000, build: buildLeviathan,
+    desc: 'The largest hull Helion Yards will sell: a 270 m dreadnought built around a spinal siege lance. Twelve hardpoints, seven utility slots and armour measured in metres. It turns like a moon.',
+    stats: { shield: 9000, armor: 10000, hull: 7500, speed: 70, boost: 175, accel: 10, turn: [0.17, 0.14, 0.3], cap: 8000, capRegen: 130, shieldRegen: 120, sig: 6 },
+    fit: { w: ['plasma', 'plasma', 'heavypulse', 'heavypulse', 'heavypulse', 'heavypulse', 'beam', 'beam', 'rail', 'rail', 'flak', 'flak'], u: [null, null, null, null, null, null, null] },
+  },
 };
-export const HULL_ORDER = ['kestrel', 'corvid', 'valkyrie', 'mantis', 'warden', 'bastion', 'paladin'];
+export const HULL_ORDER = ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'mule', 'mantis', 'warden', 'sabre', 'aurora', 'atlas', 'bastion', 'paladin', 'sovereign', 'leviathan'];
 
 // mount: turret = auto-fires at hostiles, gun = fixed forward (group: primary = LMB, secondary = RMB). tech: basic (any station) / high (shipyard stations only)
 export const OUTFITS = {
@@ -119,7 +171,7 @@ export function outfitPreview(id, M) {
 
 export function fittedStats(hullId, fit) {
   const H = HULLS[hullId];
-  const s = { ...H.stats, turn: [...H.stats.turn], cls: H.cls, lockMul: 1, lockRange: 30000 };
+  const s = { ...H.stats, turn: [...H.stats.turn], cls: H.cls, lockMul: 1, lockRange: H.stats.lockRange || 30000 };
   for (const id of fit.u) {
     if (!id) continue;
     const m = OUTFITS[id].mods;
