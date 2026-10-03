@@ -726,16 +726,17 @@ function buildGate(M) {
   root.add(k.build(M, { uvTile: { hull: 40, dark: 30, window: 60 } }));
   const horizon = new THREE.Mesh(new THREE.CircleGeometry(390, 96), new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uBoost: { value: 0 } },
     vertexShader: `${LOGDEPTH_VERT_PARS} varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); ${LOGDEPTH_VERT} }`,
-    fragmentShader: `${LOGDEPTH_FRAG_PARS} uniform float uTime; varying vec2 vUv; ${NOISE}
+    fragmentShader: `${LOGDEPTH_FRAG_PARS} uniform float uTime, uBoost; varying vec2 vUv; ${NOISE}
       void main(){ ${LOGDEPTH_FRAG}
         vec2 p = vUv * 2.0 - 1.0; float r = length(p); float a = atan(p.y, p.x);
         float sw = fbm(vec3(cos(a) * 1.5, sin(a) * 1.5, r * 3.0 - uTime * 0.6) + vec3(0.0, 0.0, a * 0.3), 5);
         float edge = smoothstep(1.0, 0.85, r);
         float i = (0.15 + 0.5 * smoothstep(-0.2, 0.6, sw)) * edge * (0.3 + 0.7 * smoothstep(0.2, 1.0, r));
         vec3 c = mix(vec3(0.1, 0.4, 1.0), vec3(0.6, 0.9, 1.0), smoothstep(0.3, 0.8, sw));
-        gl_FragColor = vec4(c * i * 1.6, 1.0); }`,
+        i = mix(i, edge * (0.6 + 0.6 * smoothstep(-0.2, 0.6, sw)), uBoost);
+        gl_FragColor = vec4(c * i * (1.6 + uBoost * 2.4), 1.0); }`,
   }));
   root.add(horizon);
   const beacons = [];
@@ -1119,7 +1120,7 @@ export function buildWorld(renderer, scene) {
       b.root.position.copy(J.pos);
       b.root.lookAt(0, 0, 0);
       sys.add(b.root);
-      const loc = { id: `jump-${J.to}`, name: `Jump Gate (${explored.has(J.to) ? SYSTEMS[J.to].name : 'Uncharted'})`, type: 'Jump Gate', pos: J.pos, arrive: 2200, icon: 'gate', jump: J.to };
+      const loc = { id: `jump-${J.to}`, name: `Jump Gate (${explored.has(J.to) ? SYSTEMS[J.to].name : 'Uncharted'})`, type: 'Jump Gate', pos: J.pos, arrive: 2200, icon: 'gate', jump: J.to, horizon: b.root.userData.horizon.material.uniforms.uBoost };
       structures.push({ obj: b.root, colliders: b.colliders, loc });
       beaconSets.push(b.root.userData.beacons);
       timed.push(b.root.userData.horizon.material);

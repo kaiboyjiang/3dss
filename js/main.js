@@ -872,8 +872,8 @@ function tryDock() {
     THREE.MathUtils.clamp(4 + dist / 700, 5, 9), `DOCKING — ${st.name.toUpperCase()}`);
 }
 
-// ---------------------------------------------------------------- docking / undocking cinematics
-const cine = { mode: null, t: 0, dur: 1, pts: null, bay: null, cam: new THREE.Vector3(), q0: new THREE.Quaternion(), c0: new THREE.Vector3(), cq0: new THREE.Quaternion(), prev: new THREE.Vector3(), ending: false };
+// ---------------------------------------------------------------- docking / undocking / jump cinematics
+const cine = { mode: null, t: 0, dur: 1, pts: null, bay: null, gate: null, to: null, from: null, warpFx: 0, cam: new THREE.Vector3(), q0: new THREE.Quaternion(), c0: new THREE.Vector3(), cq0: new THREE.Quaternion(), prev: new THREE.Vector3(), ending: false };
 const _cq = new THREE.Quaternion(), _cm = new THREE.Matrix4();
 function bayWorld(dock, i) {
   const st = dock.root, b = dock.bays[i];
@@ -887,13 +887,18 @@ function bezierTangent(P, s, out) {
   const u = 1 - s;
   return out.set(0, 0, 0).addScaledVector(P[1].clone().sub(P[0]), 3 * u * u).addScaledVector(P[2].clone().sub(P[1]), 6 * u * s).addScaledVector(P[3].clone().sub(P[2]), 3 * s * s).normalize();
 }
-const cineEase = (mode, u) => (mode === 'docking' ? u * (2 - u) : 0.6 * u * u + 0.4 * u);
+const cineEase = (mode, u) => (mode === 'docking' ? u * (2 - u) : mode === 'jumpout' ? u * u * (0.35 + 0.65 * u) : mode === 'jumpin' ? 1 - (1 - u) * (1 - u) : 0.6 * u * u + 0.4 * u);
+// cinematics that start from the chase camera and end off-screen, versus ones that hand back to the chase camera
+const cineIn = (mode) => mode === 'docking' || mode === 'jumpout';
 function startCine(mode, bay, pts, dur, caption) {
   const p = G.player, r = p.ship.radius;
   const side = _v.copy(bay.dir).cross(Y).normalize();
   if (Math.random() < 0.5) side.negate();
   Object.assign(cine, { mode, t: 0, dur, pts, bay, ending: false });
-  cine.cam.copy(bay.pos).addScaledVector(bay.dir, r * 4 + 130).addScaledVector(side, r * 3 + 85).addScaledVector(Y, r * 1.2 + 30);
+  cine.side = side.clone();
+  if (mode === 'jumpout') jumpCam(p.obj.position, bay.dir, r);
+  else if (mode === 'jumpin') cine.cam.copy(bay.pos).addScaledVector(bay.dir, 700).addScaledVector(side, r * 5 + 60).addScaledVector(Y, r * 2 + 20);
+  else cine.cam.copy(bay.pos).addScaledVector(bay.dir, r * 4 + 130).addScaledVector(side, r * 3 + 85).addScaledVector(Y, r * 1.2 + 30);
   cine.q0.copy(p.obj.quaternion);
   cine.c0.copy(camera.position); cine.cq0.copy(camera.quaternion);
   cine.prev.copy(pts[0]);
@@ -901,6 +906,10 @@ function startCine(mode, bay, pts, dur, caption) {
   $('cine').classList.remove('hidden');
   $('hud').classList.add('hidden');
   if (mode === 'undocking') { fx.flash(bay.pos, r * 3 + 40, 0xbfe4ff, 0.5); audio.ui(); }
+}
+// trails the ship toward the gate with the event horizon framed ahead of it
+function jumpCam(pos, dir, r) {
+  cine.cam.copy(pos).addScaledVector(dir, -(r * 7 + 40)).addScaledVector(cine.side, r * 4 + 25).addScaledVector(Y, r * 2 + 12);
 }
 function endCine() {
   const mode = cine.mode;
@@ -910,10 +919,15 @@ function endCine() {
     $('fade').style.opacity = 1;
     setTimeout(() => { if (G.state !== 'docking') return; enterDocked(); $('fade').style.opacity = 0; }, 650);
   } else if (mode === 'undocking') finishUndock();
+  else if (mode === 'jumpout') {
+    $('fade').style.opacity = 1;
+    G.state = 'jumpfade';
+    setTimeout(() => { if (G.state === 'jumpfade') arriveJump(cine.to, cine.from); }, 650);
+  } else if (mode === 'jumpin') finishJump();
 }
 function skipCine() {
   if (!cine.mode) return;
-  if (cine.mode === 'docking') { cine.t = cine.dur; cine.ending = true; endCine(); return; }
+  if (cine.mode === 'docking' || cine.mode === 'jumpout') { cine.t = cine.dur; cine.ending = true; endCine(); return; }
   cine.t = cine.dur;
   cineStep(0);
 }
@@ -925,13 +939,29 @@ function cineStep(dt) {
   const u = cine.t / cine.dur, s = cineEase(cine.mode, u);
   bezier(cine.pts, s, p.obj.position);
   const tan = bezierTangent(cine.pts, Math.min(s, 0.999), _v2);
-  _cm.lookAt(cine.mode === 'docking' ? tan : _v3.copy(cine.bay.dir).lerp(tan, 0.5).normalize(), ORIGIN, Y);
+  _cm.lookAt(cine.mode === 'undocking' ? _v3.copy(cine.bay.dir).lerp(tan, 0.5).normalize() : tan, ORIGIN, Y);
   _cq.setFromRotationMatrix(_cm);
-  p.obj.quaternion.copy(cine.mode === 'docking' ? cine.q0.clone().slerp(_cq, Math.min(1, u * 3.5)) : _cq);
+  p.obj.quaternion.copy(cineIn(cine.mode) ? cine.q0.clone().slerp(_cq, Math.min(1, u * 3.5)) : _cq);
   if (dt > 0) p.vel.copy(p.obj.position).sub(cine.prev).divideScalar(dt);
   cine.prev.copy(p.obj.position);
-  p.throttle = cine.mode === 'docking' ? 0.35 * (1 - u) + 0.05 : 0.2 + 0.6 * u;
+  p.throttle = cine.mode === 'docking' ? 0.35 * (1 - u) + 0.05 : cine.mode === 'jumpout' ? 0.4 + 0.6 * u : cine.mode === 'jumpin' ? 1 - 0.5 * u : 0.2 + 0.6 * u;
+  G.boosting = cine.mode === 'jumpout' && u > 0.45;
   playerAngVel.set(0, 0, 0);
+  if (cine.mode === 'jumpout') {
+    // the gate spools up, then the ship punches through the event horizon
+    if (cine.gate.horizon) cine.gate.horizon.value = THREE.MathUtils.smoothstep(u, 0.1, 0.7);
+    if (u < 0.6) jumpCam(p.obj.position, cine.bay.dir, p.ship.radius);
+    cine.warpFx = THREE.MathUtils.smoothstep(u, 0.6, 1);
+    G.shake = Math.max(G.shake, cine.warpFx * 0.9);
+    if (u > 0.68 && !cine.ending) {
+      cine.ending = true;
+      fx.flash(cine.gate.pos, 1400, 0x9fc8ff, 0.9);
+      audio.warpStart();
+    }
+  } else if (cine.mode === 'jumpin') {
+    if (cine.gate && cine.gate.horizon) cine.gate.horizon.value = 1 - THREE.MathUtils.smoothstep(u, 0.15, 0.8);
+    cine.warpFx = 1 - THREE.MathUtils.smoothstep(u, 0, 0.3);
+  }
   if (cine.mode === 'docking' && u > 0.9 && !cine.ending) {
     cine.ending = true;
     fx.flash(cine.bay.pos, p.ship.radius * 3 + 40, 0xbfe4ff, 0.6);
@@ -942,11 +972,11 @@ function cineStep(dt) {
 function cineCamera() {
   if (!cine.mode) return;
   const u = cine.t / cine.dur;
-  const w = cine.mode === 'docking' ? THREE.MathUtils.smoothstep(u, 0, 0.22) : 1 - THREE.MathUtils.smoothstep(u, 0.72, 1);
+  const w = cineIn(cine.mode) ? THREE.MathUtils.smoothstep(u, 0, 0.22) : 1 - THREE.MathUtils.smoothstep(u, 0.72, 1);
   const p = G.player.obj.position;
   _m.lookAt(cine.cam, p, Y);
   _cq.setFromRotationMatrix(_m);
-  if (cine.mode === 'docking') {
+  if (cineIn(cine.mode)) {
     camera.position.lerpVectors(cine.c0, cine.cam, w);
     camera.quaternion.slerpQuaternions(cine.cq0, _cq, w);
   } else {
@@ -1421,7 +1451,7 @@ function frame(now) {
     if (staticDrawn && menuAcc < 0.1) return;
     dt = Math.min(0.1, menuAcc); menuAcc = 0; staticDrawn = true;
   }
-  if (G.state === 'flying' || G.state === 'dead' || G.state === 'docking' || G.state === 'undocking') {
+  if (G.state === 'flying' || G.state === 'dead' || G.state === 'docking' || G.state === 'undocking' || G.state === 'jumpout' || G.state === 'jumpin') {
     updatePlayer(dt);
     // capacitor and shield regeneration
     p.cap = Math.min(p.maxCap, p.cap + p.stats.capRegen * dt);
@@ -1463,13 +1493,15 @@ function frame(now) {
   // warp tunnel aligned to travel direction around the camera
   const wl = world.warp.lines;
   wl.position.copy(camera.position);
-  if (G.warp) wl.lookAt(_v.copy(camera.position).sub(_v2.copy(p.vel).normalize()));
-  world.warp.update(dt, warpI, 2500 + warpI * 9000);
+  const jw = cine.mode === 'jumpout' || cine.mode === 'jumpin' ? cine.warpFx : 0;
+  if (G.warp || jw > 0) wl.lookAt(_v.copy(camera.position).sub(_v2.copy(p.vel).normalize()));
+  const tunnel = Math.max(warpI, jw);
+  world.warp.update(dt, tunnel, 2500 + tunnel * 9000);
   fx.update(dt, camera);
   G.hitFlash *= Math.exp(-dt * 3);
-  lensPass.uniforms.uWarp.value = warpI;
+  lensPass.uniforms.uWarp.value = tunnel;
   lensPass.uniforms.uHit.value = G.hitFlash;
-  audio.update(p.throttle, G.boosting ? 1 : 0, warpI);
+  audio.update(p.throttle, G.boosting ? 1 : 0, tunnel);
   // nearest named location
   let best = Infinity;
   for (const l of LOCATIONS) { const d = l.pos.distanceTo(p.obj.position) - l.arrive; if (d < best) { best = d; G.nearestName = d < 30000 ? l.name : `Deep space near ${l.name}`; } }
@@ -1609,20 +1641,54 @@ function startJump(jp) {
   if (G.scrambled) { hud.notice('JUMP DRIVE DISRUPTED', 1.8); audio.beep(220, 0.2); return; }
   if (p.cap < 150) { hud.notice('INSUFFICIENT CAPACITOR FOR JUMP', 1.8); return; }
   p.cap -= 120;
-  G.state = 'jumping';
+  G.state = 'jumpout';
   G.input.fire1 = G.input.fire2 = G.input.mmb = false;
+  G.aimActive = false;
   const to = jp.jump, from = G.system;
-  hud.notice(`JUMPING TO ${G.explored.has(to) ? SYSTEMS[to].name.toUpperCase() : 'UNCHARTED SYSTEM'}`, 2);
-  audio.warpStart();
-  fx.flash(jp.pos, 1200, 0x88bbff, 0.8);
-  $('fade').style.opacity = 1;
-  setTimeout(() => {
-    enterSystem(to, from);
-    G.state = 'flying';
-    $('fade').style.opacity = 0;
-    audio.warpEnd();
-    G.shake = 0.8;
-  }, 900);
+  // fly through the ring along its axis, entering from whichever side the ship is on
+  const n = jp.pos.clone().negate().normalize();
+  if (_v.copy(p.obj.position).sub(jp.pos).dot(n) > 0) n.negate();
+  const pp = p.obj.position.clone();
+  const fwd = _v.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
+  const dist = pp.distanceTo(jp.pos);
+  const pts = [pp, pp.clone().addScaledVector(fwd, Math.min(600, dist * 0.3)), jp.pos.clone().addScaledVector(n, -Math.min(1200, dist * 0.5 + 300)), jp.pos.clone().addScaledVector(n, 900)];
+  startCine('jumpout', { pos: jp.pos, dir: n }, pts, 3.6 + dist / 2500, `JUMPING TO ${G.explored.has(to) ? SYSTEMS[to].name.toUpperCase() : 'UNCHARTED SYSTEM'}`);
+  Object.assign(cine, { gate: jp, to, from, warpFx: 0 });
+  audio.ui();
+}
+
+function arriveJump(to, from) {
+  enterSystem(to, from);
+  const p = G.player;
+  const back = LOCATIONS.find((l) => l.jump === from);
+  $('fade').style.opacity = 0;
+  audio.warpEnd();
+  if (!back) { finishJump(); return; }
+  G.state = 'jumpin';
+  const end = p.obj.position.clone();
+  const out = end.clone().sub(back.pos).normalize();
+  const pts = [back.pos.clone().addScaledVector(out, -200), back.pos.clone().addScaledVector(out, 500), end.clone().addScaledVector(out, -500), end];
+  p.obj.position.copy(pts[0]);
+  const def = SYSTEMS[to];
+  startCine('jumpin', { pos: back.pos, dir: out }, pts, 4, `${def.name.toUpperCase()} — ${GOVS[def.gov].name.toUpperCase()}`);
+  Object.assign(cine, { gate: back, to, from, warpFx: 1 });
+  fx.flash(back.pos, 1400, 0x9fc8ff, 0.9);
+  G.shake = 0.8;
+  cineCamera();
+}
+
+function finishJump() {
+  const p = G.player;
+  if (cine.gate && cine.gate.horizon) cine.gate.horizon.value = 0;
+  cine.warpFx = 0;
+  p.vel.copy(_v.set(0, 0, 1).applyQuaternion(p.obj.quaternion)).multiplyScalar(Math.max(200, p.vel.length()));
+  p.throttle = 0.5;
+  G.boosting = false;
+  G.stick.set(0, 0);
+  playerAngVel.set(0, 0, 0);
+  camQuat.copy(p.obj.quaternion);
+  G.state = 'flying';
+  $('hud').classList.remove('hidden');
 }
 
 $('mapbtn').addEventListener('mousedown', (ev) => { ev.stopPropagation(); starmap.toggle(); });
