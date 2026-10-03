@@ -10,8 +10,8 @@ function hazardTexture() {
   const c = document.createElement('canvas');
   c.width = 256; c.height = 32;
   const g = c.getContext('2d');
-  g.fillStyle = '#16171a'; g.fillRect(0, 0, 256, 32);
-  g.fillStyle = '#d8a520';
+  g.fillStyle = '#1b1c1e'; g.fillRect(0, 0, 256, 32);
+  g.fillStyle = '#8d9096';
   for (let x = -32; x < 288; x += 32) { g.beginPath(); g.moveTo(x, 32); g.lineTo(x + 16, 32); g.lineTo(x + 32, 0); g.lineTo(x + 16, 0); g.fill(); }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -24,10 +24,10 @@ function signTexture(text, sub) {
   const c = document.createElement('canvas');
   c.width = 1024; c.height = 256;
   const g = c.getContext('2d');
-  g.fillStyle = '#0c0f13'; g.fillRect(0, 0, 1024, 256);
-  g.fillStyle = '#e8eef4'; g.font = 'bold 120px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'middle';
+  g.fillStyle = '#121315'; g.fillRect(0, 0, 1024, 256);
+  g.fillStyle = '#e9eaec'; g.font = 'bold 120px "Segoe UI", Arial, sans-serif'; g.textBaseline = 'middle';
   g.fillText(text, 40, 110);
-  g.fillStyle = '#d8a520'; g.font = '44px "Segoe UI", Arial, sans-serif';
+  g.fillStyle = '#9a9ea4'; g.font = '44px "Segoe UI", Arial, sans-serif';
   g.fillText(sub, 44, 205);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -39,7 +39,7 @@ function starTexture() {
   c.width = 1024; c.height = 512;
   const g = c.getContext('2d');
   const gr = g.createLinearGradient(0, 0, 0, 512);
-  gr.addColorStop(0, '#020308'); gr.addColorStop(0.7, '#061022'); gr.addColorStop(1, '#14305a');
+  gr.addColorStop(0, '#020203'); gr.addColorStop(0.7, '#08090b'); gr.addColorStop(1, '#17191c');
   g.fillStyle = gr; g.fillRect(0, 0, 1024, 512);
   for (let i = 0; i < 900; i++) {
     const a = Math.random();
@@ -51,16 +51,28 @@ function starTexture() {
   return t;
 }
 
+function glowStripTexture() {
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 64;
+  const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 // Ship hangar bay rendered with its own scene/camera while docked.
 function slotLabel(text, on, kind) {
   const c = document.createElement('canvas');
   c.width = 128; c.height = 64;
   const g = c.getContext('2d');
-  g.fillStyle = on ? 'rgba(60,36,4,0.85)' : 'rgba(4,16,26,0.75)';
-  g.strokeStyle = on ? '#ffc060' : kind === 'w' ? '#7cd0ff' : '#80f0a8';
+  g.fillStyle = on ? 'rgba(60,36,4,0.85)' : 'rgba(14,15,17,0.78)';
+  g.strokeStyle = on ? '#ffc060' : kind === 'w' ? '#d4d7db' : '#80f0a8';
   g.lineWidth = 4;
   g.beginPath(); g.roundRect(6, 8, 116, 48, 10); g.fill(); g.stroke();
-  g.fillStyle = on ? '#ffe0a0' : '#e8f6ff';
+  g.fillStyle = on ? '#ffe0a0' : '#f2f3f4';
   g.font = 'bold 30px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText(text, 64, 33);
   const t = new THREE.CanvasTexture(c);
@@ -90,19 +102,24 @@ export class Hangar {
 
   buildEnv() {
     const s = new THREE.Scene();
-    const room = new THREE.Mesh(new THREE.BoxGeometry(400, 160, 400), new THREE.MeshBasicMaterial({ color: 0x1a1d22, side: THREE.BackSide }));
+    const room = new THREE.Mesh(new THREE.BoxGeometry(400, 160, 400), new THREE.MeshBasicMaterial({ color: 0x1d1e21, side: THREE.BackSide }));
     room.position.y = 70;
     s.add(room);
-    const strip = new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6, 5.5) });
+    const strip = new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6.2, 6.6) });
     for (let i = -3; i <= 3; i++) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 300), strip);
       m.position.set(i * 45, 148, 0);
       s.add(m);
     }
-    const door = new THREE.Mesh(new THREE.BoxGeometry(220, 90, 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.15, 0.35, 0.8) }));
+    for (const y of [12, 62, 118]) for (const [x, z, sx, sz] of [[198, 0, 2, 380], [-198, 0, 2, 380], [0, 198, 380, 2]]) {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 1.5, sz), strip);
+      m.position.set(x, y, z);
+      s.add(m);
+    }
+    const door = new THREE.Mesh(new THREE.BoxGeometry(220, 90, 2), new THREE.MeshBasicMaterial({ color: 0x0b0c0e }));
     door.position.set(0, 50, -199);
     s.add(door);
-    const floor = new THREE.Mesh(new THREE.BoxGeometry(400, 1, 400), new THREE.MeshBasicMaterial({ color: 0x2a2c30 }));
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(400, 1, 400), new THREE.MeshBasicMaterial({ color: 0x27282b }));
     s.add(floor);
     const pm = new THREE.PMREMGenerator(this.renderer);
     const t = pm.fromScene(s, 0.03).texture;
@@ -112,15 +129,16 @@ export class Hangar {
 
   buildRoom() {
     const env = this.env;
-    const fm = hullMaps({ seed: 81, base: [70, 72, 76], accent: [190, 150, 40], accentChance: 0.03, darkChance: 0.3, wear: 0.8, size: 1024, labels: ['BAY 07', 'NO STEP', 'CLEAR ZONE'] });
-    const wm = hullMaps({ seed: 82, base: [54, 58, 64], accent: [120, 126, 134], accentChance: 0.08, darkChance: 0.25, wear: 0.6, size: 1024, labels: ['HELION', 'VENT', 'P-07'] });
+    const fm = hullMaps({ seed: 81, base: [72, 75, 80], accent: [96, 98, 102], accentChance: 0.12, darkChance: 0.22, hazardChance: 0, wear: 0.7, size: 1024, labels: ['BAY 07', 'NO STEP', 'CLEAR ZONE'] });
+    const wm = hullMaps({ seed: 82, base: [96, 99, 104], accent: [118, 120, 124], accentChance: 0.1, darkChance: 0.2, hazardChance: 0, wear: 0.5, size: 1024, labels: ['HELION', 'VENT', 'P-07'] });
     const M = {
-      floor: new THREE.MeshStandardMaterial({ map: fm.map, normalMap: fm.normalMap, roughnessMap: fm.roughnessMap, metalness: 0.55, roughness: 0.6, envMap: env, envMapIntensity: 0.6 }),
-      wall: new THREE.MeshStandardMaterial({ map: wm.map, normalMap: wm.normalMap, roughnessMap: wm.roughnessMap, metalness: 0.6, roughness: 0.55, envMap: env, envMapIntensity: 0.7 }),
-      steel: new THREE.MeshStandardMaterial({ color: 0x5c6168, metalness: 0.9, roughness: 0.35, envMap: env }),
-      dark: new THREE.MeshStandardMaterial({ color: 0x1c1e22, metalness: 0.7, roughness: 0.5, envMap: env }),
-      light: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6, 5.4) }),
-      blue: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.4, 4) }),
+      floor: new THREE.MeshStandardMaterial({ map: fm.map, normalMap: fm.normalMap, roughnessMap: fm.roughnessMap, metalness: 0.7, roughness: 0.5, envMap: env, envMapIntensity: 0.8 }),
+      wall: new THREE.MeshStandardMaterial({ map: wm.map, normalMap: wm.normalMap, roughnessMap: wm.roughnessMap, metalness: 0.6, roughness: 0.5, envMap: env, envMapIntensity: 1 }),
+      steel: new THREE.MeshStandardMaterial({ color: 0x6a6c70, metalness: 0.95, roughness: 0.3, envMap: env }),
+      dark: new THREE.MeshStandardMaterial({ color: 0x232427, metalness: 0.8, roughness: 0.45, envMap: env }),
+      light: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6.2, 6.6) }),
+      strip: new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 3.4, 3.8) }),
+      glow: new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 2.6, 3) }),
       amber: new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 2.2, 0.4) }),
     };
     this.M = M;
@@ -149,11 +167,20 @@ export class Hangar {
       k.add('steel', G.rbox(7, H, 7, 1), mat([-W + 4, H / 2, p]));
       k.add('dark', G.box(5, 4, W * 2), mat([p, H - 6, 0]));
       k.add('light', G.box(3, 1, W * 1.6), mat([p + 12, H - 2.6, 0]));
+      k.add('strip', G.box(0.8, H - 30, 0.8), mat([p, H / 2 - 4, W - 7.8]));
+      k.add('strip', G.box(0.8, H - 30, 0.8), mat([W - 7.8, H / 2 - 4, p]));
+      k.add('strip', G.box(0.8, H - 30, 0.8), mat([-W + 7.8, H / 2 - 4, p]));
       k.add('dark', G.box(2, 18, 12), mat([W - 2.5, 12, p + 20]));
-      k.add('blue', G.box(0.5, 1, 10), mat([W - 3.6, 18, p + 20]));
+      k.add('glow', G.box(0.5, 1, 10), mat([W - 3.6, 18, p + 20]));
       k.add('dark', G.box(2, 18, 12), mat([-W + 2.5, 12, p + 20]));
-      k.add('blue', G.box(0.5, 1, 10), mat([-W + 3.6, 18, p + 20]));
+      k.add('glow', G.box(0.5, 1, 10), mat([-W + 3.6, 18, p + 20]));
     }
+    // horizontal light strips along the walls
+    for (const y of [24, 62, 118]) {
+      for (const s of [1, -1]) k.add('strip', G.box(0.6, 0.9, W * 2 - 16), mat([s * (W - 2.4), y, 0]));
+      k.add('strip', G.box(W * 2 - 16, 0.9, 0.6), mat([0, y, W - 2.4]));
+    }
+    for (const s of [1, -1]) k.add('strip', G.box(W - 118, 0.9, 0.6), mat([s * (110 + (W - 110) / 2), 62, -W + 2.4]));
     // catwalks
     for (const s of [1, -1]) {
       k.add('steel', G.box(14, 1, W * 2 - 20), mat([s * (W - 12), 40, 0]));
@@ -168,8 +195,9 @@ export class Hangar {
     k.add('dark', G.box(8, 4, 8), mat([-30, H - 97, 30]));
     // floor lane markings and floor lights
     for (const s of [1, -1]) {
-      k.add('amber', G.box(1.2, 0.05, W * 1.8), mat([s * 120, 0.03, 0]));
-      for (let z = -W + 10; z < W; z += 30) k.add('blue', G.box(2, 0.2, 2), mat([s * 128, 0.1, z]));
+      k.add('strip', G.box(0.9, 0.08, W * 1.8), mat([s * 120, 0.04, 0]));
+      k.add('strip', G.box(0.5, 0.08, W * 1.8), mat([s * 60, 0.04, 0]));
+      for (let z = -W + 10; z < W; z += 30) k.add('glow', G.box(2, 0.2, 2), mat([s * 128, 0.1, z]));
     }
     // cargo crates and tool carts
     for (let i = 0; i < 14; i++) {
@@ -181,19 +209,27 @@ export class Hangar {
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(80, 20), new THREE.MeshBasicMaterial({ map: signTexture('BAY 07', 'HELION YARDS · SHIP SERVICES') }));
     sign.position.set(0, 80, W - 2.2); sign.rotation.y = Math.PI;
     room.add(sign);
-    // bay door looking out at space, behind a blue force field
+    // bay door looking out at space, behind a faint force field
     const space = new THREE.Mesh(new THREE.PlaneGeometry(500, 250), new THREE.MeshBasicMaterial({ map: starTexture() }));
     space.position.set(0, 60, -W - 60);
     room.add(space);
-    const field = new THREE.Mesh(new THREE.PlaneGeometry(220, 95), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.15, 0.35, 0.9), transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const field = new THREE.Mesh(new THREE.PlaneGeometry(220, 95), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.12, 0.13, 0.15), transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false }));
     field.position.set(0, 47.5, -W - 1);
     room.add(field);
     this.field = field;
     room.traverse((o) => { if (o.isMesh && o.material.isMeshStandardMaterial) { o.receiveShadow = true; o.castShadow = o.position.y > 0.5; } });
+    // cheap glow halos so the light strips read without bloom
+    const glowMat = new THREE.MeshBasicMaterial({ map: glowStripTexture(), color: new THREE.Color(0.55, 0.58, 0.64), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const halo = (w, h, x, y, z, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), glowMat); m.position.set(x, y, z); m.rotation.y = ry; room.add(m); };
+    for (const y of [24, 62, 118]) {
+      halo(W * 2 - 16, 7, 0, y, W - 3, Math.PI);
+      halo(W * 2 - 16, 7, W - 3, y, 0, -Math.PI / 2);
+      halo(W * 2 - 16, 7, -W + 3, y, 0, Math.PI / 2);
+    }
     this.scene.add(room);
     // lighting
-    this.scene.add(new THREE.HemisphereLight(0x9aa8ba, 0x202226, 0.55));
-    const key = new THREE.DirectionalLight(0xfff2e0, 1.6);
+    this.scene.add(new THREE.HemisphereLight(0xa6a9ae, 0x1e1f22, 0.8));
+    const key = new THREE.DirectionalLight(0xf4f4f2, 1.6);
     key.position.set(40, 160, 60);
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
@@ -201,28 +237,28 @@ export class Hangar {
     key.shadow.normalBias = 0.05;
     this.scene.add(key, key.target);
     this.key = key;
-    for (const [x, z, c] of [[-120, -120, 0x9fc4ff], [120, -120, 0xffd8a8], [-120, 120, 0xffe8c8], [120, 120, 0xa8ccff]]) {
+    for (const [x, z, c] of [[-120, -120, 0xe4e8ee], [120, -120, 0xf2efe8], [-120, 120, 0xf2efe8], [120, 120, 0xe4e8ee]]) {
       const s = new THREE.SpotLight(c, 0.9, 0, 0.55, 0.6, 0);
       s.position.set(x, H - 10, z);
       s.target.position.set(0, 0, 0);
       this.scene.add(s, s.target);
     }
-    const rim = new THREE.DirectionalLight(0x5080ff, 0.6);
+    const rim = new THREE.DirectionalLight(0xb4bcc8, 0.6);
     rim.position.set(0, 40, -200);
     this.scene.add(rim);
     // holo pedestal for outfits
     const pk = new Kit();
     pk.add('dark', G.cyl(3.4, 3.8, 1.0, 32), mat([0, 0.5, 0]));
     pk.add('steel', G.cyl(2.6, 3.0, 1.4, 32), mat([0, 1.7, 0]));
-    pk.add('blue', G.torus(2.7, 0.08, 6, 48), mat([0, 2.45, 0], [Math.PI / 2, 0, 0]));
-    pk.add('blue', G.torus(3.6, 0.05, 6, 48), mat([0, 1.02, 0], [Math.PI / 2, 0, 0]));
+    pk.add('glow', G.torus(2.7, 0.08, 6, 48), mat([0, 2.45, 0], [Math.PI / 2, 0, 0]));
+    pk.add('glow', G.torus(3.6, 0.05, 6, 48), mat([0, 1.02, 0], [Math.PI / 2, 0, 0]));
     const ped = pk.build(M);
     ped.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 7, 32, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.2, 0.55, 1.2), transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 7, 32, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.8, 0.84, 0.9), transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     beam.position.y = 6;
     this.pedestal = new THREE.Group();
     this.pedestal.add(ped, beam);
-    const pl = new THREE.PointLight(0x9fd0ff, 30, 30, 2);
+    const pl = new THREE.PointLight(0xe8ecf2, 30, 30, 2);
     pl.position.set(0, 9, 3);
     this.pedestal.add(pl);
     this.pedestal.visible = false;
@@ -324,7 +360,7 @@ export class Hangar {
     k.add('steel', G.cyl(pr * 0.7, pr * 0.7, 0.5, 96), mat([0, 0.25, 0]));
     for (let i = 0; i < 24; i++) {
       const a = i / 24 * Math.PI * 2;
-      k.add('blue', G.box(0.8, 0.2, 0.8), mat([Math.cos(a) * (pr - 1.4), 0.45, Math.sin(a) * (pr - 1.4)]));
+      k.add('glow', G.box(0.8, 0.2, 0.8), mat([Math.cos(a) * (pr - 1.4), 0.45, Math.sin(a) * (pr - 1.4)]));
     }
     const sx = Math.max(1.2, (box.max.x - box.min.x) * 0.22), sz = (box.max.z - box.min.z) * 0.28;
     for (const [x, z] of [[sx, sz], [-sx, sz], [sx, -sz], [-sx, -sz]]) {

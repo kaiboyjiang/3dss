@@ -80,6 +80,7 @@ export function hullMaps(opts = {}) {
   const accentChance = opts.accentChance ?? 0.08;
   const darkChance = opts.darkChance ?? 0.1;
   const wear = opts.wear ?? 0.4;
+  const hazardChance = opts.hazardChance ?? 0.03;
 
   const col = canvas(size), hgt = canvas(size), rough = canvas(size);
   const c = col.getContext('2d'), h = hgt.getContext('2d'), ro = rough.getContext('2d');
@@ -148,7 +149,7 @@ export function hullMaps(opts = {}) {
       }
     }
     // hazard stripes
-    if (r() < 0.03 && w > size / 10) {
+    if (r() < hazardChance && w > size / 10) {
       const sh = Math.min(hh * 0.3, size / 30);
       c.save();
       c.beginPath(); c.rect(x + seam, y + seam, w - seam * 2, sh); c.clip();
