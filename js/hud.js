@@ -172,6 +172,8 @@ export class HUD {
     this.el.railammo.style.display = G.usesAmmo ? '' : 'none';
     cd('m-laser', G.cool.pri, G.input.fire1, G.priOff);
     cd('m-rail', G.cool.sec, G.input.fire2, G.secOff);
+    cd('m-turret', G.cool.tur, G.turFiring, !G.turretsAuto || !G.hasTurrets);
+    document.getElementById('turstate').textContent = !G.hasTurrets ? '' : G.turretsAuto ? 'AUTO' : 'HOLD';
     cd('m-missile', G.cool.missile / 4, false, G.ammo.missile <= 0 || !(G.lock && G.lock.progress >= 1));
     cd('m-ab', 0, G.boosting, player.cap < 10);
     cd('m-warp', G.warp ? 1 : 0, !!G.warp, G.scrambled);
@@ -246,14 +248,23 @@ export class HUD {
     // pointer and follow vector
     const m = G.mouse;
     if (G.state === 'flying') {
-      if (G.following) {
-        g.strokeStyle = 'rgba(255,200,110,0.55)'; g.setLineDash([4, 5]);
-        g.beginPath(); g.moveTo(cx, cy); g.lineTo(m.x, m.y); g.stroke(); g.setLineDash([]);
+      if (G.aimActive && !isBehind(G.aimPoint)) {
+        const [ax, ay] = proj(G.aimPoint);
+        g.strokeStyle = 'rgba(255,200,110,0.5)'; g.setLineDash([4, 5]);
+        g.beginPath(); g.moveTo(cx, cy); g.lineTo(ax, ay); g.stroke(); g.setLineDash([]);
+        g.strokeStyle = 'rgba(255,200,110,0.95)'; g.lineWidth = 1.5;
+        g.beginPath(); g.moveTo(ax, ay - 8); g.lineTo(ax + 8, ay); g.lineTo(ax, ay + 8); g.lineTo(ax - 8, ay); g.closePath(); g.stroke();
+        g.lineWidth = 1;
       }
-      g.strokeStyle = G.following ? 'rgba(255,200,110,0.95)' : 'rgba(190,240,255,0.8)';
-      g.beginPath(); g.arc(m.x, m.y, 7, 0, Math.PI * 2); g.stroke();
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(m.x + dx * 10, m.y + dy * 10); g.lineTo(m.x + dx * 15, m.y + dy * 15); g.stroke(); }
-      if (G.following) { g.fillStyle = 'rgba(255,200,110,0.9)'; g.beginPath(); g.arc(m.x, m.y, 2, 0, Math.PI * 2); g.fill(); }
+      if (G.gunAssist) {
+        g.strokeStyle = 'rgba(255,90,72,0.85)';
+        g.beginPath(); g.arc(cx, cy, 13, 0, Math.PI * 2); g.stroke();
+      }
+      if (!G.mouseLocked) {
+        g.strokeStyle = 'rgba(190,240,255,0.8)';
+        g.beginPath(); g.arc(m.x, m.y, 7, 0, Math.PI * 2); g.stroke();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(m.x + dx * 10, m.y + dy * 10); g.lineTo(m.x + dx * 15, m.y + dy * 15); g.stroke(); }
+      }
       if (G.ctrlTargeting) {
         g.strokeStyle = 'rgba(255,176,64,0.6)'; g.setLineDash([6, 6]);
         g.beginPath(); g.arc(m.x, m.y, G.ctrlRadius, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);

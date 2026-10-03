@@ -84,8 +84,9 @@ const G = {
   mouse: new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), following: false, followToggle: false,
   ctrlTargeting: false, ctrlHover: null, ctrlRadius: 110,
   input: { fire1: false, fire2: false, mmb: false, keys: {} }, flightAssist: true, boosting: false, camMode: 0,
-  credits: 250000, kills: 0, ammo: { rail: 40, missile: 24 }, cool: { pri: 0, sec: 0, missile: 0 },
-  priOff: false, secOff: false, usesAmmo: true, leadSpeed: 3200,
+  credits: 250000, kills: 0, ammo: { rail: 40, missile: 24 }, cool: { pri: 0, sec: 0, tur: 0, missile: 0 },
+  priOff: false, secOff: false, usesAmmo: true, leadSpeed: 3200, turretsAuto: true, hasTurrets: true, turFiring: false, gunAssist: false,
+  aimDir: new THREE.Vector3(0, 0, 1), aimPoint: new THREE.Vector3(), aimActive: false, mouseLocked: false,
   hull: 'valkyrie', owned: { valkyrie: emptyFit('valkyrie') }, inventory: {}, dockedAt: LOCATIONS[0],
   nearestName: '', time: 0, shake: 0, hitFlash: 0,
 };
@@ -96,8 +97,10 @@ const STATS = {
   hauler: { cls: 'Bestower Hauler', shield: 500, armor: 1100, hull: 1000, speed: 140, accel: 15, turn: 0.28, bounty: 0, sig: 3 },
   navyKestrel: { cls: 'Helion Navy Kestrel', shield: 520, armor: 380, hull: 340, speed: 330, accel: 130, turn: 1.1, bounty: 0, sig: 0.6 },
   navyWarden: { cls: 'Helion Navy Warden', shield: 1800, armor: 1700, hull: 1300, speed: 175, accel: 50, turn: 0.4, bounty: 0, sig: 1.8 },
+  navyBastion: { cls: 'Helion Navy Bastion', shield: 2700, armor: 2900, hull: 2100, speed: 140, accel: 36, turn: 0.3, bounty: 0, sig: 2.4 },
+  navyMantis: { cls: 'Helion Navy Mantis', shield: 1150, armor: 1150, hull: 850, speed: 210, accel: 72, turn: 0.75, bounty: 0, sig: 1.2 },
 };
-const NAVY_HULL = { navyKestrel: 'kestrel', navyWarden: 'warden' };
+const NAVY_HULL = { navyKestrel: 'kestrel', navyWarden: 'warden', navyBastion: 'bastion', navyMantis: 'mantis' };
 const PIRATE_NAMES = ['Corsair Raider', 'Corsair Cutthroat', 'Corsair Wrecker', 'Corsair Outlaw', 'Corsair Plunderer', 'Corsair Despoiler'];
 const PROFILES = { em: { s: 1.25, a: 0.7, h: 1 }, kinetic: { s: 0.85, a: 1.2, h: 1 }, explosive: { s: 0.9, a: 1.1, h: 1.2 }, thermal: { s: 1.0, a: 0.95, h: 1.1 } };
 
@@ -253,27 +256,60 @@ function muzzleWorld(t, i, outPos, outDir) {
   outDir.set(0, 0, 1).transformDirection(m.matrixWorld);
 }
 
-function playerWeapons(dt, aim) {
+const GUN_ASSIST = 0.1, AIM_SENS = 0.0022, AIM_MAX = 1.4;
+const _fw = new THREE.Vector3(), _gp = new THREE.Vector3(), _tp = new THREE.Vector3(), _pd = new THREE.Vector3();
+
+function turretTarget() {
+  const pp = G.player.obj.position;
+  const L = G.lock && G.lock.progress >= 1 ? G.lock.ent : null;
+  if (L && L.alive && L.faction === 'pirate') return L;
+  let best = null, bd = 7000;
+  for (const e of G.entities) {
+    if (!e.alive || e.faction !== 'pirate') continue;
+    const d = e.obj.position.distanceTo(pp);
+    if (d < bd) { bd = d; best = e; }
+  }
+  return best;
+}
+
+function playerWeapons(dt) {
   const p = G.player;
-  const lockEnt = G.lock && G.lock.progress >= 1 ? G.lock.ent : null;
-  let pri = 0, sec = 0, priOff = true, secOff = true;
+  const lockEnt = G.lock && G.lock.progress >= 1 && G.lock.ent.alive ? G.lock.ent : null;
+  const tt = G.turretsAuto && G.state === 'flying' && !G.warp ? turretTarget() : null;
+  const fwd = _fw.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
+  let pri = 0, sec = 0, tur = 0, priOff = true, secOff = true, turFiring = false;
+  G.gunAssist = false;
   for (const t of p.ship.turrets) {
     const O = t.weapon;
     if (!O) continue;
-    const primary = O.group === 'primary';
-    let target = aim;
-    if (O.hitscan && lockEnt) target = intercept(p.obj.position, p.vel, lockEnt.obj.position, lockEnt.vel, 1e9) || lockEnt.obj.position;
-    const aligned = aimTurret(t, target, dt, O.track, -1.4, 0.35);
     t.next = Math.max(0, t.next - dt);
+    t.root.updateWorldMatrix(true, false);
+    const mp = _gp.setFromMatrixPosition(t.root.matrixWorld);
     const blocked = p.cap < O.cap || (O.ammo && G.ammo.rail <= 0);
-    if (primary) { pri = Math.max(pri, t.next / O.rof); priOff = priOff && blocked; } else { sec = Math.max(sec, t.next / O.rof); secOff = secOff && blocked; }
-    if (G.warp || G.state !== 'flying') continue;
-    if (!(primary ? G.input.fire1 : G.input.fire2) || t.next > 0 || !aligned || blocked) continue;
+    let target, fire, assisted = false;
+    if (O.mount === 'turret') {
+      tur = Math.max(tur, t.next / O.rof);
+      target = tt ? intercept(mp, p.vel, tt.obj.position, tt.vel, O.hitscan ? 1e9 : O.speed) || tt.obj.position : _tp.copy(mp).addScaledVector(fwd, 2000);
+      const aligned = aimTurret(t, target, dt, O.track, -1.4, 0.35);
+      fire = !!tt && aligned && mp.distanceTo(tt.obj.position) < O.range * 0.95;
+      if (fire && !blocked) turFiring = true;
+    } else {
+      // fixed forward gun with a small auto-aim gimbal
+      target = _tp.copy(mp).addScaledVector(fwd, 1e5);
+      if (lockEnt) {
+        const lead = intercept(mp, p.vel, lockEnt.obj.position, lockEnt.vel, O.hitscan ? 1e9 : O.speed);
+        if (lead && _v.subVectors(lead, mp).angleTo(fwd) < GUN_ASSIST && mp.distanceTo(lead) < O.range) { target = lead; assisted = true; G.gunAssist = true; }
+      }
+      aimTurret(t, target, dt, 4, -GUN_ASSIST * 1.2, GUN_ASSIST * 1.2);
+      if (O.group === 'primary') { pri = Math.max(pri, t.next / O.rof); priOff = priOff && blocked; } else { sec = Math.max(sec, t.next / O.rof); secOff = secOff && blocked; }
+      fire = O.group === 'primary' ? G.input.fire1 : G.input.fire2;
+    }
+    if (G.warp || G.state !== 'flying' || !fire || t.next > 0 || blocked) continue;
     t.next = O.rof * (0.94 + Math.random() * 0.12);
     p.cap -= O.cap;
     t.side = ((t.side || 0) + 1) % t.muzzles.length;
     muzzleWorld(t, t.side, _v2, _v3);
-    const dir = _v3.subVectors(target, _v2).normalize();
+    const dir = O.mount === 'gun' && !assisted ? _v3.copy(fwd) : _v3.subVectors(target, _v2).normalize();
     if (O.spread) { dir.x += (Math.random() - 0.5) * O.spread; dir.y += (Math.random() - 0.5) * O.spread; dir.z += (Math.random() - 0.5) * O.spread; dir.normalize(); }
     t.recoil[Math.min(t.side, t.recoil.length - 1)] = 1;
     if (t.rotor) t.spin = 30;
@@ -288,25 +324,54 @@ function playerWeapons(dt, aim) {
       if (h.ent) damage(h.ent, O.dmg, O.profile, h.point, p);
       else if (h.hitWorld) impactWorld(h.point, d.negate(), 2.5);
     } else {
-      bolts.fire(O.bolt, _v2, dir, O.speed, p.vel, O.range, O.dmg, p, O.profile);
+      for (let n = 0; n < (O.pellets || 1); n++) {
+        const d = n === 0 ? dir : _pd.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(O.spread * 1.6).add(dir).normalize();
+        bolts.fire(O.bolt, _v2, d, O.speed * (0.95 + Math.random() * 0.1), p.vel, O.range, O.dmg, p, O.profile);
+      }
       fx.muzzle(_v2, dir, O.flash, O.bolt === 'plasma' ? 6 : O.bolt === 'tracer' ? 1.3 : 2.2 * (O.scale || 1));
       if (O.bolt === 'plasma') { fx.flash(_v2, 10, 0x60ffa0, 0.12); G.shake = Math.min(1, G.shake + 0.2); }
     }
     audio[O.sound]();
   }
-  G.cool.pri = pri; G.cool.sec = sec; G.priOff = priOff; G.secOff = secOff;
+  G.cool.pri = pri; G.cool.sec = sec; G.cool.tur = tur; G.priOff = priOff; G.secOff = secOff; G.turFiring = turFiring;
   G.cool.missile = Math.max(0, G.cool.missile - dt);
 }
 
 function weaponInfo() {
   const ws = G.owned[G.hull].w.filter(Boolean).map((id) => OUTFITS[id]);
-  const names = (g) => [...new Set(ws.filter((o) => o.group === g).map((o) => o.name))].join(' + ') || 'None fitted';
-  $('priname').textContent = names('primary');
-  $('secname').textContent = names('secondary');
+  const names = (f) => [...new Set(ws.filter(f).map((o) => o.name))].join(' + ') || 'None fitted';
+  $('priname').textContent = names((o) => o.mount === 'gun' && o.group === 'primary');
+  $('secname').textContent = names((o) => o.mount === 'gun' && o.group === 'secondary');
+  $('turname').textContent = names((o) => o.mount === 'turret');
+  G.hasTurrets = ws.some((o) => o.mount === 'turret');
   G.usesAmmo = ws.some((o) => o.ammo);
-  const lead = ws.find((o) => o.group === 'primary' && !o.hitscan);
+  const lead = ws.find((o) => o.mount === 'gun' && o.group === 'primary' && !o.hitscan) || ws.find((o) => o.mount === 'gun' && !o.hitscan);
   G.leadSpeed = lead ? lead.speed : 3200;
 }
+
+function dragAim(dx, dy) {
+  const q = G.player.obj.quaternion;
+  const fwd = _fw.set(0, 0, 1).applyQuaternion(q);
+  if (!G.aimActive) { G.aimDir.copy(fwd); G.aimActive = true; }
+  G.aimDir.applyAxisAngle(_gp.set(0, 1, 0).applyQuaternion(q), -THREE.MathUtils.clamp(dx, -120, 120) * AIM_SENS);
+  G.aimDir.applyAxisAngle(_gp.set(1, 0, 0).applyQuaternion(q), THREE.MathUtils.clamp(dy, -120, 120) * AIM_SENS).normalize();
+  const a = G.aimDir.angleTo(fwd);
+  if (a > AIM_MAX) G.aimDir.copy(fwd).applyAxisAngle(_tp.crossVectors(fwd, G.aimDir).normalize(), AIM_MAX);
+}
+
+function setMouseFlight(on) {
+  G.followToggle = on;
+  if (on) lockMouse(); else if (!G.input.mmb) document.exitPointerLock?.();
+}
+function lockMouse() {
+  if (G.mouseLocked) return;
+  const r = canvas.requestPointerLock?.();
+  if (r && r.catch) r.catch(() => {});
+}
+document.addEventListener('pointerlockchange', () => {
+  G.mouseLocked = document.pointerLockElement === canvas;
+  if (!G.mouseLocked) G.followToggle = false;
+});
 
 function fireMissiles() {
   const p = G.player;
@@ -540,26 +605,30 @@ let playerAngVel = new THREE.Vector3();
 function updatePlayer(dt) {
   const p = G.player, S = p.stats, K = G.input.keys;
   if (G.state !== 'flying') return;
-  if (G.warp) { updateWarp(dt); return; }
+  if (G.warp) { G.aimActive = false; updateWarp(dt); return; }
   // throttle
   if (K.KeyW || K.ArrowUp) p.throttle = Math.min(1, p.throttle + dt * 0.6);
   if (K.KeyS || K.ArrowDown) p.throttle = Math.max(0, p.throttle - dt * 0.6);
   G.boosting = !!K.ShiftLeft && p.cap > 10 || (!!K.ShiftRight && p.cap > 10);
   if (G.boosting) p.cap -= 45 * dt;
   // rotation (local axes): +X left, +Y up, +Z forward
-  if (G.following && !G.freeLook) {
-    const r = Math.min(window.innerWidth, window.innerHeight) * 0.32;
-    G.stick.set(THREE.MathUtils.clamp((G.mouse.x - window.innerWidth / 2) / r, -1, 1), THREE.MathUtils.clamp((G.mouse.y - window.innerHeight / 2) / r, -1, 1));
-  } else G.stick.set(0, 0);
-  const dz = 0.04;
-  const sx = Math.abs(G.stick.x) > dz ? G.stick.x : 0, sy = Math.abs(G.stick.y) > dz ? G.stick.y : 0;
+  // Pioneer-style: dragging with MMB moves a target heading; the ship turns to it and stops there
+  let wx = 0, wy = 0;
+  if (G.aimActive && !G.freeLook) {
+    const l = _v2.copy(G.aimDir).applyQuaternion(_q2.copy(p.obj.quaternion).invert());
+    const ex = Math.atan2(-l.y, l.z), ey = Math.atan2(l.x, l.z);
+    wx = THREE.MathUtils.clamp(ex * 2.2, -S.turn[0], S.turn[0]);
+    wy = THREE.MathUtils.clamp(ey * 2.2, -S.turn[1], S.turn[1]);
+    if (!G.following && Math.abs(ex) < 0.002 && Math.abs(ey) < 0.002) G.aimActive = false;
+  }
   const roll = (K.KeyE ? 1 : 0) - (K.KeyQ ? 1 : 0);
-  const tgt = _v.set(sy * S.turn[0], -sx * S.turn[1], roll * S.turn[2]);
+  const tgt = _v.set(wx, wy, roll * S.turn[2]);
   const boostTurnPenalty = G.boosting ? 0.75 : 1;
   tgt.multiplyScalar(boostTurnPenalty);
   playerAngVel.lerp(tgt, 1 - Math.exp(-dt * 9));
   _q.setFromEuler(_e.set(playerAngVel.x * dt, playerAngVel.y * dt, playerAngVel.z * dt));
   p.obj.quaternion.multiply(_q).normalize();
+  if (!G.aimActive) G.aimDir.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
   // translation
   const strafeX = ((K.KeyA || K.ArrowLeft) ? 1 : 0) - ((K.KeyD || K.ArrowRight) ? 1 : 0);
   const strafeY = ((K.KeyR || K.PageUp) ? 1 : 0) - ((K.KeyB || K.PageDown) ? 1 : 0);
@@ -749,6 +818,7 @@ function tryDock() {
   $('fade').style.opacity = 1;
   G.state = 'docking';
   G.input.fire1 = G.input.fire2 = G.input.mmb = false;
+  setMouseFlight(false);
   setTimeout(() => { enterDocked(); $('fade').style.opacity = 0; }, 700);
 }
 
@@ -778,7 +848,7 @@ function statRows(s, cmp) {
 
 function weaponLine(O) {
   if (O.type !== 'weapon') return '';
-  return `${O.group === 'primary' ? 'Primary (LMB)' : 'Secondary (RMB)'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
+  return `${O.mount === 'turret' ? 'Turret — auto-engages hostiles' : O.group === 'primary' ? 'Fixed gun (LMB)' : 'Fixed gun (RMB)'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
 }
 
 function renderDock() {
@@ -837,10 +907,20 @@ function renderDock() {
     }
     R.innerHTML = `<h3>${isHigh() ? 'Helion outfitter' : 'Basic outfitter'} — ${type}s</h3>${list.map(([id, O]) => {
       const avail = O.tech === 'basic' || isHigh();
-      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${O.type === 'weapon' ? (O.group === 'primary' ? 'Primary' : 'Secondary') : 'Utility'}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
+      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${O.type === 'weapon' ? (O.mount === 'turret' ? 'Auto turret' : O.group === 'primary' ? 'Fixed gun · LMB' : 'Fixed gun · RMB') : 'Utility'}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
         <span class="pr${G.inventory[id] ? ' own' : ''}">${G.inventory[id] ? `×${G.inventory[id]} in cargo` : fmtIsk(O.price)}</span></div>`;
     }).join('')}${det}`;
   }
+  slotMarkers();
+}
+
+function slotMarkers() {
+  const s = hangar.ship;
+  if (D.tab === 'services' || !s) { hangar.setSlots(null); return; }
+  const fit = D.tab === 'shipyard' ? (G.owned[D.browse] || HULLS[D.browse].fit) : G.owned[G.hull];
+  const list = [...s.hardpoints.slice(0, fit.w.length).map((h, i) => ({ k: 'w', i, ...h })), ...s.utilMounts.slice(0, fit.u.length).map((h, i) => ({ k: 'u', i, ...h }))];
+  hangar.setSlots(list, D.tab === 'outfitter' ? D.slot : null, D.focusSlot);
+  D.focusSlot = false;
 }
 
 function setDockTab(tab) {
@@ -873,7 +953,7 @@ for (const id of ['dockleft', 'dockright']) {
     if (!t) return;
     const fit = G.owned[G.hull];
     if (t.dataset.hull) { D.browse = t.dataset.hull; hangarShow(D.browse); audio.ui(); }
-    else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; hangar.setOutfit(null); audio.ui(); }
+    else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.focusSlot = true; hangar.setOutfit(null); audio.ui(); }
     else if (t.dataset.out) {
       const O = OUTFITS[t.dataset.out];
       if (O.type === 'weapon' && D.slot.k !== 'w') D.slot = { k: 'w', i: 0 };
@@ -935,6 +1015,7 @@ function undock() {
   p.vel.copy(out).multiplyScalar(120);
   p.throttle = 0.5;
   G.stick.set(0, 0);
+  G.aimActive = false;
   playerAngVel.set(0, 0, 0);
   camQuat.copy(p.obj.quaternion);
   G.state = 'flying';
@@ -970,19 +1051,20 @@ canvas.addEventListener('mousedown', (ev) => {
   if (G.state === 'docked') { hangar.dragging = true; return; }
   if (G.state !== 'flying') return;
   if (ev.button === 0) { if (!G.lock && !G.ctrlTargeting) lockNearestToReticle(true); G.input.fire1 = true; }
-  if (ev.button === 1) G.input.mmb = true;
+  if (ev.button === 1) { G.input.mmb = true; lockMouse(); }
   if (ev.button === 2) G.input.fire2 = true;
 });
 window.addEventListener('mouseup', (ev) => {
   if (ev.button === 0) G.input.fire1 = false;
-  if (ev.button === 1) G.input.mmb = false;
+  if (ev.button === 1) { G.input.mmb = false; if (!G.followToggle && G.mouseLocked) document.exitPointerLock(); }
   if (ev.button === 2) G.input.fire2 = false;
   if (hangar) hangar.dragging = false;
 });
 canvas.addEventListener('auxclick', (ev) => ev.preventDefault());
 window.addEventListener('contextmenu', (ev) => ev.preventDefault());
 window.addEventListener('mousemove', (ev) => {
-  G.mouse.set(ev.clientX, ev.clientY);
+  if (!G.mouseLocked) G.mouse.set(ev.clientX, ev.clientY);
+  if (G.following && !G.warp && !G.freeLook && G.player) dragAim(ev.movementX, ev.movementY);
   if (G.state === 'docked' && hangar && hangar.dragging) { hangar.drag(ev.movementX, ev.movementY); return; }
   if (G.freeLook) {
     G.look.x = THREE.MathUtils.clamp(G.look.x - ev.movementX * 0.004, -Math.PI, Math.PI);
@@ -994,7 +1076,8 @@ function togglePause() {
   const paused = G.state === 'paused';
   G.state = paused ? 'flying' : 'paused';
   $('pause').classList.toggle('hidden', paused);
-  G.input.keys = {}; G.input.fire1 = G.input.fire2 = false;
+  G.input.keys = {}; G.input.fire1 = G.input.fire2 = G.input.mmb = false;
+  if (!paused) { G.followToggle = false; document.exitPointerLock?.(); }
   if (paused) audio.ctx?.resume();
   else audio.ctx?.suspend();
 }
@@ -1018,7 +1101,8 @@ window.addEventListener('keydown', (ev) => {
     case 'KeyJ':
     case 'Space': warpTo(G.navTarget); break;
     case 'KeyG': tryDock(); break;
-    case 'KeyM': G.followToggle = !G.followToggle; hud.notice(G.followToggle ? 'POINTER FOLLOW LOCKED ON (M)' : 'POINTER FOLLOW: HOLD MIDDLE MOUSE', 1.6); audio.ui(); break;
+    case 'KeyM': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (M)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
+    case 'KeyL': G.turretsAuto = !G.turretsAuto; hud.notice(G.turretsAuto ? 'TURRETS: AUTO-ENGAGE HOSTILES' : 'TURRETS: HOLD FIRE', 1.6); audio.ui(); break;
     case 'KeyH': toggleHelp(); break;
     default:
       if (/^(Digit|Numpad)[1-7]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(-1) - 1]; G.selected = l; G.navTarget = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — SPACE TO WARP`, 1.8); }
@@ -1038,7 +1122,7 @@ document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('
 function toggleHelp() {
   const h = $('help');
   if (h.classList.contains('hidden')) {
-    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and the ship turns towards the pointer; turrets always aim at the pointer. Hold left Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Ardent Relay Station (1) to repair and buy basic outfits, or at Helion Orbital Shipyard (7) for new hulls, a 3D hangar and high-tech modules. Pirates spawn at the asteroid belt (2) and the Corsair Hideout (3). Press H to close. Press Esc to pause.</p>';
+    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (M toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (L toggles hold fire). Hold left Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Ardent Relay Station (1) to repair and buy basic outfits, or at Helion Orbital Shipyard (7) for new hulls, a 3D hangar and high-tech modules. Pirates spawn at the asteroid belt (2) and the Corsair Hideout (3). Press H to close. Press Esc to pause.</p>';
     h.classList.remove('hidden');
   } else h.classList.add('hidden');
 }
@@ -1089,19 +1173,6 @@ function updateCamera(dt) {
   return warpI;
 }
 
-function aimPoint() {
-  const dir = _v.set((G.mouse.x / window.innerWidth) * 2 - 1, -(G.mouse.y / window.innerHeight) * 2 + 1, 0.5).unproject(camera).sub(camera.position).normalize().clone();
-  let dist = 1800;
-  const L = G.lock;
-  // if the lead pip is close to the pointer, converge on it (aim assist)
-  if (L && G.leadPoint) {
-    const to = _v.subVectors(G.leadPoint, camera.position);
-    if (to.angleTo(dir) < 0.08) return G.leadPoint.clone();
-    dist = THREE.MathUtils.clamp(to.length(), 300, 6000);
-  }
-  return camera.position.clone().addScaledVector(dir, dist);
-}
-
 // ---------------------------------------------------------------- main loop
 let last = performance.now();
 function frame(now) {
@@ -1131,7 +1202,8 @@ function frame(now) {
   }
   const warpI = updateCamera(dt);
   updateCtrlTargeting();
-  if (G.state === 'flying') playerWeapons(dt, aimPoint());
+  G.aimPoint.copy(camera.position).addScaledVector(G.aimDir, 5000);
+  if (G.state === 'flying') playerWeapons(dt);
   const colliders = world.collidersNear(p.obj.position, 7000);
   bolts.update(dt, G.entities, colliders, onBoltHit);
   missiles.update(dt, colliders, onMissileDetonate);
@@ -1183,7 +1255,7 @@ async function boot() {
     weaponInfo();
     // Helion navy patrol around the shipyard
     const yardPos = LOCATIONS[6].pos;
-    for (const [kind, name, off] of [['navyWarden', 'HNS Vigilant', [2500, 300, 1500]], ['navyKestrel', 'HNS Swift', [-2000, -400, 2600]], ['navyKestrel', 'HNS Harrier', [1500, 600, -2800]]]) {
+    for (const [kind, name, off] of [['navyWarden', 'HNS Vigilant', [2500, 300, 1500]], ['navyKestrel', 'HNS Swift', [-2000, -400, 2600]], ['navyKestrel', 'HNS Harrier', [1500, 600, -2800]], ['navyBastion', 'HNS Bulwark', [-3200, 900, -1200]], ['navyMantis', 'HNS Talon', [3400, -700, -2200]]]) {
       const n = makeEntity(kind, 'navy', yardPos.clone().add(new THREE.Vector3(...off)), name);
       n.ai.seed = Math.random(); n.ai.home.copy(yardPos);
     }
@@ -1209,7 +1281,7 @@ async function boot() {
       audio.init();
       $('menu').classList.add('hidden');
       hud.log('Welcome to Kaltos. Pirates reported at Asteroid Belt 1.', 'i');
-      hud.log('Press 2 then Space to warp to the belt. Hold MMB to steer, hold L-Ctrl to target.', 'i');
+      hud.log('Press 2 then Space to warp to the belt. Hold MMB and drag to steer, hold L-Ctrl to target.', 'i');
       hud.log('New hulls and high-tech outfits: Helion Orbital Shipyard (7).', 'i');
       undock();
     };
@@ -1231,6 +1303,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, camera, LOCATIONS, get world() { return world; }, warpTo, startLock, damage };
+window.__game = { G, camera, LOCATIONS, get world() { return world; }, get hangar() { return hangar; }, makeEntity, warpTo, startLock, damage };
 requestAnimationFrame(frame);
 boot();

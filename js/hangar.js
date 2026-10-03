@@ -53,6 +53,22 @@ function starTexture() {
 }
 
 // Ship hangar bay rendered with its own scene/camera while docked.
+function slotLabel(text, on, kind) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = on ? 'rgba(60,36,4,0.85)' : 'rgba(4,16,26,0.75)';
+  g.strokeStyle = on ? '#ffc060' : kind === 'w' ? '#7cd0ff' : '#80f0a8';
+  g.lineWidth = 4;
+  g.beginPath(); g.roundRect(6, 8, 116, 48, 10); g.fill(); g.stroke();
+  g.fillStyle = on ? '#ffe0a0' : '#e8f6ff';
+  g.font = 'bold 30px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, 64, 33);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 export class Hangar {
   constructor(renderer) {
     this.renderer = renderer;
@@ -241,7 +257,55 @@ export class Hangar {
     });
   }
 
+  setSlots(list, sel, focus) {
+    if (this.slotG) {
+      this.slotG.parent?.remove(this.slotG);
+      this.slotG.traverse((o) => { if (o.material) { o.material.map?.dispose(); o.material.dispose(); } });
+      this.slotG = null;
+    }
+    if (!list || !this.ship) return;
+    if (!this.ringGeo) {
+      this.ringGeo = new THREE.RingGeometry(0.9, 1.15, 48); this.ringGeo.userData.shared = true;
+      this.stemGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6); this.stemGeo.translate(0, 0.5, 0); this.stemGeo.userData.shared = true;
+    }
+    const R = this.ship.radius, ls = 0.55 + R * 0.025;
+    const g = new THREE.Group();
+    let selPos = null;
+    for (const s of list) {
+      const on = !!sel && s.k === sel.k && s.i === sel.i;
+      const col = on ? new THREE.Color(5, 3, 0.6) : s.k === 'w' ? new THREE.Color(0.5, 1.6, 3.2) : new THREE.Color(0.5, 2.6, 1.1);
+      const up = s.flip ? -1 : 1;
+      const m = new THREE.Group();
+      m.position.fromArray(s.p);
+      const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: on ? 1 : 0.6, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
+      const base = s.s * (s.k === 'u' ? 1.5 : 1.3);
+      ring.rotation.x = -Math.PI / 2; ring.position.y = up * 0.3 * s.s; ring.scale.setScalar(base * (on ? 1.5 : 1)); ring.renderOrder = 30;
+      m.add(ring);
+      const h = 2.6 * s.s + ls * 1.4;
+      if (on) {
+        const stem = new THREE.Mesh(this.stemGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.8, depthTest: false, depthWrite: false }));
+        stem.scale.set(ls, h, ls); if (up < 0) stem.rotation.x = Math.PI; stem.renderOrder = 30;
+        m.add(stem);
+      }
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: slotLabel(`${s.k.toUpperCase()}${s.i + 1}`, on, s.k), depthTest: false, depthWrite: false, transparent: true }));
+      spr.position.y = up * (h + ls * 0.8); spr.scale.set(3.2 * ls, 1.6 * ls, 1); spr.renderOrder = 31;
+      m.add(spr);
+      m.userData = { ring, on, base };
+      g.add(m);
+      if (on) selPos = new THREE.Vector3().fromArray(s.p);
+    }
+    this.ship.group.add(g);
+    this.slotG = g;
+    if (focus && selPos && this.focus === 'ship') {
+      this.ship.group.updateMatrixWorld(true);
+      this.ship.group.localToWorld(selPos);
+      this.targetWant.copy(this.shipCenter).lerp(selPos, 0.75);
+      this.distWant = R * 1.25 + 8;
+    }
+  }
+
   setShip(ship, keepView) {
+    this.setSlots(null);
     if (this.ship) { this.scene.remove(this.ship.group); this.dispose(this.ship.group); }
     if (this.cradle) { this.scene.remove(this.cradle); this.dispose(this.cradle); }
     this.ship = ship;
@@ -345,7 +409,6 @@ export class Hangar {
     const k = 1 - Math.exp(-dt * 4);
     this.target.lerp(this.targetWant, k);
     this.dist += (this.distWant - this.dist) * k;
-    if (!this.dragging) this.yaw += dt * 0.06;
     const cp = Math.cos(this.pitch);
     this.camera.position.set(Math.sin(this.yaw) * cp, Math.sin(this.pitch), Math.cos(this.yaw) * cp).multiplyScalar(this.dist).add(this.target);
     this.camera.position.x = THREE.MathUtils.clamp(this.camera.position.x, -192, 192);
@@ -354,7 +417,13 @@ export class Hangar {
     this.camera.lookAt(this.target);
     if (this.ship) {
       animateShip(this.ship, dt, this.time, 0.04);
-      this.ship.turrets.forEach((t, i) => { t.yaw.rotation.y = Math.sin(this.time * 0.35 + i * 1.3) * 0.7; t.pitch.rotation.x = -0.15 - 0.15 * Math.sin(this.time * 0.5 + i); });
+    }
+    if (this.slotG) {
+      const pulse = 0.5 + 0.5 * Math.sin(this.time * 5);
+      for (const m of this.slotG.children) {
+        const { ring, on, base } = m.userData;
+        if (on) { ring.scale.setScalar(base * (1.45 + pulse * 0.35)); ring.material.opacity = 0.65 + pulse * 0.35; }
+      }
     }
     if (this.outfit) this.outfit.rotation.y += dt * 0.6;
     this.holder.position.y = 5.5 + Math.sin(this.time * 1.5) * 0.15;
