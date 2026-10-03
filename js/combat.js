@@ -153,7 +153,7 @@ export class Effects {
     this.sparks = new Particles(1500, glow, true);
     scene.add(this.fire.points, this.smoke.points, this.sparks.points);
     this.flashes = [];
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 48; i++) {
       const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
       s.visible = false; s.renderOrder = 25;
       scene.add(s);
@@ -208,10 +208,11 @@ export class Effects {
     }
   }
   muzzle(pos, dir, color, size) {
-    this.flash(pos, size, color, 0.06);
-    for (let i = 0; i < 3; i++) {
-      _v.copy(dir).multiplyScalar(30 + Math.random() * 40).add(_v2.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(20));
-      this.sparks.spawn(pos, _v, 0.12, size * 0.25, 0.05, new THREE.Color(color).multiplyScalar(2), new THREE.Color(0, 0, 0), 1, 0, 2);
+    this.flash(pos, size * 2.2, color, 0.1);
+    this.flash(_v.copy(pos).addScaledVector(dir, size * 0.6), size * 0.9, 0xffffff, 0.05);
+    for (let i = 0; i < 6; i++) {
+      _v.copy(dir).multiplyScalar(40 + Math.random() * 60).add(_v2.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(25));
+      this.sparks.spawn(pos, _v, 0.18, size * 0.4, 0.08, new THREE.Color(color).multiplyScalar(3.5), new THREE.Color(0, 0, 0), 1, 0, 2);
     }
   }
   explosion(pos, scale, vel = new THREE.Vector3(), color = null) {
@@ -252,10 +253,16 @@ export class Effects {
   }
   railTrail(a, b) {
     const geo = new THREE.BufferGeometry().setFromPoints([a.clone(), b.clone()]);
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: new THREE.Color(0.8, 1.6, 4), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: new THREE.Color(2, 3.5, 8), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
     line.frustumCulled = false;
+    const beam = new THREE.Mesh(boltGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.7, 1.6, 5), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    beam.position.lerpVectors(a, b, 0.5);
+    beam.quaternion.setFromUnitVectors(_z, _v.subVectors(b, a).normalize());
+    beam.scale.set(0.3, 0.3, a.distanceTo(b));
+    beam.frustumCulled = false;
+    line.add(beam);
     this.scene.add(line);
-    this.tracers.push({ line, life: 1.2, max: 1.2 });
+    this.tracers.push({ line, beam, life: 1.6, max: 1.6 });
     // ionised particles along the path
     const len = a.distanceTo(b);
     const n = Math.min(80, Math.floor(len / 40));
@@ -303,9 +310,12 @@ export class Effects {
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const t = this.tracers[i];
       t.life -= dt;
-      t.line.material.opacity = Math.max(0, t.life / t.max);
+      const f = Math.max(0, t.life / t.max);
+      t.line.material.opacity = f;
+      t.beam.material.opacity = f * f;
+      t.beam.scale.x = t.beam.scale.y = 0.3 + (1 - f) * 1.2;
       if (t.life <= 0) {
-        this.scene.remove(t.line); t.line.geometry.dispose(); t.line.material.dispose();
+        this.scene.remove(t.line); t.line.geometry.dispose(); t.line.material.dispose(); t.beam.material.dispose();
         this.tracers.splice(i, 1);
       }
     }
@@ -315,12 +325,12 @@ export class Effects {
 // ---------------------------------------------------------------- projectiles
 const boltGeo = new THREE.CylinderGeometry(1, 1, 1, 8, 1).rotateX(Math.PI / 2);
 const BOLT_TYPES = {
-  laser: { core: new THREE.Color(6, 7, 9), halo: new THREE.Color(0.6, 1.4, 4.5), len: 14, w: 0.14, hw: 0.55 },
-  pirate: { core: new THREE.Color(9, 6, 5), halo: new THREE.Color(4.5, 0.6, 0.3), len: 12, w: 0.14, hw: 0.6 },
-  heavy: { core: new THREE.Color(9, 6, 4), halo: new THREE.Color(4.0, 1.2, 0.2), len: 30, w: 0.35, hw: 1.6 },
-  slug: { core: new THREE.Color(8, 9, 12), halo: new THREE.Color(1.0, 2.0, 6.0), len: 40, w: 0.1, hw: 0.4 },
-  tracer: { core: new THREE.Color(9, 6, 2.5), halo: new THREE.Color(3.5, 1.4, 0.3), len: 9, w: 0.07, hw: 0.28 },
-  plasma: { core: new THREE.Color(5, 10, 6), halo: new THREE.Color(0.6, 4.0, 1.6), len: 16, w: 0.6, hw: 2.2 },
+  laser: { core: new THREE.Color(8, 9, 12), halo: new THREE.Color(1.0, 2.4, 7.5), len: 22, w: 0.22, hw: 1.0, gw: 5 },
+  pirate: { core: new THREE.Color(12, 8, 6), halo: new THREE.Color(7.5, 1.0, 0.5), len: 18, w: 0.22, hw: 1.1, gw: 5 },
+  heavy: { core: new THREE.Color(12, 8, 5), halo: new THREE.Color(6.5, 2.0, 0.35), len: 42, w: 0.5, hw: 2.6, gw: 12 },
+  slug: { core: new THREE.Color(10, 11, 14), halo: new THREE.Color(1.6, 3.2, 9.0), len: 55, w: 0.16, hw: 0.8, gw: 5 },
+  tracer: { core: new THREE.Color(12, 8, 3.5), halo: new THREE.Color(6.0, 2.4, 0.5), len: 14, w: 0.12, hw: 0.6, gw: 3 },
+  plasma: { core: new THREE.Color(7, 12, 8), halo: new THREE.Color(1.0, 6.5, 2.6), len: 22, w: 0.8, hw: 3.2, gw: 14 },
 };
 
 export class Projectiles {
@@ -333,7 +343,8 @@ export class Projectiles {
     for (const [k, t] of Object.entries(BOLT_TYPES)) {
       this.mats[k] = {
         core: new THREE.MeshBasicMaterial({ color: t.core, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
-        halo: new THREE.MeshBasicMaterial({ color: t.halo, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }),
+        halo: new THREE.MeshBasicMaterial({ color: t.halo, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }),
+        glow: new THREE.SpriteMaterial({ map: glow, color: t.halo.clone().multiplyScalar(0.6), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }),
       };
     }
   }
@@ -346,10 +357,13 @@ export class Projectiles {
       core.scale.set(t.w, t.w, t.len);
       const halo = new THREE.Mesh(boltGeo, this.mats[type].halo);
       halo.scale.set(t.hw, t.hw, t.len * 1.15);
-      g.add(core, halo);
+      const head = new THREE.Sprite(this.mats[type].glow);
+      head.position.z = t.len * 0.4;
+      head.scale.setScalar(t.gw);
+      g.add(core, halo, head);
       g.renderOrder = 22;
       this.scene.add(g);
-      p = { type, obj: g, active: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), prev: new THREE.Vector3() };
+      p = { type, t, core, halo, head, obj: g, active: false, pos: new THREE.Vector3(), vel: new THREE.Vector3(), prev: new THREE.Vector3() };
       this.pool.push(p);
     }
     return p;
@@ -364,16 +378,26 @@ export class Projectiles {
     p.damage = damage; p.owner = owner; p.profile = profile;
     p.obj.position.copy(from);
     p.obj.quaternion.setFromUnitVectors(_z, dir);
+    const L = Math.max(p.t.len, speed * 0.015);
+    p.core.scale.z = L; p.halo.scale.z = L * 1.15; p.head.position.z = L * 0.4;
     this.list.push(p);
     return p;
   }
   update(dt, entities, colliders, onHit) {
+    const cam = this.fx.camera;
     for (let i = this.list.length - 1; i >= 0; i--) {
       const p = this.list[i];
       p.prev.copy(p.pos);
       p.pos.addScaledVector(p.vel, dt);
       p.life -= dt;
       p.obj.position.copy(p.pos);
+      if (cam) {
+        // keep distant shots a few pixels wide so they stay readable
+        const d = p.pos.distanceTo(cam.position), t = p.t;
+        p.core.scale.x = p.core.scale.y = Math.max(t.w, d * 0.0018);
+        p.halo.scale.x = p.halo.scale.y = Math.max(t.hw, d * 0.005);
+        p.head.scale.setScalar(Math.max(t.gw, d * 0.022));
+      }
       let hit = null, hitT = Infinity, hitEnt = null;
       // segment vs entities
       const seg = _v.subVectors(p.pos, p.prev);
@@ -447,8 +471,9 @@ export class Missiles {
         g.add(f);
       }
       const fl = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: new THREE.Color(5, 3, 1.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-      fl.position.z = -1.3; fl.scale.setScalar(1.8);
+      fl.position.z = -1.3; fl.scale.setScalar(3.5);
       g.add(fl);
+      g.userData.flare = fl;
       return g;
     };
   }
@@ -458,7 +483,7 @@ export class Missiles {
     obj.quaternion.setFromUnitVectors(_z, dir);
     this.scene.add(obj);
     this.list.push({ obj, vel: dir.clone().multiplyScalar(80).add(inherit), target, owner, damage, speed, life: 14, arm: 0.35 });
-    this.fx.flash(from, 4, 0xffc080, 0.12);
+    this.fx.flash(from, 9, 0xffc080, 0.18);
   }
   update(dt, colliders, onDetonate, sound) {
     for (let i = this.list.length - 1; i >= 0; i--) {
@@ -491,9 +516,10 @@ export class Missiles {
       m.vel.lerp(_v3, Math.min(1, dt * 3));
       if (m.vel.length() > m.speed) m.vel.setLength(m.speed);
       m.obj.position.addScaledVector(m.vel, dt);
+      if (this.fx.camera) m.obj.userData.flare.scale.setScalar(Math.max(3.5, m.obj.position.distanceTo(this.fx.camera.position) * 0.016) * (0.85 + Math.random() * 0.3));
       if (m.arm < 0.2) {
         const back = _v3.copy(m.obj.position).addScaledVector(fwd, -1.4);
-        this.fx.trail(back, _v2.copy(m.vel).multiplyScalar(0.05), 0.9, 2.2, true);
+        this.fx.trail(back, _v2.copy(m.vel).multiplyScalar(0.05), 1.4, 2.8, true);
       }
       let boom = m.life <= 0;
       for (const c of colliders) if (c.p.distanceTo(m.obj.position) < c.r) { boom = true; break; }

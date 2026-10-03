@@ -180,13 +180,14 @@ function damage(e, amount, profile, hp, source) {
   if (e.shield > 0) {
     const d = left * P.s;
     shieldImpact(e, hp);
-    fx.sparksAt(hp, nrm, 4, 30, e.faction === 'pirate' ? new THREE.Color(3, 1.2, 0.5) : new THREE.Color(0.8, 1.8, 4));
+    fx.flash(hp, 5 + amount * 0.05, e.faction === 'pirate' ? 0xff9060 : 0x80b8ff, 0.12);
+    fx.sparksAt(hp, nrm, 8, 40, e.faction === 'pirate' ? new THREE.Color(3, 1.2, 0.5) : new THREE.Color(0.8, 1.8, 4));
     if (e.shield >= d) { e.shield -= d; left = 0; } else { left = (d - e.shield) / P.s; e.shield = 0; if (isPlayer) { hud.log('Shields depleted!', 'd'); audio.alarm(); } }
     if (isPlayer) audio.shieldHit();
   }
   if (left > 0) {
-    fx.sparksAt(hp, nrm, 14, 60);
-    fx.flash(hp, 4 + amount * 0.04, 0xffa050, 0.12);
+    fx.sparksAt(hp, nrm, 20, 70);
+    fx.flash(hp, 7 + amount * 0.07, 0xffa050, 0.16);
     fx.trail(hp, nrm.clone().multiplyScalar(8), 2, 1.5, true);
     if (isPlayer) { audio.hullHit(); G.hitFlash = Math.min(1, G.hitFlash + 0.35); }
     if (e.armor > 0) {
@@ -415,8 +416,8 @@ function fireMissiles() {
 }
 
 function impactWorld(point, normal, size) {
-  fx.sparksAt(point, normal, 10, 40);
-  fx.flash(point, size * 3, 0xffb070, 0.1);
+  fx.sparksAt(point, normal, 16, 50);
+  fx.flash(point, size * 5, 0xffb070, 0.14);
   for (let i = 0; i < 4; i++) fx.smoke.spawn(point, _v.copy(normal).multiplyScalar(5 + Math.random() * 10).add(_v2.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(6)), 3, size, size * 6, new THREE.Color(0.25, 0.22, 0.2), new THREE.Color(0.1, 0.1, 0.1), 0.5, 0, 0.3);
   audio.impact(point.distanceTo(camera.position));
 }
@@ -1893,6 +1894,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, cine, camera, renderer, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
+window.__game = { G, cine, camera, renderer, get fx() { return fx; }, get bolts() { return bolts; }, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
 requestAnimationFrame(frame);
 boot();
