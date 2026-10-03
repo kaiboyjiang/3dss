@@ -3,7 +3,9 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { buildWorld, LOCATIONS, PLANET, MOON } from './world.js';
+import { buildWorld, LOCATIONS } from './world.js';
+import { SYSTEMS, GOVS, systemDef, route } from './systems.js';
+import { StarMap } from './map.js';
 import { buildRaider, buildCruiser, buildHauler, animateShip } from './ships.js';
 import { HULLS, HULL_ORDER, OUTFITS, emptyFit, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
@@ -80,7 +82,7 @@ let world, fx, bolts, missiles, hangar;
 
 const G = {
   state: 'menu', camera, entities: [], locations: LOCATIONS, player: null,
-  selected: null, navTarget: LOCATIONS[1], lock: null, leadPoint: null, warp: null, scrambled: false,
+  selected: null, navTarget: null, lock: null, leadPoint: null, warp: null, scrambled: false,
   stick: new THREE.Vector2(), freeLook: false, look: new THREE.Vector2(),
   mouse: new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), following: false, followToggle: false,
   ctrlTargeting: false, ctrlHover: null, ctrlRadius: 110,
@@ -88,7 +90,8 @@ const G = {
   credits: 250000, kills: 0, ammo: { rail: 40, missile: 24 }, cool: { pri: 0, sec: 0, tur: 0, missile: 0 },
   priOff: false, secOff: false, usesAmmo: true, leadSpeed: 3200, turretsAuto: true, hasTurrets: true, turFiring: false, gunAssist: false,
   aimDir: new THREE.Vector3(0, 0, 1), aimPoint: new THREE.Vector3(), aimActive: false, mouseLocked: false,
-  hull: 'valkyrie', owned: { valkyrie: emptyFit('valkyrie') }, inventory: {}, dockedAt: LOCATIONS[0],
+  hull: 'valkyrie', owned: { valkyrie: emptyFit('valkyrie') }, inventory: {}, dockedAt: null,
+  system: 'kaltos', explored: new Set(['kaltos']), routeTo: null, dockSys: 'kaltos', dockId: 'station',
   nearestName: '', time: 0, shake: 0, hitFlash: 0,
 };
 
@@ -463,7 +466,7 @@ function updateAI(e, dt) {
   const playerOk = p.alive && G.state === 'flying' && !G.warp;
   A.t += dt;
   if (e.kind === 'hauler') {
-    const goal = A.dir > 0 ? LOCATIONS[3].pos : LOCATIONS[0].pos;
+    const goal = A.dir > 0 ? A.b : A.a;
     const dir = new THREE.Vector3().subVectors(goal, e.obj.position);
     if (dir.length() < 5000) A.dir = -A.dir;
     if (A.state === 'flee') {
@@ -566,10 +569,28 @@ function updateAI(e, dt) {
 }
 
 // ---------------------------------------------------------------- encounters
-const encounters = [
-  { loc: LOCATIONS[1], ships: [], timer: 0, wave: 0, spawn(pos) { const n = 3 + Math.min(3, this.wave); const out = []; for (let i = 0; i < n; i++) out.push(['raider', 2500 + Math.random() * 3000]); return out; } },
-  { loc: LOCATIONS[2], ships: [], timer: 0, wave: 0, spawn() { const out = [['cruiser', 3000]]; if (this.wave >= 2) out.push(['cruiser', 4200]); for (let i = 0; i < 3 + Math.min(3, this.wave); i++) out.push(['raider', 3500 + Math.random() * 2000]); return out; } },
-];
+let encounters = [];
+// combat sites scale with the system's danger rating; quiet core worlds have none
+function buildEncounters(def) {
+  const dg = def.danger, out = [];
+  if (dg > 0) for (const loc of LOCATIONS.filter((l) => l.icon === 'belt')) {
+    out.push({ loc, ships: [], timer: 0, wave: 0, spawn() {
+      const n = 2 + dg + Math.min(3, this.wave), o = [];
+      if (dg >= 2 && this.wave >= 1) o.push(['cruiser', 3500]);
+      for (let i = 0; i < n; i++) o.push(['raider', 2500 + Math.random() * 3000]);
+      return o;
+    } });
+  }
+  for (const loc of LOCATIONS.filter((l) => l.icon === 'outpost')) {
+    out.push({ loc, ships: [], timer: 0, wave: 0, spawn() {
+      const o = [['cruiser', 3000]];
+      if (this.wave >= 2 || dg >= 3) o.push(['cruiser', 4200]);
+      for (let i = 0; i < 2 + dg + Math.min(3, this.wave); i++) o.push(['raider', 3500 + Math.random() * 2000]);
+      return o;
+    } });
+  }
+  return out;
+}
 
 function updateEncounters(dt) {
   const pp = G.player.obj.position;
@@ -673,7 +694,7 @@ function updatePlayer(dt) {
       }
     }
   }
-  for (const body of [PLANET, MOON]) {
+  for (const body of world.bodies) {
     const n = _v.subVectors(p.obj.position, body.pos);
     if (n.length() < body.radius + 1500) { p.obj.position.copy(body.pos).addScaledVector(n.normalize(), body.radius + 1500); p.vel.addScaledVector(n, -Math.min(0, p.vel.dot(n))); }
   }
@@ -818,11 +839,13 @@ function tryDock() {
     const dd = p.obj.position.distanceTo(l.pos);
     if (dd < d) { d = dd; st = l; }
   }
+  if (!st) { hud.notice('NO DOCKABLE STATION IN THIS SYSTEM', 2); audio.beep(220, 0.15); return; }
   const range = st.dock === 'high' ? 4500 : 3500;
   if (d > range) { hud.notice(`DOCKING RANGE ${range / 1000} km — ${st.name.toUpperCase()} AT ${fmtDist(d)}`, 2); audio.beep(220, 0.15); return; }
   if (G.entities.some((e) => e.faction === 'pirate' && e.alive && e.ai.state === 'attack' && e.obj.position.distanceTo(p.obj.position) < 15000)) { hud.notice('CANNOT DOCK WHILE IN COMBAT', 2); return; }
   hud.log(`Docking request accepted: ${st.name}`, 'i');
   G.dockedAt = st;
+  G.dockSys = G.system; G.dockId = st.id;
   $('fade').style.opacity = 1;
   G.state = 'docking';
   G.input.fire1 = G.input.fire2 = G.input.mmb = false;
@@ -1039,6 +1062,7 @@ function playerDied() {
   G.warp = null; G.lock = null;
   G.input.fire1 = G.input.fire2 = false;
   hud.log('Your ship has been destroyed!', 'd');
+  $('deadstation').textContent = LOCATIONS.find((l) => l.id === G.dockId)?.name && G.system === G.dockSys ? LOCATIONS.find((l) => l.id === G.dockId).name : `your last station in ${SYSTEMS[G.dockSys].name}`;
   setTimeout(() => $('dead').classList.remove('hidden'), 2500);
 }
 $('respawn').onclick = () => {
@@ -1048,7 +1072,8 @@ $('respawn').onclick = () => {
   G.ammo.rail = 40; G.ammo.missile = 24;
   G.credits = Math.max(0, G.credits - 50000);
   $('dead').classList.add('hidden');
-  G.dockedAt = LOCATIONS[0];
+  if (G.system !== G.dockSys) enterSystem(G.dockSys, null);
+  G.dockedAt = LOCATIONS.find((l) => l.id === G.dockId) || LOCATIONS.find((l) => l.dock);
   undock();
 };
 
@@ -1094,9 +1119,10 @@ $('resume').addEventListener('click', togglePause);
 
 window.addEventListener('keydown', (ev) => {
   if (ev.code === 'Tab' || ev.code === 'Space' || ev.code.startsWith('Arrow') || ev.code.startsWith('Page') || (ev.ctrlKey && G.state === 'flying')) ev.preventDefault();
-  if (ev.code === 'Escape') { togglePause(); return; }
+  if (ev.code === 'Escape') { if (starmap.isOpen) starmap.toggle(false); else togglePause(); return; }
   if (ev.repeat) return;
   G.input.keys[ev.code] = true;
+  if (ev.code === 'KeyN' && !ev.repeat && (G.state === 'flying' || G.state === 'docked')) { starmap.toggle(); audio.ui(); return; }
   if (G.state === 'docked' || G.state === 'menu' || G.state === 'paused') return;
   switch (ev.code) {
     case 'KeyX': G.player.throttle = 0; break;
@@ -1107,14 +1133,14 @@ window.addEventListener('keydown', (ev) => {
     case 'Tab': cycleHostile(); break;
     case 'KeyF': fireMissiles(); break;
     case 'KeyJ':
-    case 'Space': warpTo(G.navTarget); break;
+    case 'Space': jumpOrWarp(); break;
     case 'KeyG': tryDock(); break;
     case 'KeyM': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (M)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
     case 'KeyL': G.turretsAuto = !G.turretsAuto; hud.notice(G.turretsAuto ? 'TURRETS: AUTO-ENGAGE HOSTILES' : 'TURRETS: HOLD FIRE', 1.6); audio.ui(); break;
     case 'KeyH': toggleHelp(); break;
     case 'KeyO': hud.toggleOverview(); break;
     default:
-      if (/^(Digit|Numpad)[1-7]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(-1) - 1]; G.selected = l; G.navTarget = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — SPACE TO WARP`, 1.8); }
+      if (/^(Digit|Numpad)[1-9]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(-1) - 1]; if (!l) break; G.selected = l; G.navTarget = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — SPACE TO WARP`, 1.8); }
   }
 });
 window.addEventListener('keyup', (ev) => { G.input.keys[ev.code] = false; if (ev.code === 'KeyC') { G.freeLook = false; } });
@@ -1124,7 +1150,7 @@ hud.onSelect = (ref) => { G.selected = ref; if (ref.pos) G.navTarget = ref; else
 document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('mousedown', (ev) => {
   ev.stopPropagation();
   const s = G.selected;
-  if (b.dataset.act === 'warp') { if (s && s.pos) G.navTarget = s; warpTo(G.navTarget); }
+  if (b.dataset.act === 'warp') { if (s && s.pos) G.navTarget = s; jumpOrWarp(); }
   if (b.dataset.act === 'lock') { if (s && s.ship) startLock(s); else hud.notice('SELECT A SHIP TO LOCK', 1.2); }
   if (b.dataset.act === 'dock') tryDock();
 }));
@@ -1210,6 +1236,7 @@ function frame(now) {
   if (world) world.stars.material.uniforms.uPixel.value = pixelRatio;
   if (!world || !G.player) return;
   G.time += dt;
+  if (starmap.isOpen) starmap.draw(G.time);
   const p = G.player;
   if (document.body.dataset.state !== G.state) document.body.dataset.state = G.state;
   G.following = G.state === 'flying' && (G.input.mmb || G.followToggle);
@@ -1266,8 +1293,147 @@ function frame(now) {
   let best = Infinity;
   for (const l of LOCATIONS) { const d = l.pos.distanceTo(p.obj.position) - l.arrive; if (d < best) { best = d; G.nearestName = d < 30000 ? l.name : `Deep space near ${l.name}`; } }
   if (G.state === 'flying' || G.state === 'dead') hud.update(dt, G);
+  const jp = G.state === 'flying' && !G.warp && nearJump();
+  const jh = jp ? `JUMP GATE IN RANGE — SPACE TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
+  if ($('jumphint').textContent !== jh) $('jumphint').textContent = jh;
   composer.render(dt);
 }
+
+// ---------------------------------------------------------------- star systems
+const starmap = new StarMap(G);
+const NAVY_NAMES = ['HNS Vigilant', 'HNS Swift', 'HNS Harrier', 'HNS Bulwark', 'HNS Talon', 'HNS Resolute', 'HNS Aegis', 'HNS Lancer', 'HNS Sentinel', 'HNS Valor'];
+const HAULER_LINES = ['Orca Logistics', 'Kaltos Freight', 'Vexal Trading Co.', 'Helion Supply', 'Aster Bulk Lines'];
+const jitter = (s) => new THREE.Vector3((Math.random() - 0.5) * s, (Math.random() - 0.5) * s * 0.3, (Math.random() - 0.5) * s);
+
+function populate(def, from) {
+  const gates = LOCATIONS.filter((l) => l.jump);
+  if (def.gov === 'gov') {
+    let ni = 0;
+    for (const st of LOCATIONS.filter((l) => l.dock)) {
+      const kinds = st.dock === 'high' ? ['navyWarden', 'navyKestrel', 'navyKestrel', 'navyBastion', 'navyMantis'] : ['navyKestrel', 'navyMantis', 'navyWarden'].slice(0, Math.round(def.sec * 3));
+      for (const kind of kinds) {
+        const n = makeEntity(kind, 'navy', st.pos.clone().add(jitter(6000)), NAVY_NAMES[ni++ % NAVY_NAMES.length]);
+        n.ai.seed = Math.random(); n.ai.home.copy(st.pos);
+      }
+    }
+    const hub = LOCATIONS.find((l) => l.dock);
+    if (hub) for (let i = 0; i < (def.sec >= 0.6 ? 3 : 2); i++) {
+      const gate = gates[i % gates.length];
+      const pos = new THREE.Vector3().lerpVectors(hub.pos, gate.pos, 0.15 + i * 0.3).add(jitter(3000));
+      const h = makeEntity('hauler', 'civil', pos, `${HAULER_LINES[Math.floor(Math.random() * HAULER_LINES.length)]} Hauler`);
+      h.ai.a = hub.pos; h.ai.b = gate.pos; h.ai.dir = i % 2 ? 1 : -1; h.ai.state = 'cruise';
+      h.obj.lookAt(h.ai.dir > 0 ? h.ai.b : h.ai.a);
+    }
+  } else {
+    // lawless space: raider gangs lurk off the gates you didn't arrive through
+    for (const g of gates) {
+      if (g.jump === from || Math.random() < 0.35) continue;
+      const home = g.pos.clone().add(jitter(9000));
+      for (let i = 0; i < def.danger; i++) {
+        const e = makeEntity('raider', 'pirate', home.clone().add(jitter(1500)), PIRATE_NAMES[Math.floor(Math.random() * PIRATE_NAMES.length)]);
+        e.ai.seed = Math.random(); e.ai.home.copy(home);
+      }
+    }
+  }
+}
+
+function nextHop() {
+  if (!G.routeTo || G.routeTo === G.system) { G.routeTo = null; return null; }
+  const path = route(G.system, G.routeTo, G.explored);
+  if (!path || path.length < 2) { G.routeTo = null; return null; }
+  return LOCATIONS.find((l) => l.jump === path[1]) || null;
+}
+starmap.onRoute = () => {
+  const hop = nextHop();
+  if (!hop) return;
+  G.navTarget = hop; G.selected = hop; hud.ovT = 0;
+  hud.notice(`ROUTE SET: ${hop.name.toUpperCase()} — SPACE TO WARP`, 2.5);
+};
+
+function updateSysInfo(def) {
+  $('sysname').textContent = def.name;
+  const sec = $('syssec');
+  sec.textContent = def.sec.toFixed(1);
+  sec.style.color = def.sec >= 0.5 ? '#6f6' : def.sec > 0 ? '#f0a020' : '#f44';
+  const gv = $('sysgov');
+  gv.textContent = `${GOVS[def.gov].name} · ${def.starInfo.name}`;
+  gv.style.color = GOVS[def.gov].color;
+  document.title = `GVCSG — ${def.name} · Generic Vibe Coded Space Game`;
+}
+
+function enterSystem(to, from) {
+  for (const e of [...G.entities]) if (e !== G.player) removeEntity(e);
+  for (let i = bolts.list.length - 1; i >= 0; i--) bolts.kill(bolts.list[i], i);
+  for (const m of missiles.list) scene.remove(m.obj);
+  missiles.list.length = 0;
+  const fresh = !G.explored.has(to);
+  G.explored.add(to);
+  G.system = to;
+  const def = systemDef(to);
+  world.load(def, G.explored);
+  G.selected = null; G.lock = null; G.leadPoint = null; G.warp = null; G.scrambled = false; G.aimActive = false;
+  encounters = buildEncounters(def);
+  const back = from && LOCATIONS.find((l) => l.jump === from);
+  if (back) {
+    const p = G.player;
+    const out = back.pos.clone().negate().normalize();
+    p.obj.position.copy(back.pos).addScaledVector(out, 1800).add(jitter(300));
+    _m.lookAt(out, ORIGIN, Y);
+    p.obj.quaternion.setFromRotationMatrix(_m);
+    p.vel.copy(out).multiplyScalar(200);
+    playerAngVel.set(0, 0, 0);
+    camQuat.copy(p.obj.quaternion);
+  }
+  populate(def, from);
+  G.navTarget = nextHop() || LOCATIONS.find((l) => l.dock) || LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS[0];
+  updateSysInfo(def);
+  hud.ovT = 0;
+  if (starmap.isOpen) starmap.renderInfo();
+  if (from) {
+    hud.notice(`${def.name.toUpperCase()} — ${GOVS[def.gov].name.toUpperCase()}`, 3.5);
+    hud.log(`Jumped into ${def.name} (${GOVS[def.gov].name}, security ${def.sec.toFixed(1)}).`, def.gov === 'pirate' ? 'd' : 'i');
+    if (def.gov === 'pirate') hud.log('Warning: lawless space. No navy, no stations.', 'w');
+  }
+  if (fresh) hud.log(`New system charted: ${def.name}, ${def.starInfo.name}. It now appears on the star map (N).`, 'g');
+}
+
+function nearJump() {
+  const pp = G.player.obj.position;
+  let best = null, bd = 3500;
+  for (const l of LOCATIONS) if (l.jump) { const d = l.pos.distanceTo(pp); if (d < bd) { bd = d; best = l; } }
+  return best;
+}
+
+function jumpOrWarp() {
+  if (G.state !== 'flying' || G.warp) return;
+  const jp = nearJump();
+  if (jp && (!G.navTarget || G.navTarget.jump || G.navTarget.pos.distanceTo(G.player.obj.position) < G.navTarget.arrive + 8000)) startJump(jp);
+  else warpTo(G.navTarget);
+}
+
+function startJump(jp) {
+  const p = G.player;
+  if (G.scrambled) { hud.notice('JUMP DRIVE DISRUPTED', 1.8); audio.beep(220, 0.2); return; }
+  if (p.cap < 150) { hud.notice('INSUFFICIENT CAPACITOR FOR JUMP', 1.8); return; }
+  p.cap -= 120;
+  G.state = 'jumping';
+  G.input.fire1 = G.input.fire2 = G.input.mmb = false;
+  const to = jp.jump, from = G.system;
+  hud.notice(`JUMPING TO ${G.explored.has(to) ? SYSTEMS[to].name.toUpperCase() : 'UNCHARTED SYSTEM'}`, 2);
+  audio.warpStart();
+  fx.flash(jp.pos, 1200, 0x88bbff, 0.8);
+  $('fade').style.opacity = 1;
+  setTimeout(() => {
+    enterSystem(to, from);
+    G.state = 'flying';
+    $('fade').style.opacity = 0;
+    audio.warpEnd();
+    G.shake = 0.8;
+  }, 900);
+}
+
+$('mapbtn').addEventListener('mousedown', (ev) => { ev.stopPropagation(); starmap.toggle(); });
+$('dockmap').addEventListener('click', () => starmap.toggle());
 
 // ---------------------------------------------------------------- boot
 async function boot() {
@@ -1282,21 +1448,9 @@ async function boot() {
     await step('Assembling ships…');
     G.player = makeEntity('player', 'player', new THREE.Vector3(), 'Valkyrie');
     weaponInfo();
-    // Helion navy patrol around the shipyard
-    const yardPos = LOCATIONS[6].pos;
-    for (const [kind, name, off] of [['navyWarden', 'HNS Vigilant', [2500, 300, 1500]], ['navyKestrel', 'HNS Swift', [-2000, -400, 2600]], ['navyKestrel', 'HNS Harrier', [1500, 600, -2800]], ['navyBastion', 'HNS Bulwark', [-3200, 900, -1200]], ['navyMantis', 'HNS Talon', [3400, -700, -2200]]]) {
-      const n = makeEntity(kind, 'navy', yardPos.clone().add(new THREE.Vector3(...off)), name);
-      n.ai.seed = Math.random(); n.ai.home.copy(yardPos);
-    }
-    // civilian traffic between station and gate
-    for (let i = 0; i < 3; i++) {
-      const t = 0.15 + i * 0.3;
-      const pos = new THREE.Vector3().lerpVectors(LOCATIONS[0].pos, LOCATIONS[3].pos, t).add(new THREE.Vector3((Math.random() - 0.5) * 3000, (Math.random() - 0.5) * 800, (Math.random() - 0.5) * 3000));
-      const h = makeEntity('hauler', 'civil', pos, ['Orca Logistics', 'Kaltos Freight', 'Vexal Trading Co.'][i] + ' Hauler');
-      h.ai.dir = i % 2 ? 1 : -1; h.ai.state = 'cruise';
-      h.obj.lookAt(h.ai.dir > 0 ? LOCATIONS[3].pos : LOCATIONS[0].pos);
-    }
-    // a patrol idling at the hideout entrance so the overview shows threats
+    enterSystem('kaltos', null);
+    G.dockedAt = LOCATIONS[0];
+    G.navTarget = LOCATIONS.find((l) => l.icon === 'belt');
     undockPose();
     await step('Compiling shaders…');
     renderer.compile(scene, camera);
@@ -1309,9 +1463,10 @@ async function boot() {
     start.onclick = () => {
       audio.init();
       $('menu').classList.add('hidden');
-      hud.log('Welcome to Kaltos. Pirates reported at Asteroid Belt 1.', 'i');
-      hud.log('Press 2 then Space to warp to the belt. Hold MMB and drag to steer, hold L-Ctrl to target.', 'i');
-      hud.log('New hulls and high-tech outfits: Helion Orbital Shipyard (7).', 'i');
+      const num = (f) => LOCATIONS.findIndex(f) + 1;
+      hud.log('Welcome to GVCSG - Generic Vibe Coded Space Game. Pirates reported at Kaltos III - Asteroid Belt 1.', 'i');
+      hud.log(`Press ${num((l) => l.icon === 'belt')} then Space to warp to the belt. Hold MMB and drag to steer, hold L-Ctrl to target.`, 'i');
+      hud.log(`New hulls and high-tech outfits: Helion Orbital Shipyard (${num((l) => l.id === 'shipyard')}). Jump gates lead to other systems; N opens the star map.`, 'i');
       undock();
     };
   } catch (err) {
@@ -1321,7 +1476,7 @@ async function boot() {
 }
 
 function undockPose() {
-  const st = world.station.root;
+  const st = world.docks.station.root;
   const a = Math.PI / 4;
   const p = G.player;
   p.obj.position.copy(new THREE.Vector3(Math.cos(a) * 900, -180, Math.sin(a) * 900).applyQuaternion(st.quaternion).add(st.position));
@@ -1332,6 +1487,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, camera, LOCATIONS, get world() { return world; }, get hangar() { return hangar; }, makeEntity, warpTo, startLock, damage };
+window.__game = { G, camera, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, jumpOrWarp, nearJump };
 requestAnimationFrame(frame);
 boot();

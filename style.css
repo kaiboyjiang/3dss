@@ -163,3 +163,26 @@ table.st .up { color: #7fe0a0; } table.st .dn { color: #ff7a66; }
 #overview #selinfo #selname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #overview #selinfo button { padding: 2px 7px; font-size: 11px; }
 #overview.collapsed .ovscroll, #overview.collapsed #selinfo, #overview.collapsed .tabs { display: none; }
+
+/* system info + star map */
+#sysinfo #mapbtn { pointer-events: auto; font-size: 10px; padding: 1px 6px; margin-left: 6px; vertical-align: middle; letter-spacing: 1px; }
+#sysgov { font-size: 11px; letter-spacing: 1px; }
+#map { position: fixed; inset: 0; z-index: 40; background: radial-gradient(ellipse at center, rgba(4, 12, 22, 0.94), rgba(0, 0, 0, 0.97)); }
+#mapc { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+#maphead { position: absolute; left: 22px; top: 16px; font-size: 22px; letter-spacing: 6px; font-weight: 300; color: #fff; }
+#maphead span { font-size: 12px; letter-spacing: 4px; color: #6cf; margin-left: 8px; }
+#maphead button { margin-left: 18px; vertical-align: middle; }
+#mapinfo { right: 18px; top: 18px; width: 270px; padding: 10px 14px; max-height: 80vh; overflow-y: auto; }
+#mapinfo h2 { margin: 0 0 4px; font-weight: 300; letter-spacing: 3px; color: #fff; font-size: 20px; }
+#mapinfo h3 { margin: 10px 0 3px; font-weight: normal; color: #6cf; font-size: 11px; letter-spacing: 2px; }
+#mapinfo p { margin: 2px 0; color: #bcd; }
+#mapinfo .dim { color: #789; }
+#mapinfo .yard { color: #fc6; font-size: 10px; }
+#mapinfo .pir { color: #ff7a66; }
+#mapinfo .route { color: #ffb040; margin-top: 10px; }
+#mapinfo .here { color: #fff; margin-top: 10px; }
+#mapinfo .hint { color: #789; font-size: 11px; }
+#maplegend { left: 18px; bottom: 18px; padding: 6px 12px; color: #9ab; font-size: 11px; }
+#maplegend .lg { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 2px solid; margin: 0 4px 0 10px; vertical-align: middle; }
+#maplegend .lg.gov { border-color: #6cf; } #maplegend .lg.pir { border-color: #ff5a48; } #maplegend .lg.unk { border: 1px dashed #9bc; border-radius: 0; height: 0; width: 14px; }
+#jumphint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); color: #8cf; letter-spacing: 3px; font-size: 13px; text-shadow: 0 0 6px #000; }

@@ -4,20 +4,10 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { NOISE, LOGDEPTH_VERT_PARS, LOGDEPTH_VERT, LOGDEPTH_FRAG_PARS, LOGDEPTH_FRAG } from './shaders.js';
 import { hullMaps, rockMaps, windowMaps, solarPanelMaps, glowTexture, rng } from './textures.js';
 import { Kit, G, mat, boxUV } from './geo.js';
+import { SYSTEMS } from './systems.js';
 
 export const SUN_DIR = new THREE.Vector3(0.78, 0.32, 0.2).normalize();
-export const PLANET = { pos: new THREE.Vector3(120000, -40000, -280000), radius: 60000 };
-export const MOON = { pos: new THREE.Vector3(-150000, 52000, -210000), radius: 14000 };
-
-export const LOCATIONS = [
-  { id: 'station', name: 'Ardent Relay Station', type: 'Station', pos: new THREE.Vector3(0, 0, 0), arrive: 3200, icon: 'station', dock: 'basic' },
-  { id: 'belt', name: 'Kaltos III - Asteroid Belt 1', type: 'Asteroid Belt', pos: new THREE.Vector3(48000, 4000, -36000), arrive: 1500, icon: 'belt' },
-  { id: 'outpost', name: 'Corsair Hideout', type: 'Pirate Outpost', pos: new THREE.Vector3(-62000, -9000, -24000), arrive: 6000, icon: 'outpost' },
-  { id: 'gate', name: 'Stargate (Vexal)', type: 'Stargate', pos: new THREE.Vector3(18000, 7000, 70000), arrive: 4000, icon: 'gate' },
-  { id: 'planet', name: 'Kaltos III', type: 'Planet (Temperate)', pos: PLANET.pos, arrive: PLANET.radius + 9000, icon: 'planet' },
-  { id: 'moon', name: 'Kaltos III - Moon 1', type: 'Moon', pos: MOON.pos, arrive: MOON.radius + 4000, icon: 'moon' },
-  { id: 'shipyard', name: 'Helion Orbital Shipyard', type: 'Station (High-Tech)', pos: new THREE.Vector3(-38000, 14000, 34000), arrive: 3000, icon: 'shipyard', dock: 'high' },
-];
+export const LOCATIONS = [];
 
 // ---------------------------------------------------------------- sky
 export const SUN_COL = new THREE.Color(1.0, 0.92, 0.8);
@@ -201,13 +191,19 @@ const PLANET_VERT = /* glsl */`
     ${LOGDEPTH_VERT}
   }`;
 
-function makePlanetMaterial(type, radius) {
+const PTYPE_ID = { temperate: 0, barren: 1, gas: 2, desert: 3, ice: 4, lava: 5, ocean: 6 };
+function makePlanetMaterial(P) {
+  const atmo = P.atmo || [0.3, 0.55, 1.0];
   return new THREE.ShaderMaterial({
-    uniforms: { uSun: { value: SUN_DIR }, uRadius: { value: radius }, uType: { value: type }, uTime: { value: 0 } },
+    uniforms: {
+      uSun: { value: SUN_DIR }, uSunCol: { value: SUN_COL }, uRadius: { value: P.radius }, uType: { value: PTYPE_ID[P.type] }, uTime: { value: 0 },
+      uSeed: { value: new THREE.Vector3(P.seed, P.seed * 1.7, P.seed * 0.3) }, uTint: { value: new THREE.Vector3(...P.tint) },
+      uAtmo: { value: new THREE.Vector3(...atmo) }, uHaze: { value: P.atmo ? 0.75 : 0 }, uSea: { value: P.type === 'ocean' ? 0.26 : 0.02 },
+    },
     vertexShader: PLANET_VERT,
     fragmentShader: /* glsl */`
       ${LOGDEPTH_FRAG_PARS}
-      uniform vec3 uSun; uniform float uRadius; uniform float uType; uniform float uTime;
+      uniform vec3 uSun, uSunCol, uSeed, uTint, uAtmo; uniform float uRadius, uType, uTime, uHaze, uSea;
       varying vec3 vObj; varying vec3 vWN; varying vec3 vWP;
       ${NOISE}
       vec3 bump(vec3 N, float h, float scale) {
@@ -221,6 +217,7 @@ function makePlanetMaterial(type, radius) {
       void main() {
         ${LOGDEPTH_FRAG}
         vec3 p = normalize(vObj);
+        vec3 sp = p + uSeed;
         vec3 N = normalize(vWN);
         vec3 V = normalize(cameraPosition - vWP);
         float NdV = max(dot(N, V), 0.0);
@@ -229,16 +226,16 @@ function makePlanetMaterial(type, radius) {
         // octave LOD from on-screen footprint: skip noise detail smaller than a pixel
         int L = int(clamp(-log2(max(length(fwidth(p)), 1e-6)) - 2.0, 3.0, 8.0));
         int L2 = L > 4 ? L - 2 : 3;
-        if (uType < 0.5) {
-          vec3 q = p + 0.15 * vec3(fbm(p * 2.0, 4), fbm(p * 2.0 + 5.2, 4), fbm(p * 2.0 + 9.1, 4));
+        float lat = abs(p.y);
+        if (uType < 0.5 || uType > 5.5) {
+          vec3 q = sp + 0.15 * vec3(fbm(sp * 2.0, 4), fbm(sp * 2.0 + 5.2, 4), fbm(sp * 2.0 + 9.1, 4));
           float h = fbm(q * 1.7, L) + 0.35 * ridged(q * 3.2, L2 + 1) - 0.2;
-          float lat = abs(p.y);
-          float sea = 0.02;
+          float sea = uSea;
           float land = smoothstep(sea, sea + 0.01, h);
           float e = max(h - sea, 0.0);
-          float moist = fbm(p * 3.1 + 40.0, L2);
+          float moist = fbm(sp * 3.1 + 40.0, L2);
           vec3 deep = vec3(0.005, 0.03, 0.09), shallow = vec3(0.02, 0.12, 0.2);
-          vec3 ocean = mix(deep, shallow, smoothstep(-0.25, sea, h));
+          vec3 ocean = mix(deep, shallow, smoothstep(sea - 0.27, sea, h));
           vec3 sand = vec3(0.55, 0.48, 0.34), forest = vec3(0.07, 0.16, 0.05), grass = vec3(0.2, 0.28, 0.1);
           vec3 desert = vec3(0.6, 0.42, 0.24), rock = vec3(0.32, 0.29, 0.26), snow = vec3(0.9, 0.92, 0.95);
           vec3 lc = mix(desert, mix(grass, forest, smoothstep(0.0, 0.3, moist)), smoothstep(-0.25, 0.05, moist - lat * 0.3 + 0.1));
@@ -246,52 +243,72 @@ function makePlanetMaterial(type, radius) {
           lc = mix(lc, rock, smoothstep(0.2, 0.38, e));
           lc = mix(lc, snow, smoothstep(0.42, 0.55, e + lat * 0.25));
           col = mix(ocean, lc, land);
-          float ice = smoothstep(0.78, 0.86, lat + fbm(p * 6.0, 4) * 0.08);
+          float ice = smoothstep(0.78, 0.86, lat + fbm(sp * 6.0, 4) * 0.08);
           col = mix(col, snow, ice);
           N = bump(N, e * land * 2500.0, 1.0);
           spec = (1.0 - land) * (1.0 - ice);
-          // cloud shadows
-          vec3 cp = p + vec3(uTime * 0.002, 0.0, 0.0);
+          vec3 cp = sp + vec3(uTime * 0.002, 0.0, 0.0);
           float cl = smoothstep(0.05, 0.5, fbm(cp * 3.0 + fbm(cp * 1.4, 3), 4));
           col *= 1.0 - cl * 0.55 * smoothstep(-0.1, 0.3, NdL0);
-          if (NdL0 < 0.1) {
+          if (NdL0 < 0.1 && uType < 0.5) {
             float cityAA = 1.0 - smoothstep(0.15, 0.6, length(fwidth(p * 45.0)));
-            float city = cityAA * smoothstep(0.58, 0.85, fbm(p * 45.0, 4) + 0.5) * land * (1.0 - ice) * smoothstep(0.35, 0.05, e) * smoothstep(0.1, -0.12, NdL0);
+            float city = cityAA * smoothstep(0.58, 0.85, fbm(sp * 45.0, 4) + 0.5) * land * (1.0 - ice) * smoothstep(0.35, 0.05, e) * smoothstep(0.1, -0.12, NdL0);
             emit = vec3(1.0, 0.62, 0.28) * city * 0.9 * (1.0 - cl * 0.7);
           }
+        } else if (uType > 1.5 && uType < 2.5) {
+          // gas giant: turbulent latitude bands
+          float y = p.y + 0.06 * fbm(sp * 3.0 + vec3(uTime * 0.002, 0.0, 0.0), L2);
+          float b = fbm(vec3(y * 9.0, uSeed.x, 0.5), 4);
+          float b2 = fbm(vec3(y * 26.0 + fbm(sp * 6.0, L2) * 0.6, uSeed.y, 1.5), 3);
+          col = mix(uTint * 0.5, uTint * 1.12, smoothstep(-0.45, 0.45, b));
+          col = mix(col, uTint.zyx * 0.75 + 0.1, smoothstep(0.15, 0.6, b2) * 0.35);
+          vec3 so = normalize(vec3(sin(uSeed.x), -0.35, cos(uSeed.x)));
+          float storm = smoothstep(0.16, 0.0, length((p - so) * vec3(1.0, 2.2, 1.0)));
+          col = mix(col, vec3(0.75, 0.38, 0.24), storm * 0.7);
+          col *= 0.8 + 0.2 * smoothstep(0.98, 0.7, lat);
         } else {
-          float h = fbm(p * 2.5, L) * 0.5 + ridged(p * 5.0, L2) * 0.3;
-          // craters
+          // rocky bodies: barren / desert / ice / lava
+          float h = fbm(sp * 2.5, L) * 0.5 + ridged(sp * 5.0, L2) * 0.3;
           float cr = 0.0;
           for (int i = 0; i < 3; i++) {
             float sc = 6.0 * pow(2.6, float(i));
-            vec3 c = floor(p * sc); vec3 hsh = hash33(c);
+            vec3 c = floor(sp * sc); vec3 hsh = hash33(c);
             vec3 cc = (c + 0.25 + hsh * 0.5) / sc;
-            float d = length(p - cc) * sc / (0.25 + hsh.x * 0.25);
+            float d = length(sp - cc) * sc / (0.25 + hsh.x * 0.25);
             cr += (smoothstep(1.0, 0.7, d) * -0.6 + smoothstep(0.7, 1.0, d) * smoothstep(1.3, 1.0, d) * 0.5) * step(0.4, hsh.y) / float(i + 1);
           }
-          h += cr * 0.3;
-          col = mix(vec3(0.16, 0.155, 0.15), vec3(0.42, 0.4, 0.38), smoothstep(-0.3, 0.6, h));
-          col = mix(col, vec3(0.07, 0.07, 0.075), smoothstep(0.1, 0.4, fbm(p * 1.3 + 7.0, 4)) * 0.7);
+          float isDes = step(2.5, uType) * step(uType, 3.5), isIce = step(3.5, uType) * step(uType, 4.5), isLava = step(4.5, uType);
+          h += cr * mix(0.3, 0.08, isDes + isIce * 0.6);
+          col = mix(uTint * 0.38, uTint, smoothstep(-0.3, 0.6, h));
+          col = mix(col, uTint * 0.17, smoothstep(0.1, 0.4, fbm(sp * 1.3 + 7.0, 4)) * 0.7 * (1.0 - isIce));
+          if (isDes > 0.5) col *= 0.82 + 0.18 * sin((sp.x + sp.z * 0.6) * 70.0 + fbm(sp * 8.0, 3) * 7.0);
+          if (isIce > 0.5) {
+            col = mix(col, vec3(0.42, 0.58, 0.75), smoothstep(0.62, 0.7, ridged(sp * 4.0, L2)) * 0.6);
+            spec = 0.25;
+          }
+          if (isLava > 0.5) {
+            float cracks = smoothstep(0.72, 0.95, ridged(sp * 3.0, L2 + 1));
+            emit = vec3(2.6, 0.75, 0.15) * cracks * (0.35 + 0.65 * smoothstep(0.25, -0.2, NdL0));
+          }
           N = bump(N, h * 900.0, 1.0);
         }
         float NdL = dot(N, uSun);
         float diff = max(NdL, 0.0);
         float term = smoothstep(-0.12, 0.25, NdL0);
-        vec3 light = vec3(1.0, 0.96, 0.9) * 2.6 * diff;
-        vec3 c = col * light * mix(1.0, term, 0.5);
-        if (uType < 0.5) {
+        vec3 c = col * uSunCol * 2.6 * diff * mix(1.0, term, 0.5);
+        if (spec > 0.0) {
           vec3 H = normalize(uSun + V);
           vec3 Ns = normalize(vWN);
-          c += vec3(1.0, 0.9, 0.75) * pow(max(dot(Ns, H), 0.0), 180.0) * spec * 3.0 * term;
-          c += vec3(1.0, 0.9, 0.75) * pow(max(dot(Ns, H), 0.0), 18.0) * spec * 0.08 * term;
-          // atmospheric haze toward limb
-          float haze = pow(1.0 - NdV, 2.5);
-          vec3 sky = mix(vec3(0.9, 0.35, 0.12), vec3(0.25, 0.5, 1.0), smoothstep(-0.05, 0.35, NdL0));
-          c = mix(c, sky * 1.4 * smoothstep(-0.2, 0.25, NdL0), haze * 0.75);
-          c += vec3(0.04, 0.08, 0.16) * term * 0.4;
-          c += emit;
+          c += uSunCol * pow(max(dot(Ns, H), 0.0), 180.0) * spec * 3.0 * term;
+          c += uSunCol * pow(max(dot(Ns, H), 0.0), 18.0) * spec * 0.08 * term;
         }
+        if (uHaze > 0.0) {
+          float haze = pow(1.0 - NdV, 2.5);
+          vec3 sky = mix(vec3(0.9, 0.35, 0.12), uAtmo, smoothstep(-0.05, 0.35, NdL0));
+          c = mix(c, sky * 1.4 * uSunCol * smoothstep(-0.2, 0.25, NdL0), haze * uHaze);
+          c += uAtmo * 0.1 * term * 0.4;
+        }
+        c += emit;
         gl_FragColor = vec4(c, 1.0);
       }`,
   });
@@ -325,10 +342,10 @@ function makeClouds(radius) {
   });
 }
 
-function makeAtmosphere(center, radius, outer) {
+function makeAtmosphere(center, radius, outer, col = [0.3, 0.55, 1.0]) {
   return new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, side: THREE.BackSide, blending: THREE.AdditiveBlending,
-    uniforms: { uSun: { value: SUN_DIR }, uCenter: { value: center }, uR: { value: radius }, uRa: { value: outer } },
+    uniforms: { uSun: { value: SUN_DIR }, uSunCol: { value: SUN_COL }, uCol: { value: new THREE.Vector3(...col) }, uCenter: { value: center }, uR: { value: radius }, uRa: { value: outer } },
     vertexShader: /* glsl */`
       ${LOGDEPTH_VERT_PARS}
       varying vec3 vWP;
@@ -340,7 +357,7 @@ function makeAtmosphere(center, radius, outer) {
       }`,
     fragmentShader: /* glsl */`
       ${LOGDEPTH_FRAG_PARS}
-      uniform vec3 uSun; uniform vec3 uCenter; uniform float uR; uniform float uRa;
+      uniform vec3 uSun, uSunCol, uCol; uniform vec3 uCenter; uniform float uR; uniform float uRa;
       varying vec3 vWP;
       void main() {
         ${LOGDEPTH_FRAG}
@@ -354,7 +371,7 @@ function makeAtmosphere(center, radius, outer) {
         vec3 up = normalize(closest);
         float sunAmt = dot(up, uSun);
         float day = smoothstep(-0.35, 0.35, sunAmt);
-        vec3 c = mix(vec3(1.0, 0.4, 0.15), vec3(0.3, 0.55, 1.0), smoothstep(-0.1, 0.4, sunAmt));
+        vec3 c = mix(vec3(1.0, 0.4, 0.15), uCol, smoothstep(-0.1, 0.4, sunAmt)) * uSunCol;
         float fw = pow(max(dot(rd, uSun), 0.0), 8.0);
         gl_FragColor = vec4(c * dens * day * (1.6 + fw * 4.0), 1.0);
       }`,
@@ -362,6 +379,34 @@ function makeAtmosphere(center, radius, outer) {
 }
 
 // ---------------------------------------------------------------- materials
+function makeRing(P) {
+  const inner = P.radius * 1.35, outer = P.radius * 2.25;
+  const geo = new THREE.RingGeometry(inner, outer, 160, 1);
+  const m = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    uniforms: { uSun: { value: SUN_DIR }, uSunCol: { value: SUN_COL }, uIn: { value: inner }, uOut: { value: outer }, uR: { value: P.radius }, uCenter: { value: P.pos }, uTint: { value: new THREE.Vector3(...P.tint) }, uSeed: { value: P.seed } },
+    vertexShader: `${LOGDEPTH_VERT_PARS} varying vec3 vL; varying vec3 vWP; void main(){ vL = position; vec4 wp = modelMatrix * vec4(position, 1.0); vWP = wp.xyz; gl_Position = projectionMatrix * viewMatrix * wp; ${LOGDEPTH_VERT} }`,
+    fragmentShader: `${LOGDEPTH_FRAG_PARS} uniform vec3 uSun, uSunCol, uCenter, uTint; uniform float uIn, uOut, uR, uSeed; varying vec3 vL; varying vec3 vWP;
+      float h1(float x){ return fract(sin(x * 127.1 + uSeed) * 43758.5453); }
+      void main(){ ${LOGDEPTH_FRAG}
+        float t = (length(vL.xy) - uIn) / (uOut - uIn);
+        float x = t * 64.0; float i = floor(x); float f = fract(x);
+        float dens = mix(h1(i), h1(i + 1.0), smoothstep(0.0, 1.0, f));
+        dens = smoothstep(0.15, 0.9, dens) * smoothstep(0.0, 0.06, t) * smoothstep(1.0, 0.9, t);
+        dens *= 1.0 - 0.8 * smoothstep(0.02, 0.0, abs(t - 0.62));
+        // planet shadow on the ring
+        vec3 oc = vWP - uCenter; float b = dot(oc, uSun); float cc = dot(oc, oc) - uR * uR;
+        float sh = (b < 0.0 && b * b - cc > 0.0) ? 0.04 : 1.0;
+        vec3 c = uTint * uSunCol * (0.55 + 0.6 * dens) * 1.3 * sh;
+        gl_FragColor = vec4(c, dens * 0.8); }`,
+  });
+  const mesh = new THREE.Mesh(geo, m);
+  mesh.position.copy(P.pos);
+  mesh.rotation.x = -Math.PI / 2 + 0.38;
+  mesh.rotation.y = 0.2;
+  return mesh;
+}
+
 export function stationMaterials(env) {
   const hull = hullMaps({ seed: 21, base: [176, 178, 182], accent: [196, 92, 30], accentChance: 0.05, darkChance: 0.14, wear: 0.6, labels: ['ARDENT', 'BAY 04', 'DOCK', 'AUX', 'C-12', 'VENT'] });
   const dark = hullMaps({ seed: 22, base: [70, 72, 76], accent: [140, 40, 30], accentChance: 0.02, darkChance: 0.2, wear: 0.5 });
@@ -710,10 +755,10 @@ function buildGate(M) {
 }
 
 // ---------------------------------------------------------------- pirate outpost (derelict structures)
-function buildOutpost(M) {
+function buildOutpost(M, seed = 77) {
   const root = new THREE.Group();
   const k = new Kit();
-  const r = rng(77);
+  const r = rng(seed);
   const colliders = [];
   for (let i = 0; i < 9; i++) {
     const p = new THREE.Vector3((r() - 0.5) * 1600, (r() - 0.5) * 500, (r() - 0.5) * 1600);
@@ -788,7 +833,8 @@ function buildAsteroidField(center, env, count, spread, seed, tint) {
   const r = rng(seed);
   const maps = rockMaps(seed, 512, tint);
   const material = new THREE.MeshStandardMaterial({ map: maps.map, normalMap: maps.normalMap, normalScale: new THREE.Vector2(1.5, 1.5), roughness: 0.92, metalness: 0.05, envMap: env, envMapIntensity: 0.25 });
-  const geos = makeAsteroidGeometries(5);
+  material.userData.ownMaps = true;
+  const geos = sharedRockGeos();
   const per = Math.ceil(count / geos.length);
   const group = new THREE.Group();
   const rocks = [];
@@ -910,11 +956,14 @@ function makeWarpTunnel() {
 }
 
 // ---------------------------------------------------------------- world assembly
+let rockGeos = null;
+const sharedRockGeos = () => rockGeos || (rockGeos = makeAsteroidGeometries(5));
+
 export function buildWorld(renderer, scene) {
-  // environment map from the sky (sun dimmed so reflections don't blow out)
+  // sky is baked to a cubemap per system; the PMREM env is re-rendered into the same target so materials keep their reference
   const cube = new THREE.WebGLCubeRenderTarget(1024, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const envTarget = bakeSky(renderer, cube, pmrem, null);
+  let envTarget = bakeSky(renderer, cube, pmrem, null);
   const env = envTarget.texture;
 
   const sky = makeSky();
@@ -923,7 +972,6 @@ export function buildWorld(renderer, scene) {
   scene.add(stars);
 
   const sun = new THREE.DirectionalLight(0xfff2e0, 4.2);
-  sun.position.copy(SUN_DIR).multiplyScalar(1000);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   const sc = sun.shadow.camera;
@@ -931,97 +979,155 @@ export function buildWorld(renderer, scene) {
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.08;
   scene.add(sun, sun.target);
-  // dim fill: planet bounce + ambient starlight
   const bounce = new THREE.DirectionalLight(0x6f8fbf, 0.06);
-  bounce.position.copy(PLANET.pos).normalize().multiplyScalar(-1000).negate();
   scene.add(bounce, bounce.target);
   scene.add(new THREE.AmbientLight(0x2a3040, 0.08));
-
-  const planet = new THREE.Mesh(new THREE.SphereGeometry(PLANET.radius, 256, 128), makePlanetMaterial(0, PLANET.radius));
-  planet.position.copy(PLANET.pos);
-  planet.rotation.z = 0.35;
-  const clouds = new THREE.Mesh(new THREE.SphereGeometry(PLANET.radius * 1.006, 192, 96), makeClouds(PLANET.radius * 1.006));
-  clouds.position.copy(PLANET.pos);
-  clouds.rotation.z = 0.35;
-  const atmo = new THREE.Mesh(new THREE.SphereGeometry(PLANET.radius * 1.045, 128, 64), makeAtmosphere(PLANET.pos, PLANET.radius, PLANET.radius * 1.045));
-  atmo.position.copy(PLANET.pos);
-  scene.add(planet, clouds, atmo);
-
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(MOON.radius, 160, 80), makePlanetMaterial(1, MOON.radius));
-  moon.position.copy(MOON.pos);
-  scene.add(moon);
 
   const SM = stationMaterials(env);
   const rustMaps = hullMaps({ seed: 31, base: [92, 62, 48], accent: [150, 40, 25], accentChance: 0.08, darkChance: 0.25, wear: 1.0 });
   SM.rust = new THREE.MeshStandardMaterial({ map: rustMaps.map, normalMap: rustMaps.normalMap, roughnessMap: rustMaps.roughnessMap, metalness: 0.6, roughness: 0.75, envMap: env, envMapIntensity: 0.4 });
-
-  const structures = [];
-  const station = buildStation(SM);
-  station.root.position.copy(LOCATIONS[0].pos);
-  station.root.rotation.y = 0.4;
-  scene.add(station.root);
-  structures.push({ obj: station.root, colliders: station.colliders, loc: LOCATIONS[0] });
-
-  const yardLoc = LOCATIONS.find((l) => l.id === 'shipyard');
-  const yard = buildShipyard(SM);
-  yard.root.position.copy(yardLoc.pos);
-  yard.root.rotation.y = -0.6;
-  scene.add(yard.root);
-  structures.push({ obj: yard.root, colliders: yard.colliders, loc: yardLoc });
-
-  const docks = {
-    station: { root: station.root, undock: () => { const a = Math.PI / 4 + Math.floor(Math.random() * 4) * Math.PI / 2; return { pos: new THREE.Vector3(Math.cos(a) * 640, -230, Math.sin(a) * 640), dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) }; } },
-    shipyard: { root: yard.root, undock: () => ({ pos: new THREE.Vector3(0, -300, 420), dir: new THREE.Vector3(0, 0, 1) }) },
-  };
-
-  const gate = buildGate(SM);
-  gate.root.position.copy(LOCATIONS[3].pos);
-  gate.root.lookAt(0, 0, 0);
-  scene.add(gate.root);
-  structures.push({ obj: gate.root, colliders: gate.colliders, loc: LOCATIONS[3] });
-
-  const outpost = buildOutpost(SM);
-  outpost.root.position.copy(LOCATIONS[2].pos);
-  scene.add(outpost.root);
-  structures.push({ obj: outpost.root, colliders: outpost.colliders, loc: LOCATIONS[2] });
-
-  const belt = buildAsteroidField(LOCATIONS[1].pos, env, 520, [14000, 3500, 14000], 101, [118, 108, 98]);
-  scene.add(belt.group);
-  const outRocks = buildAsteroidField(LOCATIONS[2].pos, env, 120, [8000, 3000, 8000], 202, [92, 80, 72]);
-  scene.add(outRocks.group);
-  const rocks = belt.rocks.concat(outRocks.rocks);
+  const keepMats = new Set(Object.values(SM));
 
   const dust = makeDust();
   scene.add(dust.lines);
   const warp = makeWarpTunnel();
   scene.add(warp.lines);
 
-  let time = 0;
+  const structures = [], rocks = [], bodies = [], spinners = [], fields = [], beaconSets = [], timed = [];
+  const docks = {};
+  let sys = null, time = 0;
+
+  function clearSystem() {
+    if (!sys) return;
+    scene.remove(sys);
+    const keepGeo = new Set(sharedRockGeos());
+    sys.traverse((o) => {
+      if (o.geometry && !keepGeo.has(o.geometry)) o.geometry.dispose();
+      if (o.material && !keepMats.has(o.material)) {
+        if (o.material.userData.ownMaps) for (const k of ['map', 'normalMap', 'roughnessMap']) o.material[k]?.dispose();
+        o.material.dispose();
+      }
+    });
+    sys = null;
+  }
+
+  function load(def, explored) {
+    clearSystem();
+    sys = new THREE.Group();
+    scene.add(sys);
+    for (const a of [structures, rocks, bodies, spinners, fields, beaconSets, timed, LOCATIONS]) a.length = 0;
+    for (const k of Object.keys(docks)) delete docks[k];
+
+    const st = def.starInfo;
+    SUN_DIR.copy(def.sunDir);
+    SUN_COL.setRGB(...st.color);
+    SKY_U.uSunSize.value = st.size;
+    SKY_U.uNebDir.value.set(...def.sky.dir).normalize();
+    SKY_U.uNeb1.value.setRGB(...def.sky.c1);
+    SKY_U.uNeb2.value.setRGB(...def.sky.c2);
+    SKY_U.uNeb3.value.setRGB(...def.sky.c3);
+    SKY_U.uNebAmt.value = def.sky.amt;
+    envTarget = bakeSky(renderer, cube, pmrem, envTarget);
+    sun.color.setRGB(...st.color);
+    sun.intensity = st.light * 1.24;
+
+    const planetLocs = [];
+    for (const P of def.planets) {
+      const seg = P.moon ? [128, 64] : P.type === 'gas' ? [160, 80] : [224, 112];
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(P.radius, seg[0], seg[1]), makePlanetMaterial(P));
+      mesh.position.copy(P.pos);
+      mesh.rotation.z = P.type === 'gas' ? 0.06 : 0.35;
+      sys.add(mesh);
+      timed.push(mesh.material);
+      spinners.push({ o: mesh, s: P.type === 'gas' ? 0.003 : 0.0012 });
+      if (P.clouds) {
+        const cl = new THREE.Mesh(new THREE.SphereGeometry(P.radius * 1.006, 160, 80), makeClouds(P.radius * 1.006));
+        cl.position.copy(P.pos);
+        cl.rotation.z = 0.35;
+        sys.add(cl);
+        timed.push(cl.material);
+        spinners.push({ o: cl, s: 0.0016 });
+      }
+      if (P.atmo) {
+        const at = new THREE.Mesh(new THREE.SphereGeometry(P.radius * 1.045, 96, 48), makeAtmosphere(P.pos, P.radius, P.radius * 1.045, P.atmo));
+        at.position.copy(P.pos);
+        sys.add(at);
+      }
+      if (P.ring) sys.add(makeRing(P));
+      bodies.push({ pos: P.pos, radius: P.radius });
+      planetLocs.push({ id: `planet-${planetLocs.length}`, name: P.name, type: P.moon ? 'Moon' : `Planet (${P.label})`, pos: P.pos, arrive: P.radius + (P.type === 'gas' ? 20000 : 9000), icon: P.moon ? 'moon' : 'planet' });
+    }
+    bounce.position.copy(def.planets[0].pos).normalize().multiplyScalar(1000);
+
+    for (const S of def.stations) {
+      const yard = S.kind === 'shipyard';
+      const b = yard ? buildShipyard(SM) : buildStation(SM);
+      b.root.position.copy(S.pos);
+      b.root.rotation.y = S.rot;
+      sys.add(b.root);
+      const loc = { id: S.id, name: S.name, type: yard ? 'Station (High-Tech)' : 'Station', pos: S.pos, arrive: yard ? 3000 : 3200, icon: S.kind, dock: S.dock };
+      structures.push({ obj: b.root, colliders: b.colliders, loc });
+      spinners.push({ o: b.root.userData.ring, s: yard ? -0.025 : 0.03 });
+      beaconSets.push(b.root.userData.beacons);
+      docks[S.id] = yard
+        ? { root: b.root, undock: () => ({ pos: new THREE.Vector3(0, -300, 420), dir: new THREE.Vector3(0, 0, 1) }) }
+        : { root: b.root, undock: () => { const a = Math.PI / 4 + Math.floor(Math.random() * 4) * Math.PI / 2; return { pos: new THREE.Vector3(Math.cos(a) * 640, -230, Math.sin(a) * 640), dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) }; } };
+      LOCATIONS.push(loc);
+    }
+    def.belts.forEach((B, i) => {
+      const f = buildAsteroidField(B.pos, env, B.count, B.spread, B.seed, B.tint);
+      sys.add(f.group);
+      fields.push({ f, pos: B.pos });
+      rocks.push(...f.rocks);
+      LOCATIONS.push({ id: `belt-${i}`, name: B.name, type: 'Asteroid Belt', pos: B.pos, arrive: 1500, icon: 'belt' });
+    });
+    def.outposts.forEach((O, i) => {
+      const b = buildOutpost(SM, 77 + i * 13);
+      b.root.position.copy(O.pos);
+      sys.add(b.root);
+      const loc = { id: `outpost-${i}`, name: O.name, type: 'Pirate Outpost', pos: O.pos, arrive: 6000, icon: 'outpost' };
+      structures.push({ obj: b.root, colliders: b.colliders, loc });
+      beaconSets.push(b.root.userData.beacons);
+      if (O.rocks) {
+        const f = buildAsteroidField(O.pos, env, 120, [8000, 3000, 8000], 202 + i, [92, 80, 72]);
+        sys.add(f.group);
+        fields.push({ f, pos: O.pos });
+        rocks.push(...f.rocks);
+      }
+      LOCATIONS.push(loc);
+    });
+    for (const J of def.jumps) {
+      const b = buildGate(SM);
+      b.root.position.copy(J.pos);
+      b.root.lookAt(0, 0, 0);
+      sys.add(b.root);
+      const loc = { id: `jump-${J.to}`, name: `Jump Gate (${explored.has(J.to) ? SYSTEMS[J.to].name : 'Uncharted'})`, type: 'Jump Gate', pos: J.pos, arrive: 2200, icon: 'gate', jump: J.to };
+      structures.push({ obj: b.root, colliders: b.colliders, loc });
+      beaconSets.push(b.root.userData.beacons);
+      timed.push(b.root.userData.horizon.material);
+      LOCATIONS.push(loc);
+    }
+    LOCATIONS.push(...planetLocs);
+  }
+
   const _wp = new THREE.Vector3();
   const worldColliders = [];
 
-  const world = {
-    env, sun, sky, stars, planet, clouds, moon, station, yard, docks, gate, rocks, dust, warp, structures,
+  return {
+    env, sun, sky, stars, docks, rocks, bodies, dust, warp, structures, load,
+    // rename jump gates once their destination is charted
+    chart(id) { const l = LOCATIONS.find((x) => x.jump === id); if (l) l.name = `Jump Gate (${SYSTEMS[id].name})`; },
     update(dt, camera, focus) {
       time += dt;
       sky.position.copy(camera.position);
       stars.position.copy(camera.position);
-      planet.rotation.y += dt * 0.0012;
-      clouds.rotation.y += dt * 0.0016;
-      clouds.material.uniforms.uTime.value = time;
-      planet.material.uniforms.uTime.value = time;
-      station.root.userData.ring.rotation.y += dt * 0.03;
-      yard.root.userData.ring.rotation.y -= dt * 0.025;
-      gate.root.userData.horizon.material.uniforms.uTime.value = time;
-      for (const st of [station.root, yard.root, gate.root, outpost.root]) {
-        for (const b of st.userData.beacons) {
-          const on = b.rate === 0 ? 1 : (Math.sin((time * b.rate + b.phase) * Math.PI * 2) > 0.6 ? 1 : 0.08);
-          b.s.material.opacity = on;
-        }
+      for (const s of spinners) s.o.rotation.y += dt * s.s;
+      for (const m of timed) m.uniforms.uTime.value = time;
+      for (const set of beaconSets) {
+        for (const b of set) b.s.material.opacity = b.rate === 0 ? 1 : (Math.sin((time * b.rate + b.phase) * Math.PI * 2) > 0.6 ? 1 : 0.08);
       }
       // asteroids only need animating when near
-      if (focus.distanceTo(LOCATIONS[1].pos) < 40000) belt.update(dt);
-      if (focus.distanceTo(LOCATIONS[2].pos) < 40000) outRocks.update(dt);
+      for (const f of fields) if (focus.distanceTo(f.pos) < 40000) f.f.update(dt);
       // shadow frustum follows the focus
       sun.target.position.copy(focus);
       sun.position.copy(focus).addScaledVector(SUN_DIR, 1500);
@@ -1042,7 +1148,5 @@ export function buildWorld(renderer, scene) {
       }
       return worldColliders;
     },
-    stars,
   };
-  return world;
 }
