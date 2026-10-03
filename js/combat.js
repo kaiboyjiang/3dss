@@ -319,6 +319,8 @@ const BOLT_TYPES = {
   pirate: { core: new THREE.Color(9, 6, 5), halo: new THREE.Color(4.5, 0.6, 0.3), len: 12, w: 0.14, hw: 0.6 },
   heavy: { core: new THREE.Color(9, 6, 4), halo: new THREE.Color(4.0, 1.2, 0.2), len: 30, w: 0.35, hw: 1.6 },
   slug: { core: new THREE.Color(8, 9, 12), halo: new THREE.Color(1.0, 2.0, 6.0), len: 40, w: 0.1, hw: 0.4 },
+  tracer: { core: new THREE.Color(9, 6, 2.5), halo: new THREE.Color(3.5, 1.4, 0.3), len: 9, w: 0.07, hw: 0.28 },
+  plasma: { core: new THREE.Color(5, 10, 6), halo: new THREE.Color(0.6, 4.0, 1.6), len: 16, w: 0.6, hw: 2.2 },
 };
 
 export class Projectiles {

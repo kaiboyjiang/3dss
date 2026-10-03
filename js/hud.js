@@ -9,17 +9,21 @@ export function fmtDist(m) {
   return `${(m / 1.496e11).toFixed(2)} AU`;
 }
 
+const COLORS = { hostile: '255,90,72', neutral: '207,214,218', friendly: '127,224,160' };
+function factionCls(e) { return e.faction === 'pirate' ? 'hostile' : e.faction === 'navy' ? 'friendly' : 'neutral'; }
+
 export class HUD {
   constructor() {
     this.el = {
-      hud: $('hud'), brackets: $('brackets'), stick: $('stick'), prograde: $('prograde'), lead: $('lead'), off: $('offarrow'),
+      hud: $('hud'), brackets: $('brackets'), hudc: $('hudc'), prograde: $('prograde'), lead: $('lead'), off: $('offarrow'),
       log: $('log'), notice: $('notice'), warning: $('warning'), target: $('target'), tname: $('tname'), tsub: $('tsub'),
       tsh: $('tsh'), tar: $('tar'), thu: $('thu'), tlock: $('tlock'), ov: $('ovbody'), selname: $('selname'),
       speed: $('speed'), flags: $('flags'), gauge: $('gauge'), loc: $('locname'), credits: $('credits'), kills: $('kills'),
-      warpfx: $('warpfx'), warpdest: $('warpdest'), cursorhint: $('cursorhint'),
+      warpfx: $('warpfx'), warpdest: $('warpdest'),
       railammo: $('railammo'), misammo: $('misammo'),
     };
     this.g = this.el.gauge.getContext('2d');
+    this.o = this.el.hudc.getContext('2d');
     this.pool = [];
     this.noticeT = 0;
     this.ovT = 0;
@@ -63,7 +67,7 @@ export class HUD {
     const items = [];
     for (const e of G.entities) {
       if (!e.alive || e === player) continue;
-      items.push({ ref: e, pos: e.obj.position, cls: e.faction === 'pirate' ? 'hostile' : 'neutral', label: e.name, size: e.ship.radius });
+      items.push({ ref: e, pos: e.obj.position, cls: factionCls(e), label: e.name, size: e.ship.radius });
     }
     for (const l of G.locations) items.push({ ref: l, pos: l.pos, cls: 'loc', label: l.name, size: 0, loc: true });
     for (const it of items) {
@@ -101,10 +105,8 @@ export class HUD {
     }
     for (let i = n; i < this.pool.length; i++) this.pool[i].d.style.display = 'none';
 
-    // ---- stick / prograde / lead / off-screen arrow
-    this.el.stick.style.left = `${w / 2 + G.stick.x * Math.min(w, h) * 0.22}px`;
-    this.el.stick.style.top = `${h / 2 + G.stick.y * Math.min(w, h) * 0.22}px`;
-    this.el.stick.style.display = G.pointerLocked && !G.freeLook ? '' : 'none';
+    // ---- reticle compass, pointer and prograde / lead / off-screen arrow
+    this.overlay(G, w, h, proj, isBehind);
     const sp = player.vel.length();
     if (sp > 5) {
       const pp = _v.copy(player.obj.position).addScaledVector(player.vel, 1000 / sp);
@@ -140,7 +142,7 @@ export class HUD {
       this.el.tsh.style.width = `${(tp.shield / tp.maxShield) * 100}%`;
       this.el.tar.style.width = `${(tp.armor / tp.maxArmor) * 100}%`;
       this.el.thu.style.width = `${(tp.hull / tp.maxHull) * 100}%`;
-      this.el.tlock.textContent = tgt === tp ? (G.lock.progress >= 1 ? 'TARGET LOCKED' : `LOCKING ${Math.round(G.lock.progress * 100)}%`) : 'SELECTED — press T to lock';
+      this.el.tlock.textContent = tgt === tp ? (G.lock.progress >= 1 ? 'TARGET LOCKED' : `LOCKING ${Math.round(G.lock.progress * 100)}%`) : 'SELECTED — hold Ctrl or press T to lock';
     } else this.el.target.classList.add('hidden');
 
     // ---- overview (throttled)
@@ -167,12 +169,12 @@ export class HUD {
       m.firstChild.style.height = `${Math.max(0, Math.min(1, f)) * 100}%`;
       m.classList.toggle('active', !!active); m.classList.toggle('off', !!off);
     };
-    cd('m-laser', 0, G.input.fire1, player.cap < 6);
-    cd('m-rail', G.cool.rail / 1.6, G.input.fire2, G.ammo.rail <= 0);
+    this.el.railammo.style.display = G.usesAmmo ? '' : 'none';
+    cd('m-laser', G.cool.pri, G.input.fire1, G.priOff);
+    cd('m-rail', G.cool.sec, G.input.fire2, G.secOff);
     cd('m-missile', G.cool.missile / 4, false, G.ammo.missile <= 0 || !(G.lock && G.lock.progress >= 1));
     cd('m-ab', 0, G.boosting, player.cap < 10);
     cd('m-warp', G.warp ? 1 : 0, !!G.warp, G.scrambled);
-    this.el.cursorhint.style.display = !G.pointerLocked && G.state === 'flying' ? '' : 'none';
     // warnings
     const warn = [];
     if (G.scrambled) warn.push('WARP DRIVE DISRUPTED');
@@ -184,6 +186,88 @@ export class HUD {
     this.el.warpfx.classList.toggle('hidden', !G.warp);
     if (G.warp) this.el.warpdest.textContent = `${G.warp.phase === 'align' ? 'Aligning to' : 'Warping to'} ${G.warp.dest.name} — ${fmtDist(G.warp.remaining)}`;
   }
+  overlay(G, w, h, proj, isBehind) {
+    const c = this.el.hudc, g = this.o;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    g.clearRect(0, 0, w, h);
+    const cam = G.camera, pp = G.player.obj.position;
+    const cx = w / 2, cy = h / 2, R0 = 24, R = 68;
+    // compass ring around the reticle: centre = dead ahead, outer edge = directly behind
+    g.lineWidth = 1;
+    g.strokeStyle = 'rgba(160,230,255,0.22)';
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
+    g.setLineDash([2, 4]);
+    g.strokeStyle = 'rgba(160,230,255,0.14)';
+    g.beginPath(); g.arc(cx, cy, (R0 + R) / 2, 0, Math.PI * 2); g.stroke();
+    g.setLineDash([]);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4, l = i % 2 ? 3 : 6;
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R); g.lineTo(cx + Math.cos(a) * (R + l), cy + Math.sin(a) * (R + l)); g.stroke();
+    }
+    const inv = cam.matrixWorldInverse;
+    const tgt = G.lock ? G.lock.ent : (G.selected && G.selected.ship && G.selected.alive ? G.selected : null);
+    const dirOf = (p) => {
+      const rel = _v.copy(p).applyMatrix4(inv);
+      const len = rel.length() || 1;
+      const th = Math.acos(Math.max(-1, Math.min(1, -rel.z / len)));
+      const ph = Math.atan2(-rel.y, rel.x);
+      return { th, ph, r: R0 + (R - R0) * (th / Math.PI) };
+    };
+    let tdir = null;
+    for (const e of G.entities) {
+      if (!e.alive || e === G.player) continue;
+      const d = e.obj.position.distanceTo(pp);
+      if (d > 60000 && e !== tgt) continue;
+      const D = dirOf(e.obj.position);
+      if (e === tgt) { tdir = D; continue; }
+      const col = COLORS[factionCls(e)];
+      const x = cx + Math.cos(D.ph) * D.r, y = cy + Math.sin(D.ph) * D.r;
+      const a = d < 15000 ? 0.95 : 0.5;
+      g.beginPath();
+      g.arc(x, y, e.ship.radius > 30 ? 3.2 : 2.4, 0, Math.PI * 2);
+      if (D.th > Math.PI / 2) { g.strokeStyle = `rgba(${col},${a})`; g.stroke(); } else { g.fillStyle = `rgba(${col},${a})`; g.fill(); }
+    }
+    if (tdir && tgt) {
+      const locked = G.lock && G.lock.ent === tgt && G.lock.progress >= 1;
+      const col = locked ? '#ff4a30' : G.lock && G.lock.ent === tgt ? '#ffb040' : '#eef6ff';
+      const x = cx + Math.cos(tdir.ph) * tdir.r, y = cy + Math.sin(tdir.ph) * tdir.r;
+      g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5;
+      g.strokeRect(x - 4.5, y - 4.5, 9, 9);
+      if (tdir.th > 0.03) {
+        const ax = cx + Math.cos(tdir.ph) * (R + 12), ay = cy + Math.sin(tdir.ph) * (R + 12);
+        g.save(); g.translate(ax, ay); g.rotate(tdir.ph);
+        g.beginPath(); g.moveTo(9, 0); g.lineTo(-3, -7); g.lineTo(-1, 0); g.lineTo(-3, 7); g.closePath(); g.fill();
+        g.restore();
+        g.font = '11px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(fmtDist(tgt.obj.position.distanceTo(pp)), cx + Math.cos(tdir.ph) * (R + 30), cy + Math.sin(tdir.ph) * (R + 30));
+      }
+      g.lineWidth = 1;
+    }
+    // pointer and follow vector
+    const m = G.mouse;
+    if (G.state === 'flying') {
+      if (G.following) {
+        g.strokeStyle = 'rgba(255,200,110,0.55)'; g.setLineDash([4, 5]);
+        g.beginPath(); g.moveTo(cx, cy); g.lineTo(m.x, m.y); g.stroke(); g.setLineDash([]);
+      }
+      g.strokeStyle = G.following ? 'rgba(255,200,110,0.95)' : 'rgba(190,240,255,0.8)';
+      g.beginPath(); g.arc(m.x, m.y, 7, 0, Math.PI * 2); g.stroke();
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { g.beginPath(); g.moveTo(m.x + dx * 10, m.y + dy * 10); g.lineTo(m.x + dx * 15, m.y + dy * 15); g.stroke(); }
+      if (G.following) { g.fillStyle = 'rgba(255,200,110,0.9)'; g.beginPath(); g.arc(m.x, m.y, 2, 0, Math.PI * 2); g.fill(); }
+      if (G.ctrlTargeting) {
+        g.strokeStyle = 'rgba(255,176,64,0.6)'; g.setLineDash([6, 6]);
+        g.beginPath(); g.arc(m.x, m.y, G.ctrlRadius, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+        const hv = G.ctrlHover;
+        if (hv && hv.alive && !isBehind(hv.obj.position)) {
+          const [hx, hy] = proj(hv.obj.position);
+          g.strokeStyle = 'rgba(255,176,64,0.9)';
+          g.beginPath(); g.moveTo(m.x, m.y); g.lineTo(hx, hy); g.stroke();
+        }
+        g.fillStyle = '#ffb040'; g.font = '10px monospace'; g.textAlign = 'left';
+        g.fillText('TARGETING', m.x + 18, m.y - 12);
+      }
+    }
+  }
   overview(G) {
     const pp = G.player.obj.position;
     const rows = [];
@@ -193,10 +277,10 @@ export class HUD {
       if (d > 150000) continue;
       if (this.tab === 'nav') continue;
       if (this.tab === 'hostile' && e.faction !== 'pirate') continue;
-      rows.push({ ref: e, cls: e.faction === 'pirate' ? 'hostile' : 'neutral', ico: e.faction === 'pirate' ? '▼' : '▽', name: e.name, type: e.className, d });
+      rows.push({ ref: e, cls: factionCls(e), ico: e.faction === 'pirate' ? '▼' : e.faction === 'navy' ? '△' : '▽', name: e.name, type: e.className, d });
     }
     if (this.tab !== 'hostile') {
-      G.locations.forEach((l, i) => rows.push({ ref: l, cls: 'loc', ico: ['◆', '◌', '☠', '◎', '●', '○'][i] || '◇', name: `${i + 1}. ${l.name}`, type: l.type, d: l.pos.distanceTo(pp) }));
+      G.locations.forEach((l, i) => rows.push({ ref: l, cls: 'loc', ico: ['◆', '◌', '☠', '◎', '●', '○', '✦'][i] || '◇', name: `${i + 1}. ${l.name}`, type: l.type, d: l.pos.distanceTo(pp) }));
     }
     rows.sort((a, b) => a.d - b.d);
     const body = this.el.ov;

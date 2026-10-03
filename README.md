@@ -1,27 +1,29 @@
 # Kaltos 0.4 — 3D Space Simulator
 
-A procedural browser-based space combat simulator built with Three.js. Pilot the Valkyrie assault frigate through the Kaltos system, engage Corsair raiders, navigate asteroid fields, warp between landmarks, and dock at Ardent Relay Station.
+A procedural browser-based space combat simulator built with Three.js. Pilot the Valkyrie assault frigate through the Kaltos system, engage Corsair raiders, navigate asteroid fields, warp between landmarks, and dock at Ardent Relay Station or the high-tech Helion Orbital Shipyard, where you can inspect and buy hulls (Kestrel, Valkyrie, Warden, Paladin) in a 3D hangar and fit weapons and modules in the outfitter.
 
 ## Play
 
 Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/3dss/) in a desktop browser with WebGL enabled.
 
-- Mouse: direct pitch and yaw
+- Hold middle mouse: the ship turns towards the pointer (M toggles follow mode on)
+- Pointer: turrets aim at the pointer; the reticle compass shows the direction of the target and other ships
 - Arrow Up / Down: thrust and throttle
 - Arrow Left / Right: strafe
 - W / S: throttle
 - Q / E: roll
 - A / D: strafe
-- R / Ctrl: vertical thrust
+- R / B: vertical thrust up / down
 - Shift: afterburner
-- Left mouse: pulse lasers
-- Right mouse: railgun
-- Middle mouse / T: quickly lock target near reticle
+- Left mouse: primary weapons
+- Right mouse: secondary weapons
+- Hold left Ctrl: lock the ship nearest the pointer
+- T: lock target near the pointer / reticle
 - Tab: cycle hostiles
 - F: missile salvo after locking
-- 1–6: select navigation destination
+- 1–7: select navigation destination
 - Space / J: warp to the selected destination
-- G: dock near Ardent Relay Station
+- G: dock at Ardent Relay Station (1) or Helion Orbital Shipyard (7)
 - V: cycle cameras
 - Esc: pause and show controls
 - H: help

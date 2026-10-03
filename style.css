@@ -11,7 +11,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 #reticle .ring::before { left: 15px; top: -8px; width: 1px; height: 6px; box-shadow: 0 40px 0 rgba(160, 230, 255, 0.7); }
 #reticle .ring::after { top: 15px; left: -8px; height: 1px; width: 6px; box-shadow: 40px 0 0 rgba(160, 230, 255, 0.7); }
 #reticle .dot { position: absolute; left: -1.5px; top: -1.5px; width: 3px; height: 3px; background: #bff; border-radius: 50%; }
-#stick { display: none; position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border: 1px solid rgba(255, 210, 120, 0.85); transform: rotate(45deg); }
+#hudc { position: absolute; inset: 0; width: 100%; height: 100%; }
 #prograde { position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px; border: 2px solid rgba(120, 255, 160, 0.7); border-radius: 50%; }
 #prograde::before, #prograde::after { content: ""; position: absolute; background: rgba(120, 255, 160, 0.7); top: 5px; width: 6px; height: 2px; }
 #prograde::before { left: -9px; } #prograde::after { right: -9px; }
@@ -24,7 +24,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
   -webkit-mask: linear-gradient(#000 0 0) top left / 30% 30% no-repeat, linear-gradient(#000 0 0) top right / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom left / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom right / 30% 30% no-repeat;
           mask: linear-gradient(#000 0 0) top left / 30% 30% no-repeat, linear-gradient(#000 0 0) top right / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom left / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom right / 30% 30% no-repeat; }
 .br .lbl { position: absolute; left: 50%; top: 50%; margin-left: 4px; }
-.br.hostile { color: #ff5a48; } .br.neutral { color: #cfd6da; } .br.loc { color: #8fd8ff; }
+.br.hostile { color: #ff5a48; } .br.neutral { color: #cfd6da; } .br.friendly { color: #7fe0a0; } .br.loc { color: #8fd8ff; }
 .br.loc .box { border-radius: 2px; transform: translate(-50%, -50%) rotate(45deg); -webkit-mask: none; mask: none; }
 .br.sel .box { border-width: 2px; opacity: 1; }
 .br .lockring { position: absolute; left: 50%; top: 50%; border: 2px dashed #ffb040; border-radius: 50%; transform: translate(-50%, -50%); animation: spin 2s linear infinite; }
@@ -86,7 +86,6 @@ button.primary { background: rgba(30, 110, 160, 0.7); border-color: #6cf; }
 .mod.active { border-color: #6cf; box-shadow: 0 0 10px rgba(80, 200, 255, 0.4) inset; }
 .mod.active .ic { color: #fff; }
 .mod.off { opacity: 0.45; }
-#cursorhint { position: absolute; bottom: 240px; width: 100%; text-align: center; color: #fc6; font-size: 12px; letter-spacing: 1px; text-shadow: 0 0 4px #000; }
 
 #warpfx { position: fixed; top: 34%; width: 100%; text-align: center; pointer-events: none; }
 #warpfx .wt { font-size: 20px; letter-spacing: 8px; color: #aef; text-shadow: 0 0 14px #39f; }
@@ -112,3 +111,44 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin: 0 1px; bor
 #pause { background: rgba(0, 5, 10, 0.82); backdrop-filter: blur(8px); }
 #pause .box { width: min(780px, 92vw); }
 #resume { margin-top: 12px; font-size: 15px; padding: 9px 28px; }
+
+body[data-state="flying"] #c { cursor: none; }
+body[data-state="docked"] #c { cursor: grab; }
+body[data-state="docked"] #c:active { cursor: grabbing; }
+#overview tr.friendly td { color: #7fe0a0; }
+
+/* ---- docked: hangar, shipyard and outfitter */
+#docked { position: fixed; inset: 0; pointer-events: none; color: #cde; }
+#docked > * { pointer-events: auto; }
+#docktop { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 24px; padding: 12px 22px; background: linear-gradient(rgba(4, 10, 16, 0.92), rgba(4, 10, 16, 0.6)); border-bottom: 1px solid rgba(120, 190, 220, 0.25); }
+#docktop h1 { margin: 0; font-weight: 300; letter-spacing: 5px; font-size: 22px; color: #fff; }
+#docksub { font-size: 11px; letter-spacing: 2px; color: #6cf; }
+.dtabs { display: flex; gap: 4px; margin-left: 20px; }
+.dtabs b { font-weight: normal; padding: 7px 16px; border: 1px solid rgba(120, 190, 220, 0.25); cursor: pointer; letter-spacing: 2px; font-size: 12px; text-transform: uppercase; color: #9bc; }
+.dtabs b.on { background: rgba(30, 110, 160, 0.55); color: #fff; border-color: #6cf; }
+.dtabs b.na { opacity: 0.45; }
+#dockwallet { margin-left: auto; font-size: 13px; color: #fd8; letter-spacing: 1px; }
+.dpanel { position: absolute; top: 74px; width: 330px; max-height: calc(100vh - 110px); overflow-y: auto; background: rgba(4, 10, 16, 0.82); border: 1px solid rgba(120, 190, 220, 0.25); padding: 14px 16px; font-size: 12px; }
+#dockleft { left: 16px; }
+#dockright { right: 16px; width: 300px; }
+.dpanel h3 { margin: 4px 0 8px; font-weight: normal; letter-spacing: 2px; color: #6cf; font-size: 12px; text-transform: uppercase; }
+.dpanel h2 { margin: 0 0 2px; font-weight: 300; letter-spacing: 3px; color: #fff; font-size: 20px; }
+.dpanel p { margin: 4px 0 10px; line-height: 1.5; color: #abc; }
+.dpanel .sub { color: #6cf; letter-spacing: 1px; font-size: 11px; margin-bottom: 8px; }
+.dpanel button { width: 100%; margin-top: 6px; }
+.dpanel .row2 { display: flex; gap: 6px; } .dpanel .row2 button { flex: 1; }
+.item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 9px; margin-bottom: 4px; border: 1px solid rgba(120, 190, 220, 0.15); background: rgba(20, 40, 55, 0.35); cursor: pointer; }
+.item:hover { border-color: rgba(120, 200, 230, 0.5); }
+.item.on { border-color: #6cf; background: rgba(30, 110, 160, 0.4); }
+.item.dis { opacity: 0.45; }
+.item .nm { color: #eef; } .item .ty { color: #789; font-size: 11px; }
+.item .pr { color: #fd8; white-space: nowrap; font-size: 11px; text-align: right; }
+.item .pr.own { color: #7fe0a0; }
+.slot .k { display: inline-block; width: 26px; color: #6cf; font-family: monospace; }
+.slot.empty .nm { color: #678; font-style: italic; }
+table.st { width: 100%; border-collapse: collapse; margin: 6px 0 10px; }
+table.st td { padding: 3px 0; border-bottom: 1px solid rgba(120, 190, 220, 0.08); }
+table.st td:last-child { text-align: right; color: #eef; }
+table.st .up { color: #7fe0a0; } table.st .dn { color: #ff7a66; }
+#dockhint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #789; letter-spacing: 2px; pointer-events: none; }
+.dpanel { scrollbar-width: thin; scrollbar-color: rgba(120, 190, 220, 0.35) transparent; }

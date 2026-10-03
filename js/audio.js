@@ -85,6 +85,20 @@ export class Audio {
     this.noise(0.5, 'lowpass', 4000, 0.5, v * 0.6, 0.002, 200);
     this.tone('sawtooth', 3000, 400, 0.25, v * 0.18);
   }
+  cannon(dist) {
+    if (!this.ctx) return;
+    const v = this.vol(dist) * 0.35;
+    if (v < 0.01) return;
+    this.noise(0.07, 'bandpass', 1100 + Math.random() * 300, 0.9, v * 0.5, 0.002, 300);
+    this.tone('square', 150, 60, 0.05, v * 0.12);
+  }
+  plasma(dist) {
+    if (!this.ctx) return;
+    const v = this.vol(dist);
+    this.tone('sawtooth', 220, 40, 0.7, v * 0.35, 0.01);
+    this.tone('sine', 1600, 200, 0.4, v * 0.2);
+    this.noise(0.6, 'bandpass', 800, 1.5, v * 0.4, 0.01, 150);
+  }
   railCharge() {
     if (!this.ctx) return;
     this.tone('sine', 300, 1800, 0.35, 0.05, 0.3);

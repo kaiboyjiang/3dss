@@ -15,6 +15,10 @@ export function livery(name, env) {
     pirate: { base: [74, 76, 80], accent: [168, 28, 22], second: [24, 24, 26], eng: [1.0, 0.45, 0.2], labels: ['XX', 'KILL', 'CR-9', '666', 'RCS'], seed: 9, wear: 0.85 },
     cruiser: { base: [96, 84, 74], accent: [176, 34, 26], second: [30, 28, 28], eng: [1.0, 0.4, 0.18], labels: ['CORSAIR', 'BAY', 'C-01', 'HAZARD'], seed: 13, wear: 1.0 },
     hauler: { base: [190, 176, 120], accent: [60, 90, 140], second: [50, 52, 56], eng: [0.6, 0.8, 1.0], labels: ['KALTOS LOG.', 'CARGO', 'H-220', 'HEAVY'], seed: 17, wear: 0.6 },
+    kestrel: { base: [62, 64, 68], accent: [40, 190, 210], second: [22, 22, 24], eng: [0.6, 0.85, 1.0], labels: ['KESTREL', 'K-7', 'NO STEP', 'RCS', '0117'], seed: 41, wear: 0.3 },
+    warden: { base: [124, 126, 120], accent: [226, 178, 32], second: [40, 42, 44], eng: [0.5, 0.7, 1.0], labels: ['WARDEN', 'DD-4', 'HAZARD', '0442', 'RCS'], seed: 51, wear: 0.5 },
+    paladin: { base: [222, 224, 228], accent: [40, 84, 170], second: [52, 56, 64], eng: [0.55, 0.8, 1.0], labels: ['PALADIN', 'BC-1', 'HELION YARDS', 'DANGER', 'VENT'], seed: 61, wear: 0.2 },
+    navy: { base: [72, 84, 98], accent: [230, 232, 236], second: [28, 32, 38], eng: [0.5, 0.8, 1.0], labels: ['HELION', 'NAVY', 'HN-12', 'RCS'], seed: 71, wear: 0.35 },
   }[name];
   const h = hullMaps({ seed: L.seed, base: L.base, accent: L.accent, accentChance: 0.05, darkChance: 0.08, wear: L.wear, labels: L.labels });
   const a = hullMaps({ seed: L.seed + 1, base: L.accent, accent: L.base, accentChance: 0.0, darkChance: 0.05, wear: L.wear * 0.8, labels: L.labels, size: 512 });
@@ -31,9 +35,11 @@ export function livery(name, env) {
     engine: new THREE.MeshBasicMaterial({ color: engColor.clone().multiplyScalar(2.2) }),
     light: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5, 5) }),
     coil: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.4, 4) }),
+    plasma: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 4.5, 2.4) }),
+    amber: new THREE.MeshBasicMaterial({ color: new THREE.Color(4.5, 2.2, 0.4) }),
     engColor,
   };
-  for (const k of ['engine', 'light', 'coil']) M[k].userData.noShadow = true;
+  for (const k of ['engine', 'light', 'coil', 'plasma', 'amber']) M[k].userData.noShadow = true;
   liveryCache[name] = M;
   return M;
 }
@@ -132,6 +138,54 @@ export function buildTurret(M, kind = 'laser', scale = 1) {
     }
     kp.add('dark', G.rbox(1.2, 0.5, 0.9, 0.1), mat([0, 0, 0.2]));
     pitch.position.set(0, 0.85, 0.3);
+  } else if (kind === 'auto') {
+    // rotary autocannon with side ammo feed
+    kb.add('dark', G.cyl(0.9, 1.1, 0.35, 24), mat([0, 0.17, 0]));
+    kb.add('metal', G.cyl(0.65, 0.65, 0.2, 24), mat([0, 0.42, 0]));
+    ky.add('hull', G.rbox(1.5, 0.9, 1.6, 0.16), mat([0, 0.85, -0.1]));
+    ky.add('accent', G.rbox(1.55, 0.18, 1.0, 0.05), mat([0, 1.3, -0.25]));
+    ky.addMirrored('dark', G.box(0.25, 0.7, 0.8), mat([0.8, 0.85, 0]));
+    ky.add('dark', G.rbox(0.6, 0.65, 1.0, 0.08), mat([-1.05, 0.75, -0.4]));
+    ky.add('metal', G.box(0.3, 0.12, 0.9), mat([-0.7, 1.05, -0.2], [0, 0, -0.5]));
+    const rotor = new THREE.Group();
+    const kr = new Kit();
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * Math.PI * 2;
+      kr.add('gun', G.cyl(0.065, 0.065, 2.5, 8), mat([Math.cos(a) * 0.19, Math.sin(a) * 0.19, 1.35], [Math.PI / 2, 0, 0]));
+    }
+    for (const z of [0.55, 1.7, 2.45]) kr.add('metal', G.cyl(0.3, 0.3, 0.1, 18), mat([0, 0, z], [Math.PI / 2, 0, 0]));
+    kr.add('dark', G.cyl(0.36, 0.3, 0.5, 18), mat([0, 0, 0.15], [Math.PI / 2, 0, 0]));
+    rotor.add(kr.build(M));
+    rotor.position.set(0, 0, 0.35);
+    pitch.add(rotor);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 2.7); rotor.add(mz);
+    muzzles.push(mz); barrels.push(rotor);
+    kp.add('dark', G.rbox(1.0, 0.6, 0.9, 0.1), mat([0, 0, -0.1]));
+    kp.add('gun', G.cyl(0.42, 0.42, 0.5, 20), mat([0, 0, 0.25], [Math.PI / 2, 0, 0]));
+    pitch.position.set(0, 0.88, 0.2);
+  } else if (kind === 'plasma') {
+    // plasma lance: magnetic bottle chamber feeding a ringed emitter
+    kb.add('dark', G.cyl(1.3, 1.5, 0.45, 24), mat([0, 0.22, 0]));
+    kb.add('metal', G.cyl(1.0, 1.0, 0.18, 24), mat([0, 0.52, 0]));
+    ky.add('hull', G.rbox(2.4, 1.1, 2.6, 0.25), mat([0, 1.05, -0.4]));
+    ky.add('accent', G.rbox(2.45, 0.25, 1.2, 0.08), mat([0, 1.6, -0.7]));
+    ky.addMirrored('dark', G.rbox(0.45, 1.0, 1.6, 0.1), mat([1.3, 0.95, -0.4]));
+    ky.addMirrored('plasma', G.box(0.05, 0.5, 1.0), mat([1.53, 0.95, -0.4]));
+    const b = new THREE.Group();
+    const kb2 = new Kit();
+    kb2.add('dark', G.cyl(0.6, 0.7, 2.0, 20), mat([0, 0, 0.6], [Math.PI / 2, 0, 0]));
+    kb2.add('plasma', G.cyl(0.62, 0.62, 0.3, 20, true), mat([0, 0, 0.6], [Math.PI / 2, 0, 0]));
+    kb2.add('gun', G.cyl(0.3, 0.38, 3.4, 16), mat([0, 0, 3.2], [Math.PI / 2, 0, 0]));
+    for (let i = 0; i < 4; i++) kb2.add('metal', G.torus(0.48, 0.09, 8, 24), mat([0, 0, 2.0 + i * 0.75]));
+    for (let i = 0; i < 3; i++) kb2.add('plasma', G.torus(0.42, 0.04, 6, 24), mat([0, 0, 2.38 + i * 0.75]));
+    kb2.add('dark', G.cyl(0.52, 0.34, 0.7, 20), mat([0, 0, 5.1], [Math.PI / 2, 0, 0]));
+    kb2.add('plasma', G.cyl(0.24, 0.24, 0.04, 16), mat([0, 0, 5.47], [Math.PI / 2, 0, 0]));
+    b.add(kb2.build(M));
+    pitch.add(b);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 5.6); b.add(mz);
+    muzzles.push(mz); barrels.push(b);
+    kp.add('dark', G.rbox(1.5, 1.0, 1.4, 0.12), mat([0, 0, 0.1]));
+    pitch.position.set(0, 1.1, 0.3);
   } else {
     // railgun: long twin-rail barrel with glowing magnetic coils
     kb.add('dark', G.cyl(1.3, 1.5, 0.45, 24), mat([0, 0.22, 0]));
@@ -160,11 +214,12 @@ export function buildTurret(M, kind = 'laser', scale = 1) {
   yaw.add(ky.build(M));
   pitch.add(kp.build(M));
   root.scale.setScalar(scale);
-  return { root, yaw, pitch, muzzles, barrels, kind, recoil: barrels.map(() => 0), next: 0 };
+  const recoilDist = { laser: 0.35, rail: 0.8, auto: 0.06, plasma: 0.55 }[kind];
+  return { root, yaw, pitch, muzzles, barrels, kind, recoil: barrels.map(() => 0), baseZ: barrels.map((b) => b.position.z), recoilDist, rotor: kind === 'auto' ? barrels[0] : null, spin: 0, next: 0 };
 }
 
 function shipBase(name, M) {
-  return { name, group: new THREE.Group(), turrets: [], guns: [], launchers: [], engines: [], navLights: [], M, radius: 10, hitSpheres: [] };
+  return { name, group: new THREE.Group(), turrets: [], guns: [], launchers: [], engines: [], navLights: [], M, radius: 10, hitSpheres: [], hardpoints: [], utilMounts: [], cockpit: new THREE.Vector3(0, 2, 6) };
 }
 
 function scatterGreebles(k, r, n, box, keys = ['dark', 'metal', 'gun']) {
@@ -178,8 +233,8 @@ function scatterGreebles(k, r, n, box, keys = ['dark', 'metal', 'gun']) {
 }
 
 // ---------------------------------------------------------------- player frigate (~36 m)
-export function buildFrigate(env) {
-  const M = livery('player', env);
+export function buildFrigate(env, liv = 'player') {
+  const M = livery(liv, env);
   const ship = shipBase('Valkyrie', M);
   const k = new Kit();
   const r = rng(31);
@@ -270,11 +325,9 @@ export function buildFrigate(env) {
 
   ship.group.add(k.build(M, { uvTile: { hull: 9, accent: 6, dark: 6 } }));
 
-  // turrets
-  const t1 = buildTurret(M, 'laser', 1); t1.root.position.set(0, 3.5, 1.2); t1.slot = 'laser';
-  const t2 = buildTurret(M, 'laser', 1); t2.root.position.set(0, 4.1, -5.6); t2.slot = 'laser';
-  const t3 = buildTurret(M, 'rail', 0.9); t3.root.position.set(0, -2.7, -2.0); t3.root.rotation.z = Math.PI; t3.slot = 'rail';
-  for (const t of [t1, t2, t3]) { ship.group.add(t.root); ship.turrets.push(t); }
+  ship.hardpoints = [{ p: [0, 3.5, 1.2], flip: 0, s: 1 }, { p: [0, 4.1, -5.6], flip: 0, s: 1 }, { p: [0, -2.7, -2.0], flip: 1, s: 0.9 }];
+  ship.utilMounts = [{ p: [9.5, -0.55, -5.5], flip: 0, s: 0.55 }, { p: [-9.5, -0.55, -5.5], flip: 0, s: 0.55 }, { p: [0, -2.85, -10], flip: 1, s: 0.6 }];
+  ship.cockpit.set(0, 2.75, 8.4);
   for (const x of [15.4, -15.4]) {
     for (const [dx, dy] of [[-0.28, -0.25], [0.28, 0.25]]) {
       const o = new THREE.Object3D(); o.position.set(x + dx, -1.45 + dy, -3.2); ship.group.add(o); ship.launchers.push(o);
@@ -450,6 +503,234 @@ export function animateShip(ship, dt, time, throttle) {
   }
   for (const t of ship.turrets) {
     t.recoil = t.recoil.map((v) => Math.max(0, v - dt * 4));
-    t.barrels.forEach((b, i) => { b.position.z = (t.kind === 'laser' ? 0.5 : 0) - t.recoil[i] * (t.kind === 'laser' ? 0.35 : 0.8); });
+    t.barrels.forEach((b, i) => { b.position.z = t.baseZ[i] - t.recoil[i] * t.recoilDist; });
+    if (t.rotor) { t.rotor.rotation.z += dt * t.spin; t.spin = Math.max(0, t.spin - dt * 40); }
   }
+}
+
+// ---------------------------------------------------------------- Kestrel interceptor (~22 m)
+export function buildKestrel(env, liv = 'kestrel') {
+  const M = livery(liv, env);
+  const ship = shipBase('Kestrel', M);
+  const k = new Kit();
+  const r = rng(71);
+  const rotZtoX = [0, -Math.PI / 2, 0];
+  k.add('hull', G.extrude([[-9, -0.9], [-9, 1.3], [-4, 1.7], [3, 1.5], [8, 0.8], [12, 0.15], [12, -0.25], [7, -0.8], [0, -1.2], [-6, -1.2]], 2.0, 0.25, 2), mat([0, 0, 0], rotZtoX));
+  k.add('dark', G.extrude([[-8.5, -1.1], [-8.5, 0], [6, 0], [9, -0.6], [4, -1.6], [-5, -1.7]], 1.4, 0.15), mat([0, 0, 0], rotZtoX));
+  k.add('glass', G.sphere(1, 28, 14), mat([0, 1.35, 4.6], [0, 0, 0], [0.85, 0.6, 2.4]));
+  k.add('dark', G.torus(1, 0.05, 6, 32), mat([0, 1.35, 4.0], [0, 0, 0], [0.86, 0.62, 1]));
+  k.add('dark', G.torus(1, 0.05, 6, 32), mat([0, 1.35, 5.4], [0, 0, 0], [0.78, 0.55, 1]));
+  k.add('accent', G.rbox(0.8, 0.4, 9, 0.12), mat([0, 1.85, -3]));
+  k.add('metal', G.cyl(0.03, 0.05, 1.6, 6), mat([0.3, 2.6, -6.5], [-0.3, 0, 0]));
+  // nacelles
+  const nac = [[0, 4], [0.5, 3.8], [0.95, 2.8], [1.15, 0.5], [1.15, -4], [1.3, -4.6], [1.3, -5.9], [1.0, -6.1]];
+  k.addMirrored('hull', G.lathe(nac, 28), mat([2.4, -0.1, -2.4], [Math.PI / 2, 0, 0]));
+  k.addMirrored('accent', G.cyl(1.18, 1.18, 0.6, 28, true), mat([2.4, -0.1, -1.0], [Math.PI / 2, 0, 0]));
+  k.addMirrored('dark', G.cyl(1.32, 1.32, 0.35, 28), mat([2.4, -0.1, -7.6], [Math.PI / 2, 0, 0]));
+  k.addMirrored('nozzle', G.lathe([[0.9, 0.3], [1.0, 0], [1.15, -0.6], [1.25, -1.0]], 24), mat([2.4, -0.1, -8.3], [Math.PI / 2, 0, 0]));
+  k.addMirrored('engine', G.cyl(0.9, 0.9, 0.05, 20), mat([2.4, -0.1, -8.35], [Math.PI / 2, 0, 0]));
+  k.addMirrored('dark', G.rbox(1.6, 0.5, 4.5, 0.15), mat([1.4, 0.4, -3.5]));
+  // delta wings with accent tips
+  const wingM = mat([3.2, -0.4, -1.0], [Math.PI / 2, 0, -0.05]);
+  k.addMirrored('hull', G.extrude([[0, 2], [7, -3.5], [7.6, -5.8], [0, -6.5]], 0.28, 0.08), wingM);
+  k.addMirrored('accent', G.extrude([[5.8, -2.6], [7, -3.5], [7.6, -5.8], [6.4, -5.9]], 0.32, 0.03), wingM);
+  k.addMirrored('dark', G.extrude([[1.0, -4.0], [5.5, -4.9], [5.6, -5.8], [1.0, -6.2]], 0.33, 0.02), wingM);
+  k.addMirrored('dark', G.extrude([[0, 0], [-2.4, 0], [-3.0, 1.8], [-2.2, 1.8]], 0.18, 0.04), mat([10.6, -0.35, -3.8], [0, -Math.PI / 2, 0]));
+  k.addMirrored('gun', G.cyl(0.08, 0.1, 2.2, 8), mat([10.7, -0.45, -2.0], [Math.PI / 2, 0, 0]));
+  // canards
+  k.addMirrored('hull', G.extrude([[0, 0.8], [2.2, -0.4], [2.3, -1.0], [0, -0.9]], 0.16, 0.04), mat([1.0, 0.2, 7.0], [Math.PI / 2, 0, 0.05]));
+  scatterGreebles(k, r, 18, { x0: -0.6, x1: 0.6, z0: -7.5, z1: -0.5, y: 2.05, s: 0.3 });
+  for (let i = 0; i < 12; i++) k.addMirrored(r() < 0.5 ? 'gun' : 'dark', G.box(0.1, 0.2 + r() * 0.3, 0.3 + r() * 0.6), mat([1.1, -0.6 + r() * 1.2, -6 + r() * 10]));
+  ship.group.add(k.build(M, { uvTile: { hull: 7, accent: 5, dark: 5 } }));
+  for (const x of [2.4, -2.4]) addEngine(ship, M, new THREE.Vector3(x, -0.1, -8.4), 0.9, 11);
+  for (const x of [5.2, -5.2]) { const o = new THREE.Object3D(); o.position.set(x, -0.9, -1); ship.group.add(o); ship.launchers.push(o); }
+  addLight(ship, new THREE.Vector3(10.9, -0.4, -3.5), 0xff2015, 1.2, 0);
+  addLight(ship, new THREE.Vector3(-10.9, -0.4, -3.5), 0x15ff40, 1.2, 0);
+  addLight(ship, new THREE.Vector3(0, 2.2, -7.8), 0xffffff, 1.5, 1.3, 0);
+  ship.hardpoints = [{ p: [0, 1.75, 1.6], flip: 0, s: 0.72 }, { p: [0, 2.05, -3.6], flip: 0, s: 0.72 }];
+  ship.utilMounts = [{ p: [0, -1.85, -1.5], flip: 1, s: 0.42 }, { p: [0, -1.85, -5.0], flip: 1, s: 0.42 }];
+  ship.cockpit.set(0, 1.75, 5.0);
+  ship.radius = 12;
+  ship.hitSpheres = [[0, 0, 7, 1.6], [0, 0, 2, 2.1], [0, 0, -4, 2.2], [2.4, 0, -3, 1.6], [-2.4, 0, -3, 1.6], [7, -0.4, -3.5, 2], [-7, -0.4, -3.5, 2]];
+  return ship;
+}
+
+// ---------------------------------------------------------------- Warden destroyer (~66 m)
+export function buildWarden(env, liv = 'warden') {
+  const M = livery(liv, env);
+  const ship = shipBase('Warden', M);
+  const k = new Kit();
+  const r = rng(113);
+  const rotZtoX = [0, -Math.PI / 2, 0];
+  k.add('hull', G.extrude([[-28, -3], [-28, 3.5], [-12, 4.2], [10, 4.0], [22, 2.5], [33, 0.6], [33, -0.6], [22, -2.8], [0, -3.6], [-20, -3.6]], 7, 0.5, 2), mat([0, 0, 0], rotZtoX));
+  k.add('dark', G.extrude([[-26, -3.4], [-26, 0], [24, 0], [28, -1.6], [18, -5.2], [-18, -5.4]], 5, 0.3), mat([0, 0, 0], rotZtoX));
+  k.addMirrored('accent', G.extrude([[12, 0.4], [12, 2.6], [22, 1.6], [30, 0.4]], 0.2, 0.04), mat([3.6, 0, 0], rotZtoX));
+  // sponsons with armour ribs
+  k.addMirrored('hull', G.rbox(3.2, 4.5, 30, 0.5), mat([5.6, -0.5, -6]));
+  k.addMirrored('accent', G.rbox(3.3, 1.0, 24, 0.2), mat([5.65, 1.2, -6]));
+  k.addMirrored('dark', G.rbox(2.6, 1.8, 22, 0.3), mat([6.4, -2.3, -6]));
+  for (let i = 0; i < 5; i++) k.addMirrored('dark', G.box(0.3, 3.2, 1.5), mat([7.25, -0.5, -18 + i * 6]));
+  k.addMirrored('light', G.box(0.2, 0.6, 3), mat([7.2, -2.3, 5.0]));
+  // bridge tower
+  k.add('hull', G.rbox(4.5, 3.2, 8, 0.4), mat([0, 5.6, -14]));
+  k.add('dark', G.rbox(5.4, 1.4, 4.2, 0.2), mat([0, 7.6, -13]));
+  k.add('glass', G.box(5.3, 0.6, 4.0), mat([0, 7.7, -12.95]));
+  k.add('metal', G.cyl(0.08, 0.12, 5, 6), mat([0.8, 10.2, -15]));
+  k.add('metal', G.cyl(0.06, 0.1, 3.4, 6), mat([-0.9, 9.6, -15.6]));
+  k.add('dark', G.cyl(1.4, 0.1, 0.4, 20), mat([0, 8.8, -16.5], [0.4, 0, 0]));
+  // dorsal deck and radiators
+  k.add('dark', G.rbox(4, 0.6, 18, 0.2), mat([0, 4.3, -1]));
+  for (let i = 0; i < 10; i++) k.addMirrored('metal', G.box(3.5, 0.15, 1.0), mat([4.0, 3.9, -26 + i * 1.2], [0, 0, 0.5]));
+  // engine block
+  k.add('dark', G.rbox(11, 8, 6, 0.8), mat([0, 0.2, -30]));
+  const nz = [[-2.8, 1.8], [2.8, 1.8], [-2.8, -1.8], [2.8, -1.8]];
+  for (const [x, y] of nz) {
+    k.add('nozzle', G.lathe([[1.5, 0.4], [1.65, 0], [1.95, -1.0], [2.1, -1.6]], 24), mat([x, y, -33.0], [Math.PI / 2, 0, 0]));
+    k.add('engine', G.cyl(1.5, 1.5, 0.08, 20), mat([x, y, -33.1], [Math.PI / 2, 0, 0]));
+  }
+  scatterGreebles(k, r, 50, { x0: -2.8, x1: 2.8, z0: -26, z1: -18, y: 4.2, s: 0.9 });
+  scatterGreebles(k, r, 40, { x0: -1.8, x1: 1.8, z0: -16, z1: 14, y: -5.6, s: 0.8 });
+  for (let i = 0; i < 40; i++) k.addMirrored(r() < 0.5 ? 'dark' : 'gun', G.box(0.3 + r() * 0.4, 0.4 + r() * 1.2, 0.8 + r() * 3), mat([3.9, -2.5 + r() * 5, -26 + r() * 46]));
+  ship.group.add(k.build(M, { uvTile: { hull: 12, accent: 8, dark: 8 } }));
+  for (const [x, y] of nz) addEngine(ship, M, new THREE.Vector3(x, y, -33.2), 1.5, 20);
+  for (const x of [6.4, -6.4]) { const o = new THREE.Object3D(); o.position.set(x, -2.3, 6); ship.group.add(o); ship.launchers.push(o); }
+  addLight(ship, new THREE.Vector3(7.5, 0, 8), 0xff2015, 2.2, 0);
+  addLight(ship, new THREE.Vector3(-7.5, 0, 8), 0x15ff40, 2.2, 0);
+  addLight(ship, new THREE.Vector3(0.8, 12.8, -15), 0xffffff, 2.6, 1.0, 0);
+  addLight(ship, new THREE.Vector3(0, -5.9, -28), 0xff3030, 2.0, 0.8, 0.5);
+  ship.hardpoints = [
+    { p: [0, 4.6, 6], flip: 0, s: 1.1 }, { p: [0, 4.6, -4], flip: 0, s: 1.1 }, { p: [0, 4.3, -22], flip: 0, s: 1.0 },
+    { p: [0, -5.6, 6], flip: 1, s: 1.0 }, { p: [0, -5.6, -9], flip: 1, s: 1.0 },
+  ];
+  ship.utilMounts = [{ p: [5.6, 1.75, 2], flip: 0, s: 0.75 }, { p: [-5.6, 1.75, 2], flip: 0, s: 0.75 }, { p: [5.6, 1.75, -14], flip: 0, s: 0.75 }, { p: [-5.6, 1.75, -14], flip: 0, s: 0.75 }];
+  ship.cockpit.set(0, 8.3, -10.6);
+  ship.radius = 34;
+  ship.hitSpheres = [[0, 0, 27, 3], [0, 0, 17, 4.5], [0, 0, 5, 5], [0, 0, -8, 5.5], [0, 0, -20, 5.5], [0, 0, -30, 5], [0, 6, -14, 3], [6, -0.5, -6, 3], [-6, -0.5, -6, 3]];
+  return ship;
+}
+
+// ---------------------------------------------------------------- Paladin battlecruiser (~118 m)
+export function buildPaladin(env, liv = 'paladin') {
+  const M = livery(liv, env);
+  const ship = shipBase('Paladin', M);
+  const k = new Kit();
+  const r = rng(149);
+  const outline = [[0, 58], [7, 50], [17, 18], [21, -12], [19, -50], [8, -56], [-8, -56], [-19, -50], [-21, -12], [-17, 18], [-7, 50]];
+  const flat = [Math.PI / 2, 0, 0];
+  k.add('hull', G.extrude(outline, 9, 1.0, 2), mat([0, 0, 0], flat));
+  k.add('hull', G.extrude(outline.map(([x, y]) => [x * 0.7, y * 0.7 - 2]), 4, 0.5), mat([0, 7, 0], flat));
+  k.add('dark', G.extrude(outline.map(([x, y]) => [x * 0.8, y * 0.8 - 3]), 4, 0.5), mat([0, -7, 0], flat));
+  k.addMirrored('accent', G.extrude([[7, 50], [17, 18], [17.6, 18.5], [8, 51]], 9.4, 0.1), mat([0, 0, 0], flat));
+  k.addMirrored('accent', G.rbox(1.2, 1.4, 48, 0.3), mat([12.2, 9.4, -6]));
+  // side blisters
+  k.addMirrored('dark', G.rbox(6, 7, 60, 1.0), mat([20, -1, -16]));
+  for (let i = 0; i < 8; i++) k.addMirrored('hull', G.rbox(1.2, 7.4, 4, 0.3), mat([23.2, -1, -42 + i * 7.5]));
+  k.addMirrored('light', G.box(0.4, 2.5, 8), mat([23.4, -1, 14.5]));
+  // command superstructure
+  k.add('hull', G.rbox(12, 8, 22, 1.2), mat([0, 13, -24]));
+  k.add('dark', G.rbox(14, 3, 10, 0.5), mat([0, 18, -20]));
+  k.add('glass', G.box(13.8, 1.0, 9.6), mat([0, 18.4, -19.95]));
+  k.add('accent', G.rbox(8, 3, 8, 0.6), mat([0, 21, -24]));
+  k.add('metal', G.cyl(0.25, 0.4, 14, 8), mat([2, 29, -26]));
+  k.add('metal', G.cyl(0.2, 0.3, 9, 8), mat([-2, 26.5, -27]));
+  k.add('dark', G.cyl(3.5, 0.3, 1.0, 24), mat([0, 24, -30], [0.5, 0, 0]));
+  // ventral hangar bay
+  k.add('dark', G.box(10, 2, 16), mat([0, -9.4, 30]));
+  k.add('light', G.box(8, 0.2, 14), mat([0, -10.45, 30]));
+  // engine block
+  k.add('dark', G.rbox(30, 12, 10, 1.5), mat([0, 0, -58]));
+  const nz = [[-10, 2.5], [0, 2.5], [10, 2.5], [-5, -3.2], [5, -3.2]];
+  for (const [x, y] of nz) {
+    k.add('nozzle', G.lathe([[2.6, 0.6], [2.9, 0], [3.4, -1.8], [3.7, -3]], 28), mat([x, y, -63], [Math.PI / 2, 0, 0]));
+    k.add('engine', G.cyl(2.6, 2.6, 0.1, 24), mat([x, y, -63.2], [Math.PI / 2, 0, 0]));
+  }
+  for (let i = 0; i < 12; i++) k.addMirrored('metal', G.box(10, 0.3, 2), mat([16, 6.5, -40 - i * 1.4], [0, 0, 0.3]));
+  scatterGreebles(k, r, 120, { x0: -9, x1: 9, z0: -10, z1: 32, y: 9.4, s: 2.2 });
+  scatterGreebles(k, r, 80, { x0: -9, x1: 9, z0: -40, z1: 20, y: -9.6, s: 2 });
+  for (let i = 0; i < 60; i++) k.addMirrored(r() < 0.5 ? 'dark' : 'gun', G.box(0.6 + r(), 0.8 + r() * 2.5, 1.5 + r() * 5), mat([14 + r() * 3, -4 + r() * 8, -36 + r() * 60]));
+  ship.group.add(k.build(M, { uvTile: { hull: 16, accent: 10, dark: 10 } }));
+  for (const [x, y] of nz) addEngine(ship, M, new THREE.Vector3(x, y, -63.3), 2.6, 34);
+  for (const x of [12, -12]) { const o = new THREE.Object3D(); o.position.set(x, 0, 34); ship.group.add(o); ship.launchers.push(o); }
+  addLight(ship, new THREE.Vector3(23.6, -1, 0), 0xff2015, 3.5, 0);
+  addLight(ship, new THREE.Vector3(-23.6, -1, 0), 0x15ff40, 3.5, 0);
+  addLight(ship, new THREE.Vector3(2, 36.2, -26), 0xffffff, 4, 1.0, 0);
+  addLight(ship, new THREE.Vector3(0, 0, 59), 0xffffff, 3, 1.4, 0.3);
+  ship.hardpoints = [
+    { p: [0, 9.4, 30], flip: 0, s: 1.7 }, { p: [0, 9.4, 12], flip: 0, s: 1.7 },
+    { p: [9, 9.4, -4], flip: 0, s: 1.6 }, { p: [-9, 9.4, -4], flip: 0, s: 1.6 },
+    { p: [9, 9.4, -30], flip: 0, s: 1.5 }, { p: [-9, 9.4, -30], flip: 0, s: 1.5 },
+    { p: [0, -9.4, 8], flip: 1, s: 1.6 },
+  ];
+  ship.utilMounts = [{ p: [16, 5.5, -8], flip: 0, s: 1.4 }, { p: [-16, 5.5, -8], flip: 0, s: 1.4 }, { p: [15, 5.5, -32], flip: 0, s: 1.4 }, { p: [-15, 5.5, -32], flip: 0, s: 1.4 }, { p: [0, -9.4, -20], flip: 1, s: 1.4 }];
+  ship.cockpit.set(0, 19.4, -15.5);
+  ship.radius = 62;
+  ship.hitSpheres = [[0, 0, 46, 8], [0, 0, 28, 13], [0, 0, 8, 17], [0, 0, -14, 19], [0, 0, -36, 18], [0, 0, -56, 12], [0, 14, -24, 9], [18, 0, -16, 9], [-18, 0, -16, 9]];
+  return ship;
+}
+
+// ---------------------------------------------------------------- outfit models (utility modules face +Y, ~2.5 m across)
+export function buildOutfitModel(id, M) {
+  const k = new Kit();
+  const up = [0, 0, 0];
+  switch (id) {
+    case 'shieldext':
+      k.add('dark', G.rbox(2.4, 0.4, 2.4, 0.1), mat([0, 0.2, 0]));
+      k.add('hull', G.cyl(0.8, 1.0, 1.0, 24), mat([0, 0.9, 0]));
+      k.add('metal', G.lathe([[0.2, 0], [1.1, 0.25], [1.25, 0.45], [1.2, 0.5]], 32), mat([0, 1.4, 0]));
+      for (let i = 0; i < 3; i++) k.add('coil', G.torus(0.85 - i * 0.2, 0.04, 6, 32), mat([0, 1.55 + i * 0.12, 0], [Math.PI / 2, 0, 0]));
+      k.add('coil', G.sphere(0.18, 16, 10), mat([0, 1.95, 0]));
+      break;
+    case 'shieldbooster':
+      k.add('dark', G.rbox(2.2, 0.4, 2.2, 0.1), mat([0, 0.2, 0]));
+      k.add('hull', G.cyl(0.6, 0.75, 2.4, 20), mat([0, 1.6, 0]));
+      for (let i = 0; i < 4; i++) {
+        k.add('metal', G.torus(0.8, 0.1, 8, 28), mat([0, 0.8 + i * 0.5, 0], [Math.PI / 2, 0, 0]));
+        k.add('coil', G.torus(0.72, 0.04, 6, 28), mat([0, 1.05 + i * 0.5, 0], [Math.PI / 2, 0, 0]));
+      }
+      k.add('accent', G.cyl(0.3, 0.6, 0.4, 20), mat([0, 3.0, 0]));
+      break;
+    case 'armorplate':
+      for (let i = 0; i < 3; i++) {
+        k.add(i === 1 ? 'accent' : 'hull', G.rbox(2.6 - i * 0.3, 0.32, 2.2 - i * 0.2, 0.08), mat([0, 0.2 + i * 0.36, 0], [0, i * 0.05, 0]));
+        for (const [x, z] of [[1, 0.8], [-1, 0.8], [1, -0.8], [-1, -0.8]]) k.add('metal', G.cyl(0.07, 0.07, 0.1, 8), mat([x * (1 - i * 0.14), 0.4 + i * 0.36, z * (1 - i * 0.12)]));
+      }
+      k.add('dark', G.box(2.7, 0.12, 0.25), mat([0, 0.06, 0]));
+      break;
+    case 'capbattery':
+      k.add('dark', G.rbox(2.6, 0.35, 1.8, 0.08), mat([0, 0.18, 0]));
+      for (let i = 0; i < 4; i++) {
+        const x = -0.9 + i * 0.6;
+        k.add('metal', G.cyl(0.26, 0.26, 1.6, 18), mat([x, 0.65, 0], [Math.PI / 2, 0, 0]));
+        k.add('coil', G.cyl(0.27, 0.27, 0.12, 18, true), mat([x, 0.65, 0.4], [Math.PI / 2, 0, 0]));
+        k.add('accent', G.cyl(0.2, 0.2, 0.1, 18), mat([x, 0.65, 0.84], [Math.PI / 2, 0, 0]));
+      }
+      k.add('dark', G.box(2.5, 0.12, 0.2), mat([0, 0.95, 0]));
+      break;
+    case 'caprecharger':
+      k.add('dark', G.rbox(1.4, 1.0, 1.4, 0.15), mat([0, 0.5, 0]));
+      for (let i = 0; i < 7; i++) k.add('metal', G.box(2.6, 0.06, 1.2), mat([0, 1.1 + i * 0.14, 0]));
+      k.add('coil', G.box(0.2, 0.9, 1.25), mat([0, 1.5, 0]));
+      k.add('gun', G.cyl(0.08, 0.08, 1.4, 8), mat([0.9, 0.6, 0], [0, 0, Math.PI / 2]));
+      break;
+    case 'overdrive':
+      k.add('dark', G.rbox(1.8, 0.35, 2.4, 0.08), mat([0, 0.18, 0]));
+      k.add('hull', G.cyl(0.5, 0.6, 1.6, 20), mat([0, 0.75, 0.2], [Math.PI / 2, 0, 0]));
+      k.add('nozzle', G.lathe([[0.45, 0.3], [0.5, 0], [0.62, -0.4], [0.7, -0.7]], 24), mat([0, 0.75, -0.6], [Math.PI / 2, 0, 0]));
+      k.add('amber', G.cyl(0.45, 0.45, 0.04, 20), mat([0, 0.75, -0.62], [Math.PI / 2, 0, 0]));
+      k.add('gun', G.cyl(0.08, 0.08, 1.4, 8), mat([0.55, 1.05, 0.1], [Math.PI / 2, 0, 0]));
+      k.add('gun', G.cyl(0.08, 0.08, 1.4, 8), mat([-0.55, 1.05, 0.1], [Math.PI / 2, 0, 0]));
+      k.add('accent', G.rbox(0.9, 0.3, 0.8, 0.06), mat([0, 1.25, 0.6]));
+      break;
+    case 'sensor':
+      k.add('dark', G.rbox(1.6, 0.35, 1.6, 0.08), mat([0, 0.18, 0]));
+      k.add('metal', G.cyl(0.12, 0.18, 1.6, 10), mat([0, 1.1, 0]));
+      k.add('hull', G.lathe([[0.05, 0], [0.7, 0.25], [1.1, 0.55], [1.15, 0.62]], 32), mat([0, 1.8, 0.1], [0.5, 0, 0]));
+      k.add('gun', G.cyl(0.03, 0.03, 0.8, 6), mat([0, 2.2, 0.35], [0.5, 0, 0]));
+      k.add('coil', G.sphere(0.09, 10, 8), mat([0, 2.55, 0.55]));
+      k.add('glass', G.sphere(0.3, 16, 10), mat([0.55, 0.55, 0.4]));
+      break;
+    default:
+      k.add('dark', G.box(1, 1, 1), mat(up));
+  }
+  return k.build(M, { uvTile: { hull: 3, accent: 3, dark: 3 } });
 }
