@@ -846,11 +846,106 @@ function tryDock() {
   hud.log(`Docking request accepted: ${st.name}`, 'i');
   G.dockedAt = st;
   G.dockSys = G.system; G.dockId = st.id;
-  $('fade').style.opacity = 1;
   G.state = 'docking';
   G.input.fire1 = G.input.fire2 = G.input.mmb = false;
+  G.lock = null; G.selected = null;
   setMouseFlight(false);
-  setTimeout(() => { enterDocked(); $('fade').style.opacity = 0; }, 700);
+  const dock = world.docks[st.id];
+  const pp = p.obj.position;
+  const bays = dock.bays.map((_, i) => bayWorld(dock, i));
+  const b = bays.reduce((m, x) => (x.pos.clone().addScaledVector(x.dir, 900).distanceTo(pp) < m.pos.clone().addScaledVector(m.dir, 900).distanceTo(pp) ? x : m));
+  const r = p.ship.radius;
+  const end = b.pos.clone().addScaledVector(b.dir, r * 1.2 + 6);
+  const dist = pp.distanceTo(end);
+  const fwd = _v.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
+  startCine('docking', b, [pp.clone(), pp.clone().addScaledVector(fwd, THREE.MathUtils.clamp(dist * 0.35, 200, 1200)), end.clone().addScaledVector(b.dir, Math.max(900, r * 14)), end],
+    THREE.MathUtils.clamp(4 + dist / 700, 5, 9), `DOCKING — ${st.name.toUpperCase()}`);
+}
+
+// ---------------------------------------------------------------- docking / undocking cinematics
+const cine = { mode: null, t: 0, dur: 1, pts: null, bay: null, cam: new THREE.Vector3(), q0: new THREE.Quaternion(), c0: new THREE.Vector3(), cq0: new THREE.Quaternion(), prev: new THREE.Vector3(), ending: false };
+const _cq = new THREE.Quaternion(), _cm = new THREE.Matrix4();
+function bayWorld(dock, i) {
+  const st = dock.root, b = dock.bays[i];
+  return { pos: b.pos.clone().applyQuaternion(st.quaternion).add(st.position), dir: b.dir.clone().applyQuaternion(st.quaternion).normalize() };
+}
+function bezier(P, s, out) {
+  const u = 1 - s;
+  return out.set(0, 0, 0).addScaledVector(P[0], u * u * u).addScaledVector(P[1], 3 * u * u * s).addScaledVector(P[2], 3 * u * s * s).addScaledVector(P[3], s * s * s);
+}
+function bezierTangent(P, s, out) {
+  const u = 1 - s;
+  return out.set(0, 0, 0).addScaledVector(P[1].clone().sub(P[0]), 3 * u * u).addScaledVector(P[2].clone().sub(P[1]), 6 * u * s).addScaledVector(P[3].clone().sub(P[2]), 3 * s * s).normalize();
+}
+const cineEase = (mode, u) => (mode === 'docking' ? u * (2 - u) : 0.6 * u * u + 0.4 * u);
+function startCine(mode, bay, pts, dur, caption) {
+  const p = G.player, r = p.ship.radius;
+  const side = _v.copy(bay.dir).cross(Y).normalize();
+  if (Math.random() < 0.5) side.negate();
+  Object.assign(cine, { mode, t: 0, dur, pts, bay, ending: false });
+  cine.cam.copy(bay.pos).addScaledVector(bay.dir, r * 4 + 130).addScaledVector(side, r * 3 + 85).addScaledVector(Y, r * 1.2 + 30);
+  cine.q0.copy(p.obj.quaternion);
+  cine.c0.copy(camera.position); cine.cq0.copy(camera.quaternion);
+  cine.prev.copy(pts[0]);
+  $('cinecap').textContent = caption;
+  $('cine').classList.remove('hidden');
+  $('hud').classList.add('hidden');
+  if (mode === 'undocking') { fx.flash(bay.pos, r * 3 + 40, 0xbfe4ff, 0.5); audio.ui(); }
+}
+function endCine() {
+  const mode = cine.mode;
+  cine.mode = null;
+  $('cine').classList.add('hidden');
+  if (mode === 'docking') {
+    $('fade').style.opacity = 1;
+    setTimeout(() => { if (G.state !== 'docking') return; enterDocked(); $('fade').style.opacity = 0; }, 650);
+  } else if (mode === 'undocking') finishUndock();
+}
+function skipCine() {
+  if (!cine.mode) return;
+  if (cine.mode === 'docking') { cine.t = cine.dur; cine.ending = true; endCine(); return; }
+  cine.t = cine.dur;
+  cineStep(0);
+}
+function cineStep(dt) {
+  if (!cine.mode) return;
+  if (G.state !== cine.mode) { cine.mode = null; $('cine').classList.add('hidden'); return; }
+  const p = G.player;
+  cine.t = Math.min(cine.dur, cine.t + dt);
+  const u = cine.t / cine.dur, s = cineEase(cine.mode, u);
+  bezier(cine.pts, s, p.obj.position);
+  const tan = bezierTangent(cine.pts, Math.min(s, 0.999), _v2);
+  _cm.lookAt(cine.mode === 'docking' ? tan : _v3.copy(cine.bay.dir).lerp(tan, 0.5).normalize(), ORIGIN, Y);
+  _cq.setFromRotationMatrix(_cm);
+  p.obj.quaternion.copy(cine.mode === 'docking' ? cine.q0.clone().slerp(_cq, Math.min(1, u * 3.5)) : _cq);
+  if (dt > 0) p.vel.copy(p.obj.position).sub(cine.prev).divideScalar(dt);
+  cine.prev.copy(p.obj.position);
+  p.throttle = cine.mode === 'docking' ? 0.35 * (1 - u) + 0.05 : 0.2 + 0.6 * u;
+  playerAngVel.set(0, 0, 0);
+  if (cine.mode === 'docking' && u > 0.9 && !cine.ending) {
+    cine.ending = true;
+    fx.flash(cine.bay.pos, p.ship.radius * 3 + 40, 0xbfe4ff, 0.6);
+    audio.beep(990, 0.12, 0.08);
+  }
+  if (u >= 1) endCine();
+}
+function cineCamera() {
+  if (!cine.mode) return;
+  const u = cine.t / cine.dur;
+  const w = cine.mode === 'docking' ? THREE.MathUtils.smoothstep(u, 0, 0.22) : 1 - THREE.MathUtils.smoothstep(u, 0.72, 1);
+  const p = G.player.obj.position;
+  _m.lookAt(cine.cam, p, Y);
+  _cq.setFromRotationMatrix(_m);
+  if (cine.mode === 'docking') {
+    camera.position.lerpVectors(cine.c0, cine.cam, w);
+    camera.quaternion.slerpQuaternions(cine.cq0, _cq, w);
+  } else {
+    camera.position.lerp(cine.cam, w);
+    camera.quaternion.slerp(_cq, w);
+  }
+  camera.fov += (52 - camera.fov) * w;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
 }
 
 const D = { tab: 'services', browse: 'valkyrie', slot: { k: 'w', i: 0 }, preview: null, shown: null };
@@ -1076,23 +1171,35 @@ $('undock').onclick = () => { $('docked').classList.add('hidden'); undock(); };
 function undock() {
   const p = G.player;
   const dock = world.docks[G.dockedAt.id];
-  const st = dock.root;
-  const u = dock.undock();
-  const pos = u.pos.applyQuaternion(st.quaternion).add(st.position);
-  const out = u.dir.applyQuaternion(st.quaternion).normalize();
+  const b = bayWorld(dock, Math.floor(Math.random() * dock.bays.length));
   if (hangar) { hangar.restoreEnv(); hangar.setOutfit(null); }
-  p.obj.position.copy(pos);
-  _m.lookAt(out, ORIGIN, Y);
+  $('docked').classList.add('hidden');
+  const r = p.ship.radius;
+  const start = b.pos.clone().addScaledVector(b.dir, r * 1.2 + 6);
+  const end = b.pos.clone().addScaledVector(b.dir, r * 7 + 760);
+  p.obj.position.copy(start);
+  _m.lookAt(b.dir, ORIGIN, Y);
   p.obj.quaternion.setFromRotationMatrix(_m);
-  p.vel.copy(out).multiplyScalar(120);
+  p.vel.set(0, 0, 0);
+  camQuat.copy(p.obj.quaternion);
+  G.state = 'undocking';
+  G.stick.set(0, 0);
+  G.aimActive = false;
+  updateCamera(0.016);
+  startCine('undocking', b, [start, start.clone().addScaledVector(b.dir, 260), end.clone().addScaledVector(b.dir, -260).addScaledVector(Y, 25), end.clone().addScaledVector(Y, 40)], 6, `UNDOCKING — ${G.dockedAt.name.toUpperCase()}`);
+  cineCamera();
+  $('fade').style.opacity = 0;
+}
+
+function finishUndock() {
+  const p = G.player;
+  p.vel.copy(_v.set(0, 0, 1).applyQuaternion(p.obj.quaternion)).multiplyScalar(Math.max(120, p.vel.length()));
   p.throttle = 0.5;
   G.stick.set(0, 0);
   G.aimActive = false;
   playerAngVel.set(0, 0, 0);
-  camQuat.copy(p.obj.quaternion);
   G.state = 'flying';
   $('hud').classList.remove('hidden');
-  hud.notice('UNDOCKING', 2);
   hud.log(`Undocked from ${G.dockedAt.name}`, 'i');
 }
 
@@ -1166,6 +1273,7 @@ $('resume').addEventListener('click', togglePause);
 
 window.addEventListener('keydown', (ev) => {
   if (ev.code === 'Tab' || ev.code === 'Space' || ev.code.startsWith('Arrow') || ev.code.startsWith('Page') || (ev.ctrlKey && G.state === 'flying')) ev.preventDefault();
+  if (cine.mode) { if ((ev.code === 'Space' || ev.code === 'Escape') && !ev.repeat) skipCine(); return; }
   if (ev.code === 'Escape') { if (starmap.isOpen) starmap.toggle(false); else togglePause(); return; }
   if (ev.repeat) return;
   G.input.keys[ev.code] = true;
@@ -1289,7 +1397,7 @@ function frame(now) {
   G.following = G.state === 'flying' && (G.input.mmb || G.followToggle);
   if (G.state === 'docked') { hangar.update(dt); hangar.render(); return; }
   if (G.state === 'paused') { composer.render(0); return; }
-  if (G.state === 'flying' || G.state === 'dead' || G.state === 'docking') {
+  if (G.state === 'flying' || G.state === 'dead' || G.state === 'docking' || G.state === 'undocking') {
     updatePlayer(dt);
     // capacitor and shield regeneration
     p.cap = Math.min(p.maxCap, p.cap + p.stats.capRegen * dt);
@@ -1303,7 +1411,9 @@ function frame(now) {
     updateEncounters(dt);
     updateLock(dt);
   }
+  cineStep(dt);
   const warpI = updateCamera(dt);
+  cineCamera();
   updateCtrlTargeting();
   G.aimPoint.copy(camera.position).addScaledVector(G.aimDir, 5000);
   if (G.state === 'flying') playerWeapons(dt);
@@ -1562,6 +1672,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, camera, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
+window.__game = { G, cine, camera, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
 requestAnimationFrame(frame);
 boot();

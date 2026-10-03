@@ -1069,9 +1069,11 @@ export function buildWorld(renderer, scene) {
       structures.push({ obj: b.root, colliders: b.colliders, loc });
       spinners.push({ o: b.root.userData.ring, s: yard ? -0.025 : 0.03 });
       beaconSets.push(b.root.userData.beacons);
-      docks[S.id] = yard
-        ? { root: b.root, undock: () => ({ pos: new THREE.Vector3(0, -300, 420), dir: new THREE.Vector3(0, 0, 1) }) }
-        : { root: b.root, undock: () => { const a = Math.PI / 4 + Math.floor(Math.random() * 4) * Math.PI / 2; return { pos: new THREE.Vector3(Math.cos(a) * 640, -230, Math.sin(a) * 640), dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) }; } };
+      const bay = (a, r, y) => ({ pos: new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r), dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)) });
+      docks[S.id] = {
+        root: b.root,
+        bays: yard ? [Math.PI / 2, Math.PI, Math.PI * 1.5].map((a) => bay(a, 390, -120)) : [0, 1, 2, 3].map((i) => bay(Math.PI / 4 + i * Math.PI / 2, 474, -230)),
+      };
       LOCATIONS.push(loc);
     }
     def.belts.forEach((B, i) => {

@@ -27,7 +27,7 @@ Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a de
 - J: jump through a gate within 3.5 km; otherwise warp to the selected or next route gate and jump on arrival
 - M: star map (only charted systems are shown; click a system to plot a route)
 - O: collapse / expand overview
-- G: dock at the nearest station
+- G: dock at the nearest station (plays a docking cutscene; Space or Esc skips docking and undocking cutscenes)
 - V: cycle cameras
 - Esc: pause and show controls
 - H: help
