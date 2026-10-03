@@ -34,6 +34,7 @@ export class HUD {
       document.querySelectorAll('#overview .tabs b').forEach((x) => x.classList.remove('on'));
       b.classList.add('on'); this.tab = b.dataset.tab; this.ovT = 0;
     }));
+    document.querySelector('#overview .otitle').addEventListener('click', () => this.toggleOverview());
   }
   log(msg, cls = 'i') {
     const d = document.createElement('div');
@@ -42,6 +43,11 @@ export class HUD {
     d.textContent = `[${t.toTimeString().slice(0, 8)}] ${msg}`;
     this.el.log.appendChild(d);
     while (this.el.log.children.length > 8) this.el.log.firstChild.remove();
+  }
+  toggleOverview() {
+    const o = $('overview');
+    o.classList.toggle('collapsed');
+    o.querySelector('.otitle').textContent = o.classList.contains('collapsed') ? 'OVERVIEW ▸' : 'OVERVIEW ▾';
   }
   notice(msg, dur = 2.5) { this.el.notice.textContent = msg; this.el.notice.style.opacity = 1; this.noticeT = dur; }
   bracket(i) {
@@ -297,7 +303,7 @@ export class HUD {
     const body = this.el.ov;
     while (body.children.length < rows.length) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td class="ico"></td><td></td><td></td><td class="d"></td>';
+      tr.innerHTML = '<td class="ico"></td><td></td><td class="d"></td>';
       tr.addEventListener('mousedown', (ev) => { ev.stopPropagation(); if (tr._ref && this.onSelect) this.onSelect(tr._ref); });
       body.appendChild(tr);
     }
@@ -307,10 +313,10 @@ export class HUD {
       tr._ref = r.ref;
       tr.className = `${r.cls}${G.selected === r.ref ? ' sel' : ''}`;
       const c = tr.children;
-      c[0].textContent = r.ico; c[1].textContent = r.name; c[2].textContent = r.type; c[3].textContent = fmtDist(r.d);
+      c[0].textContent = r.ico; c[1].textContent = r.name; c[2].textContent = fmtDist(r.d); tr.title = r.type;
     });
     const s = G.selected;
-    this.el.selname.textContent = s ? `${s.name} — ${fmtDist(s.pos ? s.pos.distanceTo(pp) : s.obj.position.distanceTo(pp))}` : 'No selection';
+    this.el.selname.textContent = s ? `${s.name} · ${s.type || s.className || ''} — ${fmtDist(s.pos ? s.pos.distanceTo(pp) : s.obj.position.distanceTo(pp))}` : 'No selection';
   }
   gauge(G) {
     const g = this.g, p = G.player;

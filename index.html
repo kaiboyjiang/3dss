@@ -46,8 +46,8 @@
   </div>
 
   <div id="overview" class="panel">
-    <div class="ohead">OVERVIEW <span class="tabs"><b data-tab="all" class="on">All</b><b data-tab="hostile">Hostile</b><b data-tab="nav">Nav</b></span></div>
-    <table><thead><tr><th></th><th>Name</th><th>Type</th><th>Dist</th></tr></thead><tbody id="ovbody"></tbody></table>
+    <div class="ohead"><span class="otitle" title="O">OVERVIEW ▾</span> <span class="tabs"><b data-tab="all" class="on">All</b><b data-tab="hostile">Hostile</b><b data-tab="nav">Nav</b></span></div>
+    <div class="ovscroll"><table><tbody id="ovbody"></tbody></table></div>
     <div id="selinfo">
       <div id="selname">No selection</div>
       <div class="acts">
@@ -99,6 +99,7 @@
         <p><kbd>1</kbd>–<kbd>7</kbd> select destination</p>
         <p><kbd>Space</kbd> warp · <kbd>J</kbd> alternate warp key</p>
         <p><kbd>G</kbd> dock (shipyard: 7) · <kbd>Esc</kbd> pause</p>
+        <p><kbd>O</kbd> collapse / expand overview</p>
       </div>
     </div>
     <button id="start" disabled>Loading…</button>

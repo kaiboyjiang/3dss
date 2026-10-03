@@ -152,3 +152,14 @@ table.st td:last-child { text-align: right; color: #eef; }
 table.st .up { color: #7fe0a0; } table.st .dn { color: #ff7a66; }
 #dockhint { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #789; letter-spacing: 2px; pointer-events: none; }
 .dpanel { scrollbar-width: thin; scrollbar-color: rgba(120, 190, 220, 0.35) transparent; }
+
+/* compact overview */
+#overview { width: 250px; font-size: 11px; }
+#overview .ohead { padding: 4px 8px; font-size: 11px; }
+#overview .otitle { cursor: pointer; }
+#overview .ovscroll { max-height: 26vh; overflow-y: auto; scrollbar-width: thin; }
+#overview td { padding: 2px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+#overview #selinfo { padding: 5px 8px; }
+#overview #selinfo #selname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#overview #selinfo button { padding: 2px 7px; font-size: 11px; }
+#overview.collapsed .ovscroll, #overview.collapsed #selinfo, #overview.collapsed .tabs { display: none; }

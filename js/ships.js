@@ -35,7 +35,7 @@ export function livery(name, env) {
     gun: new THREE.MeshStandardMaterial({ color: 0x2c2e31, metalness: 0.9, roughness: 0.35, envMap: env, envMapIntensity: 1.0 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0x0b1420, metalness: 0.2, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, envMap: env, envMapIntensity: 2.4, emissive: new THREE.Color(0.02, 0.05, 0.08) }),
     nozzle: new THREE.MeshStandardMaterial({ color: 0x3a3632, metalness: 0.95, roughness: 0.4, envMap: env, side: THREE.DoubleSide }),
-    engine: new THREE.MeshBasicMaterial({ color: engColor.clone().multiplyScalar(2.2) }),
+    engine: new THREE.MeshBasicMaterial({ color: engColor.clone().multiplyScalar(1.15) }),
     light: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5, 5) }),
     coil: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.4, 4) }),
     plasma: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 4.5, 2.4) }),

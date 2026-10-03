@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Kit, G, mat } from './geo.js';
 import { hullMaps } from './textures.js';
@@ -78,8 +77,6 @@ export class Hangar {
     this.camera = new THREE.PerspectiveCamera(42, w / h, 0.5, 4000);
     this.composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w / 2, h / 2), 0.4, 0.5, 0.92);
-    this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.env = this.buildEnv();
     this.yaw = 2.4; this.pitch = 0.28; this.dist = 80; this.distWant = 80;
@@ -400,8 +397,8 @@ export class Hangar {
   resize(w, h) {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.composer.setPixelRatio(this.renderer.getPixelRatio());
     this.composer.setSize(w, h);
-    this.bloom.resolution.set(w / 2, h / 2);
   }
 
   update(dt) {

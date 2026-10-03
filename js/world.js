@@ -20,12 +20,22 @@ export const LOCATIONS = [
 ];
 
 // ---------------------------------------------------------------- sky
-function makeSky(sunScale) {
+export const SUN_COL = new THREE.Color(1.0, 0.92, 0.8);
+const SKY_U = {
+  uSun: { value: SUN_DIR }, uSunCol: { value: SUN_COL }, uSunSize: { value: 1 },
+  uNebDir: { value: new THREE.Vector3(-0.6, 0.25, -0.75).normalize() },
+  uNeb1: { value: new THREE.Color(0.85, 0.18, 0.32) }, uNeb2: { value: new THREE.Color(0.15, 0.45, 0.95) },
+  uNeb3: { value: new THREE.Color(1.0, 0.55, 0.2) }, uNebAmt: { value: 0.45 },
+  uCube: { value: null },
+};
+
+// expensive procedural sky, rendered once into a cubemap
+function makeSkyBake() {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     depthTest: false,
-    uniforms: { uSun: { value: SUN_DIR }, uSunScale: { value: sunScale } },
+    uniforms: SKY_U,
     vertexShader: /* glsl */`
       varying vec3 vDir;
       void main() {
@@ -33,7 +43,7 @@ function makeSky(sunScale) {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }`,
     fragmentShader: /* glsl */`
-      uniform vec3 uSun; uniform float uSunScale;
+      uniform vec3 uSun, uSunCol, uNebDir, uNeb1, uNeb2, uNeb3; uniform float uNebAmt;
       varying vec3 vDir;
       ${NOISE}
       void main() {
@@ -47,16 +57,16 @@ function makeSky(sunScale) {
         float n2 = fbm(d * 7.0 + 3.0, 5);
         float lanes = smoothstep(0.0, 0.5, fbm(d * 5.0 + 11.0, 5) + 0.15);
         vec3 col = vec3(0.0);
-        col += vec3(0.55, 0.5, 0.45) * band * (0.35 + 0.35 * n2) * mix(1.0, 0.25, lanes * band);
-        col += vec3(0.12, 0.14, 0.2) * bandWide * 0.25;
+        col += vec3(0.55, 0.5, 0.45) * band * (0.25 + 0.3 * n2) * mix(1.0, 0.15, lanes * band);
+        col += vec3(0.12, 0.14, 0.2) * bandWide * 0.12;
         // emission nebula region
-        vec3 nc = normalize(vec3(-0.6, 0.25, -0.75));
+        vec3 nc = uNebDir;
         float nr = max(dot(d, nc), 0.0);
         float neb = smoothstep(0.55, 1.0, nr) * smoothstep(-0.2, 0.6, n1 + 0.3 * n2);
         float warp = fbm(d * 4.0 + vec3(n1, n2, 0.0) * 1.5, 6);
-        vec3 nebCol = mix(vec3(0.85, 0.18, 0.32), vec3(0.15, 0.45, 0.95), smoothstep(-0.3, 0.4, warp));
-        nebCol = mix(nebCol, vec3(1.0, 0.55, 0.2), smoothstep(0.35, 0.7, warp) * 0.6);
-        col += nebCol * neb * (0.35 + 0.65 * max(warp, 0.0)) * 0.55;
+        vec3 nebCol = mix(uNeb1, uNeb2, smoothstep(-0.3, 0.4, warp));
+        nebCol = mix(nebCol, uNeb3, smoothstep(0.35, 0.7, warp) * 0.6);
+        col += nebCol * neb * pow(0.25 + 0.75 * max(warp, 0.0), 1.6) * uNebAmt;
         // dark nebula silhouettes
         col *= 1.0 - 0.75 * smoothstep(0.25, 0.6, fbm(d * 2.4 + 21.0, 5)) * smoothstep(0.4, 1.0, nr);
         // faint background starfield
@@ -68,11 +78,39 @@ function makeSky(sunScale) {
         col += vec3(0.9, 0.92, 1.0) * star * 0.5 * h.y;
         // sun
         float sdot = max(dot(d, uSun), 0.0);
-        float disk = smoothstep(0.99985, 0.99992, sdot);
-        col += vec3(1.0, 0.92, 0.8) * disk * 60.0 * uSunScale;
-        col += vec3(1.0, 0.75, 0.5) * pow(sdot, 900.0) * 6.0 * uSunScale;
-        col += vec3(1.0, 0.7, 0.45) * pow(sdot, 60.0) * 0.25;
-        col += vec3(0.6, 0.55, 0.6) * pow(sdot, 6.0) * 0.03;
+        col += uSunCol * vec3(1.0, 0.76, 0.56) * pow(sdot, 60.0) * 0.22;
+        col += uSunCol * pow(sdot, 6.0) * 0.02;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1000, 64, 32), mat);
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+// live sky: cubemap lookup plus the analytic sun disk and glare
+function makeSky() {
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, depthTest: false,
+    uniforms: SKY_U,
+    vertexShader: /* glsl */`
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: /* glsl */`
+      uniform samplerCube uCube; uniform vec3 uSun, uSunCol; uniform float uSunSize;
+      varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        vec3 col = textureCube(uCube, d).rgb;
+        float sdot = max(dot(d, uSun), 0.0);
+        float s2 = uSunSize * uSunSize;
+        float disk = smoothstep(1.0 - 0.00015 * s2, 1.0 - 0.00008 * s2, sdot);
+        col += uSunCol * disk * 60.0;
+        col += uSunCol * vec3(1.0, 0.82, 0.62) * pow(sdot, 900.0 / uSunSize) * 7.0;
+        col += uSunCol * pow(sdot, 220.0 / uSunSize) * 0.7;
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -81,6 +119,17 @@ function makeSky(sunScale) {
   mesh.renderOrder = -1000;
   mesh.frustumCulled = false;
   return mesh;
+}
+
+// render the procedural sky into the cubemap and refresh the reflection env from it
+function bakeSky(renderer, cube, pmrem, envTarget) {
+  const s = new THREE.Scene();
+  const m = makeSkyBake();
+  s.add(m);
+  new THREE.CubeCamera(1, 5000, cube).update(renderer, s);
+  m.geometry.dispose(); m.material.dispose();
+  SKY_U.uCube.value = cube.texture;
+  return pmrem.fromCubemap(cube.texture, envTarget);
 }
 
 function makeStars() {
@@ -102,9 +151,9 @@ function makeStars() {
     v.multiplyScalar(1.5e6);
     pos.set([v.x, v.y, v.z], i * 3);
     const t = temps[Math.floor(Math.pow(r(), 1.3) * temps.length)];
-    const b = Math.pow(r(), 6) * 6 + 0.25;
+    const b = Math.pow(r(), 6) * 2.6 + 0.22;
     col.set([t[0] * b, t[1] * b, t[2] * b], i * 3);
-    size[i] = 1.2 + Math.pow(r(), 4) * 2.6;
+    size[i] = 2.2 + Math.pow(r(), 4) * 2.2;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -119,7 +168,7 @@ function makeStars() {
       void main() {
         vCol = color;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_PointSize = size * uPixel;
+        gl_PointSize = max(size * uPixel, 2.0);
         ${LOGDEPTH_VERT}
       }`,
     fragmentShader: /* glsl */`
@@ -128,8 +177,8 @@ function makeStars() {
       void main() {
         ${LOGDEPTH_FRAG}
         float d = length(gl_PointCoord - 0.5) * 2.0;
-        float a = exp(-d * d * 4.0);
-        gl_FragColor = vec4(vCol * a, 1.0);
+        float a = exp(-d * d * 3.0) * smoothstep(1.0, 0.7, d);
+        gl_FragColor = vec4(vCol * a * 0.8, 1.0);
       }`,
   });
   const pts = new THREE.Points(geo, mat);
@@ -177,14 +226,17 @@ function makePlanetMaterial(type, radius) {
         float NdV = max(dot(N, V), 0.0);
         vec3 col; float spec = 0.0; vec3 emit = vec3(0.0);
         float NdL0 = dot(N, uSun);
+        // octave LOD from on-screen footprint: skip noise detail smaller than a pixel
+        int L = int(clamp(-log2(max(length(fwidth(p)), 1e-6)) - 2.0, 3.0, 8.0));
+        int L2 = L > 4 ? L - 2 : 3;
         if (uType < 0.5) {
           vec3 q = p + 0.15 * vec3(fbm(p * 2.0, 4), fbm(p * 2.0 + 5.2, 4), fbm(p * 2.0 + 9.1, 4));
-          float h = fbm(q * 1.7, 8) + 0.35 * ridged(q * 3.2, 6) - 0.2;
+          float h = fbm(q * 1.7, L) + 0.35 * ridged(q * 3.2, L2 + 1) - 0.2;
           float lat = abs(p.y);
           float sea = 0.02;
           float land = smoothstep(sea, sea + 0.01, h);
           float e = max(h - sea, 0.0);
-          float moist = fbm(p * 3.1 + 40.0, 5);
+          float moist = fbm(p * 3.1 + 40.0, L2);
           vec3 deep = vec3(0.005, 0.03, 0.09), shallow = vec3(0.02, 0.12, 0.2);
           vec3 ocean = mix(deep, shallow, smoothstep(-0.25, sea, h));
           vec3 sand = vec3(0.55, 0.48, 0.34), forest = vec3(0.07, 0.16, 0.05), grass = vec3(0.2, 0.28, 0.1);
@@ -202,11 +254,13 @@ function makePlanetMaterial(type, radius) {
           vec3 cp = p + vec3(uTime * 0.002, 0.0, 0.0);
           float cl = smoothstep(0.05, 0.5, fbm(cp * 3.0 + fbm(cp * 1.4, 3), 4));
           col *= 1.0 - cl * 0.55 * smoothstep(-0.1, 0.3, NdL0);
-          float cityAA = 1.0 - smoothstep(0.15, 0.6, length(fwidth(p * 45.0)));
-          float city = cityAA * smoothstep(0.58, 0.85, fbm(p * 45.0, 4) + 0.5) * land * (1.0 - ice) * smoothstep(0.35, 0.05, e) * smoothstep(0.1, -0.12, NdL0);
-          emit = vec3(1.0, 0.62, 0.28) * city * 0.9 * (1.0 - cl * 0.7);
+          if (NdL0 < 0.1) {
+            float cityAA = 1.0 - smoothstep(0.15, 0.6, length(fwidth(p * 45.0)));
+            float city = cityAA * smoothstep(0.58, 0.85, fbm(p * 45.0, 4) + 0.5) * land * (1.0 - ice) * smoothstep(0.35, 0.05, e) * smoothstep(0.1, -0.12, NdL0);
+            emit = vec3(1.0, 0.62, 0.28) * city * 0.9 * (1.0 - cl * 0.7);
+          }
         } else {
-          float h = fbm(p * 2.5, 7) * 0.5 + ridged(p * 5.0, 5) * 0.3;
+          float h = fbm(p * 2.5, L) * 0.5 + ridged(p * 5.0, L2) * 0.3;
           // craters
           float cr = 0.0;
           for (int i = 0; i < 3; i++) {
@@ -740,7 +794,7 @@ function buildAsteroidField(center, env, count, spread, seed, tint) {
   const rocks = [];
   const meshes = geos.map((g) => {
     const m = new THREE.InstancedMesh(g, material, per);
-    m.castShadow = m.receiveShadow = true;
+    m.receiveShadow = true;
     m.frustumCulled = false;
     group.add(m);
     return m;
@@ -858,33 +912,30 @@ function makeWarpTunnel() {
 // ---------------------------------------------------------------- world assembly
 export function buildWorld(renderer, scene) {
   // environment map from the sky (sun dimmed so reflections don't blow out)
-  const envScene = new THREE.Scene();
-  const envSky = makeSky(0.0);
-  envSky.scale.setScalar(1000);
-  envScene.add(envSky);
+  const cube = new THREE.WebGLCubeRenderTarget(1024, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
   const pmrem = new THREE.PMREMGenerator(renderer);
-  const env = pmrem.fromScene(envScene, 0.02, 1, 5000).texture;
-  pmrem.dispose();
+  const envTarget = bakeSky(renderer, cube, pmrem, null);
+  const env = envTarget.texture;
 
-  const sky = makeSky(1.0);
+  const sky = makeSky();
   scene.add(sky);
   const stars = makeStars();
   scene.add(stars);
 
-  const sun = new THREE.DirectionalLight(0xfff2e0, 3.4);
+  const sun = new THREE.DirectionalLight(0xfff2e0, 4.2);
   sun.position.copy(SUN_DIR).multiplyScalar(1000);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1024, 1024);
   const sc = sun.shadow.camera;
   sc.left = -180; sc.right = 180; sc.top = 180; sc.bottom = -180; sc.near = 10; sc.far = 3000;
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.08;
   scene.add(sun, sun.target);
   // dim fill: planet bounce + ambient starlight
-  const bounce = new THREE.DirectionalLight(0x6f8fbf, 0.12);
+  const bounce = new THREE.DirectionalLight(0x6f8fbf, 0.06);
   bounce.position.copy(PLANET.pos).normalize().multiplyScalar(-1000).negate();
   scene.add(bounce, bounce.target);
-  scene.add(new THREE.AmbientLight(0x2a3040, 0.35));
+  scene.add(new THREE.AmbientLight(0x2a3040, 0.08));
 
   const planet = new THREE.Mesh(new THREE.SphereGeometry(PLANET.radius, 256, 128), makePlanetMaterial(0, PLANET.radius));
   planet.position.copy(PLANET.pos);

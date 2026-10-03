@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, LOCATIONS, PLANET, MOON } from './world.js';
@@ -22,13 +21,15 @@ const Z = new THREE.Vector3(0, 0, 1), Y = new THREE.Vector3(0, 1, 0), ORIGIN = n
 // ---------------------------------------------------------------- renderer
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+const PR_MAX = Math.min(window.devicePixelRatio, 1.25);
+let pixelRatio = Math.min(PR_MAX, 1);
+renderer.setPixelRatio(pixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerHeight, 0.3, 3e6);
@@ -36,8 +37,6 @@ const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerH
 const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: 4 });
 const composer = new EffectComposer(renderer, rt);
 composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), 0.42, 0.45, 0.92);
-composer.addPass(bloom);
 const lensPass = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uWarp: { value: 0 }, uHit: { value: 0 }, uAspect: { value: 1 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
@@ -51,6 +50,8 @@ const lensPass = new ShaderPass({
       col.r = texture2D(tDiffuse, uvW + c * ca).r;
       col.g = texture2D(tDiffuse, uvW).g;
       col.b = texture2D(tDiffuse, uvW - c * ca).b;
+      // high-contrast grade: crush shadows, push highlights
+      col = pow(max(col, 0.0), vec3(1.14)) * 1.12;
       vec2 cc = c * vec2(uAspect, 1.0);
       col *= 1.0 - smoothstep(0.35, 1.05, length(cc)) * 0.55;
       col = mix(col, col * vec3(1.5, 0.55, 0.45) + vec3(0.04, 0.0, 0.0), uHit * 0.45 * smoothstep(0.2, 0.9, length(cc)));
@@ -63,8 +64,8 @@ composer.addPass(new OutputPass());
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h);
+  composer.setPixelRatio(pixelRatio);
   composer.setSize(w, h);
-  bloom.resolution.set(w / 2, h / 2);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   lensPass.uniforms.uAspect.value = w / h;
@@ -256,7 +257,7 @@ function muzzleWorld(t, i, outPos, outDir) {
   outDir.set(0, 0, 1).transformDirection(m.matrixWorld);
 }
 
-const GUN_ASSIST = 0.1, AIM_SENS = 0.0022, AIM_MAX = 1.4;
+const GUN_ASSIST = 0.1, AIM_SENS = 0.0022, AIM_EDGE = 0.9;
 const _fw = new THREE.Vector3(), _gp = new THREE.Vector3(), _tp = new THREE.Vector3(), _pd = new THREE.Vector3();
 
 function turretTarget() {
@@ -353,10 +354,17 @@ function dragAim(dx, dy) {
   const q = G.player.obj.quaternion;
   const fwd = _fw.set(0, 0, 1).applyQuaternion(q);
   if (!G.aimActive) { G.aimDir.copy(fwd); G.aimActive = true; }
-  G.aimDir.applyAxisAngle(_gp.set(0, 1, 0).applyQuaternion(q), -THREE.MathUtils.clamp(dx, -120, 120) * AIM_SENS);
-  G.aimDir.applyAxisAngle(_gp.set(1, 0, 0).applyQuaternion(q), THREE.MathUtils.clamp(dy, -120, 120) * AIM_SENS).normalize();
-  const a = G.aimDir.angleTo(fwd);
-  if (a > AIM_MAX) G.aimDir.copy(fwd).applyAxisAngle(_tp.crossVectors(fwd, G.aimDir).normalize(), AIM_MAX);
+  // pointer-lock occasionally reports huge spurious jumps; drop them instead of steering backwards
+  if (Math.abs(dx) > 250 || Math.abs(dy) > 250) return;
+  G.aimDir.applyAxisAngle(_gp.set(0, 1, 0).applyQuaternion(q), -dx * AIM_SENS);
+  G.aimDir.applyAxisAngle(_gp.set(1, 0, 0).applyQuaternion(q), dy * AIM_SENS).normalize();
+  // pin the heading marker to the screen edge rather than letting it swing off-screen
+  const cq = _q2.copy(camera.quaternion);
+  const l = _tp.copy(G.aimDir).applyQuaternion(cq.clone().invert());
+  const my = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * AIM_EDGE, mx = my * camera.aspect;
+  const z = Math.max(-l.z, 1e-3);
+  l.set(THREE.MathUtils.clamp(l.x / z, -mx, mx), THREE.MathUtils.clamp(l.y / z, -my, my), -1).normalize();
+  G.aimDir.copy(l.applyQuaternion(cq));
 }
 
 function setMouseFlight(on) {
@@ -1104,6 +1112,7 @@ window.addEventListener('keydown', (ev) => {
     case 'KeyM': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (M)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
     case 'KeyL': G.turretsAuto = !G.turretsAuto; hud.notice(G.turretsAuto ? 'TURRETS: AUTO-ENGAGE HOSTILES' : 'TURRETS: HOLD FIRE', 1.6); audio.ui(); break;
     case 'KeyH': toggleHelp(); break;
+    case 'KeyO': hud.toggleOverview(); break;
     default:
       if (/^(Digit|Numpad)[1-7]$/.test(ev.code)) { const l = LOCATIONS[+ev.code.slice(-1) - 1]; G.selected = l; G.navTarget = l; hud.ovT = 0; audio.ui(); hud.notice(`DESTINATION: ${l.name.toUpperCase()} — SPACE TO WARP`, 1.8); }
   }
@@ -1175,10 +1184,30 @@ function updateCamera(dt) {
 
 // ---------------------------------------------------------------- main loop
 let last = performance.now();
+// 60 fps cap plus adaptive render resolution
+const perf = { acc: 0, n: 0 };
+function adaptResolution(ms) {
+  perf.acc += ms; perf.n++;
+  if (perf.acc < 2000) return;
+  const avg = perf.acc / perf.n;
+  perf.acc = perf.n = 0;
+  let pr = pixelRatio;
+  if (avg > 21 && pr > 0.6) pr = Math.max(0.6, pr - 0.1);
+  else if (avg < 17.5 && pr < PR_MAX) pr = Math.min(PR_MAX, pr + 0.05);
+  if (pr === pixelRatio) return;
+  pixelRatio = pr;
+  renderer.setPixelRatio(pr);
+  resize();
+}
+
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - last) / 1000);
+  if (now - last < 1000 / 62) return;
+  const ms = now - last;
+  const dt = Math.min(0.05, ms / 1000);
   last = now;
+  adaptResolution(ms);
+  if (world) world.stars.material.uniforms.uPixel.value = pixelRatio;
   if (!world || !G.player) return;
   G.time += dt;
   const p = G.player;
