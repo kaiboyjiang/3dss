@@ -96,7 +96,7 @@ const G = {
   stick: new THREE.Vector2(), freeLook: false, look: new THREE.Vector2(),
   mouse: new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2), following: false, followToggle: false,
   ctrlTargeting: false, ctrlHover: null, ctrlRadius: 110,
-  input: { fire1: false, fire2: false, mmb: false, keys: {} }, flightAssist: true, boosting: false, camMode: 0,
+  input: { fire1: false, fire2: false, mmb: false, keys: {} }, flightAssist: true, boosting: false, boostFx: 0, engFx: 0.3, camMode: 0,
   credits: 250000, kills: 0, ammo: { rail: 40, missile: 24 }, cool: { pri: 0, sec: 0, tur: 0, missile: 0 },
   priOff: false, secOff: false, usesAmmo: true, leadSpeed: 3200, turretsAuto: true, hasTurrets: true, turFiring: false, gunAssist: false,
   aimDir: new THREE.Vector3(0, 0, 1), aimPoint: new THREE.Vector3(), aimActive: false, mouseLocked: false,
@@ -805,7 +805,7 @@ function lockNearestToReticle(silent) {
 }
 
 function updateCtrlTargeting() {
-  G.ctrlTargeting = !!G.input.keys.ControlLeft && G.state === 'flying' && !G.warp;
+  G.ctrlTargeting = !!G.input.keys.ControlRight && G.state === 'flying' && !G.warp;
   if (!G.ctrlTargeting) { G.ctrlHover = null; return; }
   const e = pickNearPointer(G.ctrlRadius);
   G.ctrlHover = e;
@@ -1424,7 +1424,7 @@ document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('
 function toggleHelp() {
   const h = $('help');
   if (h.classList.contains('hidden')) {
-    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (K toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (L toggles hold fire). Hold left Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; J jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press H to close. Press Esc to pause.</p>';
+    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (K toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (L toggles hold fire). Hold right Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; J jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press H to close. Press Esc to pause.</p>';
     h.classList.remove('hidden');
   } else h.classList.add('hidden');
 }
@@ -1467,7 +1467,7 @@ function updateCamera(dt) {
     camera.rotateZ((Math.random() - 0.5) * s * 0.02);
     G.shake *= Math.exp(-dt * 5);
   }
-  const target = 68 + (G.boosting ? 7 : 0) + warpI * 26 + Math.min(4, p.vel.length() / 100);
+  const target = 68 + G.boostFx * 7 + warpI * 26 + Math.min(4, p.vel.length() / 100);
   fov += (target - fov) * (1 - Math.exp(-dt * 3));
   camera.fov = fov;
   camera.updateProjectionMatrix();
@@ -1546,10 +1546,13 @@ function frame(now) {
   const colliders = world.collidersNear(p.obj.position, 7000);
   bolts.update(dt, G.entities, colliders, onBoltHit);
   missiles.update(dt, colliders, onMissileDetonate);
-  // ship cosmetics
+  // ship cosmetics; the player's engine glow eases toward its target so afterburner and warp don't flare abruptly
+  G.boostFx += ((G.boosting ? 1 : 0) - G.boostFx) * (1 - Math.exp(-dt * (G.boosting ? 2.2 : 1.6)));
+  const engT = G.warp ? 1 : p.throttle + (Math.max(p.throttle, 1.4) - p.throttle) * G.boostFx;
+  G.engFx += (engT - G.engFx) * (1 - Math.exp(-dt * 4));
   for (const e of G.entities) {
     if (!e.alive) continue;
-    const thr = e === p ? (G.warp ? 1 : Math.max(p.throttle, G.boosting ? 1.4 : 0)) : e.throttle;
+    const thr = e === p ? G.engFx : e.throttle;
     animateShip(e.ship, dt, G.time, thr);
     const sm = e.shieldMesh;
     if (sm.visible) { sm.material.uniforms.uTime.value = G.time; if (G.time - e.shieldLast > 1) sm.visible = false; }
@@ -1573,7 +1576,7 @@ function frame(now) {
   G.hitFlash *= Math.exp(-dt * 3);
   lensPass.uniforms.uWarp.value = tunnel;
   lensPass.uniforms.uHit.value = G.hitFlash;
-  audio.update(p.throttle, G.boosting ? 1 : 0, tunnel);
+  audio.update(p.throttle, G.boostFx, tunnel);
   // nearest named location
   let best = Infinity;
   for (const l of LOCATIONS) { const d = l.pos.distanceTo(p.obj.position) - l.arrive; if (d < best) { best = d; G.nearestName = d < 30000 ? l.name : `Deep space near ${l.name}`; } }
@@ -1826,7 +1829,7 @@ async function boot() {
       saveGame(true);
       const num = (f) => LOCATIONS.findIndex(f) + 1;
       hud.log('Welcome to GVCSG - Generic Vibe Coded Space Game. Pirates reported at Kaltos III - Asteroid Belt 1.', 'i');
-      hud.log(`Press ${num((l) => l.icon === 'belt')} then Space to warp to the belt. Hold MMB and drag to steer, hold L-Ctrl to target.`, 'i');
+      hud.log(`Press ${num((l) => l.icon === 'belt')} then Space to warp to the belt. Hold MMB and drag to steer, hold R-Ctrl to target.`, 'i');
       hud.log(`New hulls and high-tech outfits: Helion Orbital Shipyard (${num((l) => l.id === 'shipyard')}). Jump gates lead to other systems; M opens the star map, J jumps.`, 'i');
       undock();
     };

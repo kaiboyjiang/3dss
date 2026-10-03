@@ -18,7 +18,7 @@ Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a de
 - Left mouse: fixed forward guns (auto-aim when the locked target's lead pip is near the reticle)
 - Right mouse: heavy fixed guns (railgun / plasma lance)
 - Turrets: engage hostiles automatically; L toggles hold fire
-- Hold left Ctrl: lock the ship nearest the pointer
+- Hold right Ctrl: lock the ship nearest the pointer
 - T: lock target near the pointer / reticle
 - Tab: cycle hostiles
 - F: missile salvo after locking

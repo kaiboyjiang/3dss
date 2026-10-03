@@ -148,7 +148,7 @@ export class HUD {
       this.el.tsh.style.width = `${(tp.shield / tp.maxShield) * 100}%`;
       this.el.tar.style.width = `${(tp.armor / tp.maxArmor) * 100}%`;
       this.el.thu.style.width = `${(tp.hull / tp.maxHull) * 100}%`;
-      this.el.tlock.textContent = tgt === tp ? (G.lock.progress >= 1 ? 'TARGET LOCKED' : `LOCKING ${Math.round(G.lock.progress * 100)}%`) : 'SELECTED — hold Ctrl or press T to lock';
+      this.el.tlock.textContent = tgt === tp ? (G.lock.progress >= 1 ? 'TARGET LOCKED' : `LOCKING ${Math.round(G.lock.progress * 100)}%`) : 'SELECTED — hold R-Ctrl or press T to lock';
     } else this.el.target.classList.add('hidden');
 
     // ---- overview (throttled)
