@@ -462,7 +462,7 @@ function updateAI(e, dt) {
 // ---------------------------------------------------------------- encounters
 const encounters = [
   { loc: LOCATIONS[1], ships: [], timer: 0, wave: 0, spawn(pos) { const n = 3 + Math.min(3, this.wave); const out = []; for (let i = 0; i < n; i++) out.push(['raider', 2500 + Math.random() * 3000]); return out; } },
-  { loc: LOCATIONS[2], ships: [], timer: 0, wave: 0, spawn() { return [['cruiser', 3000], ['raider', 3500], ['raider', 4000], ['raider', 4500]]; } },
+  { loc: LOCATIONS[2], ships: [], timer: 0, wave: 0, spawn() { const out = [['cruiser', 3000]]; if (this.wave >= 2) out.push(['cruiser', 4200]); for (let i = 0; i < 3 + Math.min(3, this.wave); i++) out.push(['raider', 3500 + Math.random() * 2000]); return out; } },
 ];
 
 function updateEncounters(dt) {
@@ -471,13 +471,13 @@ function updateEncounters(dt) {
     enc.ships = enc.ships.filter((s) => s.alive);
     const d = pp.distanceTo(enc.loc.pos);
     if (enc.active && enc.ships.length === 0) {
-      enc.active = false; enc.timer = 75; enc.wave++;
+      enc.active = false; enc.timer = 12 + Math.random() * 8; enc.wave++;
       hud.log(`${enc.loc.name}: hostiles cleared. Site bonus +${(25000 * enc.wave).toLocaleString()} ISK`, 'g');
       G.credits += 25000 * enc.wave;
-      hud.notice('SITE CLEARED', 3);
+      hud.notice('SITE CLEARED — REINFORCEMENTS INBOUND', 3);
     }
     enc.timer -= dt;
-    if (!enc.active && enc.timer <= 0 && d < 22000 && !G.warp) {
+    if (!enc.active && enc.timer <= 0 && d < 45000 && !G.warp) {
       enc.active = true;
       const spec = enc.spawn();
       const center = enc.loc.pos.clone().lerp(pp, 0.25);
@@ -509,8 +509,8 @@ function updatePlayer(dt) {
   if (G.state !== 'flying') return;
   if (G.warp) { updateWarp(dt); return; }
   // throttle
-  if (K.KeyW) p.throttle = Math.min(1, p.throttle + dt * 0.6);
-  if (K.KeyS) p.throttle = Math.max(0, p.throttle - dt * 0.6);
+  if (K.KeyW || K.ArrowUp) p.throttle = Math.min(1, p.throttle + dt * 0.6);
+  if (K.KeyS || K.ArrowDown) p.throttle = Math.max(0, p.throttle - dt * 0.6);
   G.boosting = !!K.ShiftLeft && p.cap > 10 || (!!K.ShiftRight && p.cap > 10);
   if (G.boosting) p.cap -= 45 * dt;
   // rotation (local axes): +X left, +Y up, +Z forward
@@ -526,7 +526,7 @@ function updatePlayer(dt) {
   // stick auto-centres slowly
   if (!G.freeLook) G.stick.multiplyScalar(Math.exp(-dt * 12));
   // translation
-  const strafeX = (K.KeyA ? 1 : 0) - (K.KeyD ? 1 : 0);
+  const strafeX = ((K.KeyA || K.ArrowLeft) ? 1 : 0) - ((K.KeyD || K.ArrowRight) ? 1 : 0);
   const strafeY = (K.KeyR ? 1 : 0) - ((K.ControlLeft || K.ControlRight) ? 1 : 0);
   const invQ = _q2.copy(p.obj.quaternion).invert();
   const vLocal = _v2.copy(p.vel).applyQuaternion(invQ);
@@ -542,7 +542,7 @@ function updatePlayer(dt) {
   } else {
     vLocal.x += strafeX * acc * 0.6 * dt;
     vLocal.y += strafeY * acc * 0.6 * dt;
-    vLocal.z += ((K.KeyW ? 1 : 0) - (K.KeyS ? 1 : 0) + (G.boosting ? 2 : 0)) * acc * dt;
+    vLocal.z += (((K.KeyW || K.ArrowUp) ? 1 : 0) - ((K.KeyS || K.ArrowDown) ? 1 : 0) + (G.boosting ? 2 : 0)) * acc * dt;
     if (vLocal.length() > S.boost) vLocal.setLength(S.boost);
   }
   p.vel.copy(vLocal.applyQuaternion(p.obj.quaternion));
@@ -806,7 +806,7 @@ $('pausecontrols').innerHTML = document.querySelector('#menu .cols').outerHTML;
 $('resume').addEventListener('click', togglePause);
 
 window.addEventListener('keydown', (ev) => {
-  if (ev.code === 'Tab' || ev.code === 'Space') ev.preventDefault();
+  if (ev.code === 'Tab' || ev.code === 'Space' || ev.code.startsWith('Arrow')) ev.preventDefault();
   if (ev.code === 'Escape') { togglePause(); return; }
   if (ev.repeat) return;
   G.input.keys[ev.code] = true;

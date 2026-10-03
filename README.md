@@ -7,11 +7,12 @@ A procedural browser-based space combat simulator built with Three.js. Pilot the
 Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/3dss/) in a desktop browser with WebGL enabled.
 
 - Mouse: direct pitch and yaw
+- Arrow Up / Down: thrust and throttle
+- Arrow Left / Right: strafe
 - W / S: throttle
 - Q / E: roll
 - A / D: strafe
 - R / Ctrl: vertical thrust
-- R / F: vertical thrust
 - Shift: afterburner
 - Left mouse: pulse lasers
 - Right mouse: railgun
