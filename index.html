@@ -25,7 +25,7 @@
   <div id="offarrow"></div>
 
   <div id="sysinfo" class="panel">
-    <div class="sys"><span id="sysname">Kaltos</span> <span class="sec" id="syssec">0.8</span> <button id="mapbtn" title="N">MAP</button></div>
+    <div class="sys"><span id="sysname">Kaltos</span> <span class="sec" id="syssec">0.8</span> <button id="mapbtn" title="M">MAP</button></div>
     <div id="sysgov" class="sub">Helion Federation</div>
     <div id="locname" class="sub">—</div>
     <div class="sub"><span id="credits">0</span> ISK · Kills <span id="kills">0</span></div>
@@ -80,7 +80,7 @@
 
 <div id="map" class="hidden">
   <canvas id="mapc"></canvas>
-  <div id="maphead">STAR MAP <span>CHARTED SYSTEMS</span> <button id="mapclose">Close (N)</button></div>
+  <div id="maphead">STAR MAP <span>CHARTED SYSTEMS</span> <button id="mapclose">Close (M)</button></div>
   <div id="mapinfo" class="panel"></div>
   <div id="maplegend" class="panel"><i class="lg gov"></i> Helion Federation <i class="lg pir"></i> Corsair Clans <i class="lg unk"></i> Uncharted lane · Click a system to plot a route · Drag to pan · Wheel to zoom</div>
 </div>
@@ -92,7 +92,7 @@
     <div class="cols">
       <div>
         <h3>Flight</h3>
-        <p>hold <kbd>MMB</kbd> + drag: set heading · <kbd>M</kbd> mouse flight</p>
+        <p>hold <kbd>MMB</kbd> + drag: set heading · <kbd>K</kbd> mouse flight</p>
         <p><kbd>↑</kbd><kbd>↓</kbd> thrust · <kbd>←</kbd><kbd>→</kbd> strafe</p>
         <p><kbd>W</kbd><kbd>S</kbd> throttle · <kbd>X</kbd> full stop</p>
         <p><kbd>Q</kbd><kbd>E</kbd> roll · <kbd>A</kbd><kbd>D</kbd> strafe · <kbd>R</kbd>/<kbd>B</kbd> lift up / down</p>
@@ -106,12 +106,12 @@
         <p>hold <kbd>L-Ctrl</kbd> target under pointer · <kbd>T</kbd> lock · <kbd>Tab</kbd> next hostile</p>
         <p><kbd>F</kbd> missile salvo (needs lock)</p>
         <p><kbd>1</kbd>–<kbd>9</kbd> select destination</p>
-        <p><kbd>Space</kbd> warp / jump at a gate · <kbd>J</kbd> same</p>
-        <p><kbd>N</kbd> star map (click a system to plot a route)</p>
+        <p><kbd>Space</kbd> warp · <kbd>J</kbd> jump (warps to the route gate first)</p>
+        <p><kbd>M</kbd> star map (click a system to plot a route)</p>
         <p><kbd>G</kbd> dock · <kbd>O</kbd> overview · <kbd>Esc</kbd> pause</p>
       </div>
     </div>
-    <button id="start" disabled>Loading…</button>
+    <button id="start" disabled>Loading…</button> <button id="newgame" class="hidden">New Game</button>
     <div id="loadmsg"></div>
   </div>
 </div>
@@ -129,7 +129,7 @@
     <div><h1 id="dockname">ARDENT RELAY STATION</h1><div id="docksub"></div></div>
     <div class="dtabs"><b data-tab="services" class="on">Station Services</b><b data-tab="shipyard">Shipyard</b><b data-tab="outfitter">Outfitter</b></div>
     <div id="dockwallet"></div>
-    <button id="dockmap" title="N">Star Map</button>
+    <button id="dockmap" title="M">Star Map</button>
     <button id="undock" class="primary">Undock</button>
   </div>
   <div id="dockleft" class="dpanel"></div>
@@ -140,7 +140,7 @@
 <div id="dead" class="screen hidden">
   <div class="box">
     <h1 class="red">SHIP DESTROYED</h1>
-    <p>Your capsule was recovered and your insured hull has been replaced at <span id="deadstation">your last station</span>.</p>
+    <p>Your clone wakes at <span id="deadstation">your last station</span>. Everything reverts to your last docked save.</p>
     <button id="respawn" class="primary">Wake up in clone bay</button>
   </div>
 </div>

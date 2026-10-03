@@ -91,7 +91,7 @@ const G = {
   priOff: false, secOff: false, usesAmmo: true, leadSpeed: 3200, turretsAuto: true, hasTurrets: true, turFiring: false, gunAssist: false,
   aimDir: new THREE.Vector3(0, 0, 1), aimPoint: new THREE.Vector3(), aimActive: false, mouseLocked: false,
   hull: 'valkyrie', owned: { valkyrie: emptyFit('valkyrie') }, inventory: {}, dockedAt: null,
-  system: 'kaltos', explored: new Set(['kaltos']), routeTo: null, dockSys: 'kaltos', dockId: 'station',
+  system: 'kaltos', explored: new Set(['kaltos']), routeTo: null, autoJump: null, dockSys: 'kaltos', dockId: 'station',
   nearestName: '', time: 0, shake: 0, hitFlash: 0,
 };
 
@@ -962,6 +962,46 @@ function setDockTab(tab) {
   audio.ui();
   renderDock();
 }
+const SAVE_KEY = 'gvcsg-save-v1';
+function snapshot() {
+  return { v: 1, hull: G.hull, owned: G.owned, inventory: G.inventory, credits: G.credits, kills: G.kills, ammo: G.ammo,
+    explored: [...G.explored], dockSys: G.dockSys, dockId: G.dockId, turretsAuto: G.turretsAuto,
+    hp: G.player ? [G.player.armor / G.player.maxArmor, G.player.hull / G.player.maxHull] : [1, 1] };
+}
+function saveGame(force = false) {
+  if (G.state !== 'docked' && !force) return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot())); } catch { /* storage unavailable */ }
+}
+function readSave() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    return s && s.v === 1 && HULLS[s.hull] && SYSTEMS[s.dockSys] ? s : null;
+  } catch { return null; }
+}
+function cleanFit(id, f) {
+  const d = emptyFit(id);
+  for (const k of ['w', 'u']) if (Array.isArray(f?.[k]) && f[k].length === d[k].length && f[k].every((x) => x === null || OUTFITS[x])) d[k] = [...f[k]];
+  return d;
+}
+function applySave(s) {
+  G.owned = {};
+  for (const [id, f] of Object.entries(s.owned || {})) if (HULLS[id]) G.owned[id] = cleanFit(id, f);
+  if (!G.owned[s.hull]) G.owned[s.hull] = emptyFit(s.hull);
+  G.hull = s.hull;
+  G.inventory = {};
+  for (const [k, n] of Object.entries(s.inventory || {})) if (OUTFITS[k] && n > 0) G.inventory[k] = Math.floor(n);
+  G.credits = Math.max(0, Number(s.credits) || 0);
+  G.kills = Math.max(0, Number(s.kills) || 0);
+  G.ammo = { rail: s.ammo?.rail ?? 40, missile: s.ammo?.missile ?? 24 };
+  G.explored = new Set(['kaltos', s.dockSys, ...(s.explored || []).filter((x) => SYSTEMS[x])]);
+  G.dockSys = s.dockSys;
+  G.dockId = systemDef(s.dockSys).stations.some((st) => st.id === s.dockId) ? s.dockId : (systemDef(s.dockSys).stations[0]?.id || 'station');
+  G.turretsAuto = s.turretsAuto !== false;
+}
+function dockStationName(sys, id) { return systemDef(sys).stations.find((st) => st.id === id)?.name || `your last station in ${SYSTEMS[sys].name}`; }
+$('docked').addEventListener('click', () => setTimeout(saveGame, 0));
+window.addEventListener('beforeunload', () => saveGame());
+
 function flashDockMsg(t) { const h = $('dockhint'); h.textContent = t; h.style.color = '#fc6'; setTimeout(() => { h.textContent = 'Drag to orbit · Wheel to zoom'; h.style.color = ''; }, 2500); }
 
 function rebuildPlayer() {
@@ -1027,6 +1067,7 @@ function enterDocked() {
   D.tab = 'services'; D.preview = null; D.browse = G.hull;
   hangar.setOutfit(null);
   hangarShow(G.hull);
+  saveGame();
   hangar.snap();
   renderDock();
 }
@@ -1062,18 +1103,24 @@ function playerDied() {
   G.warp = null; G.lock = null;
   G.input.fire1 = G.input.fire2 = false;
   hud.log('Your ship has been destroyed!', 'd');
-  $('deadstation').textContent = LOCATIONS.find((l) => l.id === G.dockId)?.name && G.system === G.dockSys ? LOCATIONS.find((l) => l.id === G.dockId).name : `your last station in ${SYSTEMS[G.dockSys].name}`;
+  const sv = readSave();
+  $('deadstation').textContent = sv ? `${dockStationName(sv.dockSys, sv.dockId)} (${SYSTEMS[sv.dockSys].name})` : dockStationName(G.dockSys, G.dockId);
   setTimeout(() => $('dead').classList.remove('hidden'), 2500);
 }
 $('respawn').onclick = () => {
+  $('dead').classList.add('hidden');
+  const sv = readSave();
+  if (sv) applySave(sv);
+  else { G.ammo.rail = 40; G.ammo.missile = 24; G.credits = Math.max(0, G.credits - 50000); }
+  G.routeTo = null;
+  enterSystem(G.dockSys, null);
+  rebuildPlayer();
   const p = G.player;
   p.shield = p.maxShield; p.armor = p.maxArmor; p.hull = p.maxHull; p.cap = p.maxCap;
   p.obj.visible = true; p.alive = true;
-  G.ammo.rail = 40; G.ammo.missile = 24;
-  G.credits = Math.max(0, G.credits - 50000);
-  $('dead').classList.add('hidden');
-  if (G.system !== G.dockSys) enterSystem(G.dockSys, null);
   G.dockedAt = LOCATIONS.find((l) => l.id === G.dockId) || LOCATIONS.find((l) => l.dock);
+  G.navTarget = null;
+  hud.log(sv ? 'Clone revived. Everything has reverted to your last docked save.' : 'Clone revived.', 'i');
   undock();
 };
 
@@ -1122,7 +1169,7 @@ window.addEventListener('keydown', (ev) => {
   if (ev.code === 'Escape') { if (starmap.isOpen) starmap.toggle(false); else togglePause(); return; }
   if (ev.repeat) return;
   G.input.keys[ev.code] = true;
-  if (ev.code === 'KeyN' && !ev.repeat && (G.state === 'flying' || G.state === 'docked')) { starmap.toggle(); audio.ui(); return; }
+  if (ev.code === 'KeyM' && !ev.repeat && (G.state === 'flying' || G.state === 'docked')) { starmap.toggle(); audio.ui(); return; }
   if (G.state === 'docked' || G.state === 'menu' || G.state === 'paused') return;
   switch (ev.code) {
     case 'KeyX': G.player.throttle = 0; break;
@@ -1132,10 +1179,10 @@ window.addEventListener('keydown', (ev) => {
     case 'KeyT': lockNearestToReticle(); break;
     case 'Tab': cycleHostile(); break;
     case 'KeyF': fireMissiles(); break;
-    case 'KeyJ':
-    case 'Space': jumpOrWarp(); break;
+    case 'KeyJ': jumpKey(); break;
+    case 'Space': warpKey(); break;
     case 'KeyG': tryDock(); break;
-    case 'KeyM': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (M)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
+    case 'KeyK': setMouseFlight(!G.followToggle); hud.notice(G.followToggle ? 'MOUSE FLIGHT ON — MOVE MOUSE TO STEER (K)' : 'MOUSE FLIGHT OFF — HOLD MMB AND DRAG TO STEER', 1.8); audio.ui(); break;
     case 'KeyL': G.turretsAuto = !G.turretsAuto; hud.notice(G.turretsAuto ? 'TURRETS: AUTO-ENGAGE HOSTILES' : 'TURRETS: HOLD FIRE', 1.6); audio.ui(); break;
     case 'KeyH': toggleHelp(); break;
     case 'KeyO': hud.toggleOverview(); break;
@@ -1150,14 +1197,14 @@ hud.onSelect = (ref) => { G.selected = ref; if (ref.pos) G.navTarget = ref; else
 document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('mousedown', (ev) => {
   ev.stopPropagation();
   const s = G.selected;
-  if (b.dataset.act === 'warp') { if (s && s.pos) G.navTarget = s; jumpOrWarp(); }
+  if (b.dataset.act === 'warp') { if (s && s.pos) G.navTarget = s; if (s && s.jump && nearJump() === s) jumpKey(); else warpKey(); }
   if (b.dataset.act === 'lock') { if (s && s.ship) startLock(s); else hud.notice('SELECT A SHIP TO LOCK', 1.2); }
   if (b.dataset.act === 'dock') tryDock();
 }));
 function toggleHelp() {
   const h = $('help');
   if (h.classList.contains('hidden')) {
-    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (M toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (L toggles hold fire). Hold left Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Ardent Relay Station (1) to repair and buy basic outfits, or at Helion Orbital Shipyard (7) for new hulls, a 3D hangar and high-tech modules. Pirates spawn at the asteroid belt (2) and the Corsair Hideout (3). Press H to close. Press Esc to pause.</p>';
+    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (K toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (L toggles hold fire). Hold left Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; J jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press H to close. Press Esc to pause.</p>';
     h.classList.remove('hidden');
   } else h.classList.add('hidden');
 }
@@ -1293,8 +1340,9 @@ function frame(now) {
   let best = Infinity;
   for (const l of LOCATIONS) { const d = l.pos.distanceTo(p.obj.position) - l.arrive; if (d < best) { best = d; G.nearestName = d < 30000 ? l.name : `Deep space near ${l.name}`; } }
   if (G.state === 'flying' || G.state === 'dead') hud.update(dt, G);
+  if (G.autoJump && !G.warp) { const g = G.autoJump; G.autoJump = null; if (G.state === 'flying' && nearJump() === g) startJump(g); }
   const jp = G.state === 'flying' && !G.warp && nearJump();
-  const jh = jp ? `JUMP GATE IN RANGE — SPACE TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
+  const jh = jp ? `JUMP GATE IN RANGE — J TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
   if ($('jumphint').textContent !== jh) $('jumphint').textContent = jh;
   composer.render(dt);
 }
@@ -1347,7 +1395,7 @@ starmap.onRoute = () => {
   const hop = nextHop();
   if (!hop) return;
   G.navTarget = hop; G.selected = hop; hud.ovT = 0;
-  hud.notice(`ROUTE SET: ${hop.name.toUpperCase()} — SPACE TO WARP`, 2.5);
+  hud.notice(`ROUTE SET: ${hop.name.toUpperCase()} — J TO JUMP`, 2.5);
 };
 
 function updateSysInfo(def) {
@@ -1371,7 +1419,7 @@ function enterSystem(to, from) {
   G.system = to;
   const def = systemDef(to);
   world.load(def, G.explored);
-  G.selected = null; G.lock = null; G.leadPoint = null; G.warp = null; G.scrambled = false; G.aimActive = false;
+  G.selected = null; G.lock = null; G.leadPoint = null; G.warp = null; G.autoJump = null; G.scrambled = false; G.aimActive = false;
   encounters = buildEncounters(def);
   const back = from && LOCATIONS.find((l) => l.jump === from);
   if (back) {
@@ -1394,7 +1442,7 @@ function enterSystem(to, from) {
     hud.log(`Jumped into ${def.name} (${GOVS[def.gov].name}, security ${def.sec.toFixed(1)}).`, def.gov === 'pirate' ? 'd' : 'i');
     if (def.gov === 'pirate') hud.log('Warning: lawless space. No navy, no stations.', 'w');
   }
-  if (fresh) hud.log(`New system charted: ${def.name}, ${def.starInfo.name}. It now appears on the star map (N).`, 'g');
+  if (fresh) hud.log(`New system charted: ${def.name}, ${def.starInfo.name}. It now appears on the star map (M).`, 'g');
 }
 
 function nearJump() {
@@ -1404,11 +1452,22 @@ function nearJump() {
   return best;
 }
 
-function jumpOrWarp() {
+function warpKey() {
   if (G.state !== 'flying' || G.warp) return;
   const jp = nearJump();
-  if (jp && (!G.navTarget || G.navTarget.jump || G.navTarget.pos.distanceTo(G.player.obj.position) < G.navTarget.arrive + 8000)) startJump(jp);
-  else warpTo(G.navTarget);
+  if (jp && (!G.navTarget || G.navTarget === jp)) { hud.notice('IN JUMP RANGE — PRESS J TO JUMP', 1.6); return; }
+  warpTo(G.navTarget);
+}
+
+function jumpKey() {
+  if (G.state !== 'flying' || G.warp) return;
+  const jp = nearJump();
+  if (jp) { startJump(jp); return; }
+  const gate = (G.navTarget && G.navTarget.jump && G.navTarget) || nextHop();
+  if (!gate) { hud.notice('SELECT A JUMP GATE OR PLOT A ROUTE (M)', 1.8); audio.beep(220, 0.15); return; }
+  G.navTarget = gate; G.selected = gate; hud.ovT = 0;
+  warpTo(gate);
+  if (G.warp) G.autoJump = gate;
 }
 
 function startJump(jp) {
@@ -1446,11 +1505,17 @@ async function boot() {
     bolts = new Projectiles(scene, fx);
     missiles = new Missiles(scene, fx, world.env);
     await step('Assembling ships…');
-    G.player = makeEntity('player', 'player', new THREE.Vector3(), 'Valkyrie');
+    const save = readSave();
+    if (save) applySave(save);
+    G.player = makeEntity('player', 'player', new THREE.Vector3(), HULLS[G.hull].name);
+    if (save && Array.isArray(save.hp)) {
+      const [a, h] = save.hp.map((x) => Math.min(1, Math.max(0.05, Number(x) || 1)));
+      G.player.armor = G.player.maxArmor * a; G.player.hull = G.player.maxHull * h;
+    }
     weaponInfo();
-    enterSystem('kaltos', null);
-    G.dockedAt = LOCATIONS[0];
-    G.navTarget = LOCATIONS.find((l) => l.icon === 'belt');
+    enterSystem(G.dockSys, null);
+    G.dockedAt = LOCATIONS.find((l) => l.id === G.dockId) || LOCATIONS.find((l) => l.dock);
+    G.navTarget = LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS.find((l) => l.jump);
     undockPose();
     await step('Compiling shaders…');
     renderer.compile(scene, camera);
@@ -1459,14 +1524,24 @@ async function boot() {
     composer.render(0.016);
     msg.textContent = 'Systems online.';
     const start = $('start');
-    start.disabled = false; start.textContent = 'Undock';
+    start.disabled = false; start.textContent = save ? 'Continue' : 'Undock';
+    if (save) $('newgame').classList.remove('hidden');
+    $('newgame').onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch { /* storage unavailable */ } location.reload(); };
     start.onclick = () => {
       audio.init();
       $('menu').classList.add('hidden');
+      $('newgame').classList.add('hidden');
+      if (save) {
+        hud.log(`Save loaded: ${G.dockedAt.name}, ${SYSTEMS[G.system].name}. ${G.explored.size} system${G.explored.size > 1 ? 's' : ''} charted, ${fmtIsk(G.credits)}.`, 'i');
+        hud.log('Space warps, J jumps at a gate, M opens the star map. The game saves while you are docked.', 'i');
+        undock();
+        return;
+      }
+      saveGame(true);
       const num = (f) => LOCATIONS.findIndex(f) + 1;
       hud.log('Welcome to GVCSG - Generic Vibe Coded Space Game. Pirates reported at Kaltos III - Asteroid Belt 1.', 'i');
       hud.log(`Press ${num((l) => l.icon === 'belt')} then Space to warp to the belt. Hold MMB and drag to steer, hold L-Ctrl to target.`, 'i');
-      hud.log(`New hulls and high-tech outfits: Helion Orbital Shipyard (${num((l) => l.id === 'shipyard')}). Jump gates lead to other systems; N opens the star map.`, 'i');
+      hud.log(`New hulls and high-tech outfits: Helion Orbital Shipyard (${num((l) => l.id === 'shipyard')}). Jump gates lead to other systems; M opens the star map, J jumps.`, 'i');
       undock();
     };
   } catch (err) {
@@ -1476,7 +1551,7 @@ async function boot() {
 }
 
 function undockPose() {
-  const st = world.docks.station.root;
+  const st = (world.docks[G.dockedAt?.id] || Object.values(world.docks)[0]).root;
   const a = Math.PI / 4;
   const p = G.player;
   p.obj.position.copy(new THREE.Vector3(Math.cos(a) * 900, -180, Math.sin(a) * 900).applyQuaternion(st.quaternion).add(st.position));
@@ -1487,6 +1562,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, camera, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, jumpOrWarp, nearJump };
+window.__game = { G, camera, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
 requestAnimationFrame(frame);
 boot();

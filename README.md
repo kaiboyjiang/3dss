@@ -6,7 +6,7 @@ GVCSG is a procedural browser-based space combat simulator built with Three.js. 
 
 Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a desktop browser with WebGL enabled.
 
-- Hold middle mouse and drag: set a heading marker; the ship turns to it and stops there (M toggles mouse flight without holding)
+- Hold middle mouse and drag: set a heading marker; the ship turns to it and stops there (K toggles mouse flight without holding)
 - The reticle compass shows the direction of the target and other ships
 - Arrow Up / Down: thrust and throttle
 - Arrow Left / Right: strafe
@@ -23,13 +23,18 @@ Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a de
 - Tab: cycle hostiles
 - F: missile salvo after locking
 - 1–9: select navigation destination
-- Space / J: warp to the selected destination, or jump when within 3.5 km of a jump gate
-- N: star map (only charted systems are shown; click a system to plot a route)
+- Space: warp to the selected destination
+- J: jump through a gate within 3.5 km; otherwise warp to the selected or next route gate and jump on arrival
+- M: star map (only charted systems are shown; click a system to plot a route)
 - O: collapse / expand overview
 - G: dock at the nearest station
 - V: cycle cameras
 - Esc: pause and show controls
 - H: help
+
+## Saving
+
+The game auto-saves to browser local storage whenever you are docked (on docking and after every purchase, fitting or repair). Reloading resumes from that save. If your ship is destroyed, everything — ships, fittings, credits, ammo, kills and charted systems — reverts to your last docked save. Use **New Game** on the start menu to wipe the save.
 
 ## Local development
 
