@@ -1,4 +1,4 @@
-# Kaltos 0.4 — 3D Space Simulator
+# Generic Vibe Coded Space Game
 
 A procedural browser-based space combat simulator built with Three.js. Pilot the Valkyrie assault frigate through the Kaltos system, engage Corsair raiders, navigate asteroid fields, warp between landmarks, and dock at Ardent Relay Station or the high-tech Helion Orbital Shipyard, where you can inspect and buy hulls (Kestrel, Valkyrie, Warden, Paladin) in a 3D hangar and fit weapons and modules in the outfitter.
 
