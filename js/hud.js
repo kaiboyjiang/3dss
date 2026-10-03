@@ -322,32 +322,32 @@ export class HUD {
   }
   gauge(G) {
     const g = this.g, p = G.player;
-    const W = 300, H = 170, cx = W / 2, cy = 150;
+    const W = 300, H = 170, top = 18, bh = 78, bw = 10;
     g.clearRect(0, 0, W, H);
-    const arc = (r, f, col, wdt) => {
-      const a0 = Math.PI * 1.08, a1 = Math.PI * 1.92;
-      g.lineWidth = wdt; g.lineCap = 'butt';
-      g.strokeStyle = 'rgba(255,255,255,0.08)';
-      g.beginPath(); g.arc(cx, cy, r, a0, a1); g.stroke();
-      g.strokeStyle = col;
-      g.beginPath(); g.arc(cx, cy, r, a0, a0 + (a1 - a0) * Math.max(0, Math.min(1, f))); g.stroke();
-    };
-    arc(128, p.shield / p.maxShield, '#4ab3ff', 7);
-    arc(118, p.armor / p.maxArmor, '#e9c46a', 7);
-    arc(108, p.hull / p.maxHull, '#e85d4a', 7);
-    // capacitor: segmented ring
-    const segs = 24, capF = p.cap / p.maxCap;
-    for (let i = 0; i < segs; i++) {
-      const a0 = Math.PI * 1.12 + (i / segs) * Math.PI * 0.76;
-      g.strokeStyle = i / segs < capF ? 'rgba(255,210,110,0.9)' : 'rgba(255,255,255,0.08)';
-      g.lineWidth = 9;
-      g.beginPath(); g.arc(cx, cy, 92, a0, a0 + Math.PI * 0.76 / segs * 0.7); g.stroke();
-    }
-    // throttle bar
-    g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(cx - 50, cy - 58 + 20, 100, 3);
-    g.fillStyle = G.boosting ? '#ffb040' : '#b6bac0'; g.fillRect(cx - 50, cy - 38, 100 * Math.min(1, p.throttle), 3);
-    g.font = '10px sans-serif'; g.fillStyle = '#9ba0a8'; g.textAlign = 'center';
-    g.fillText(`S ${Math.round(p.shield)} · A ${Math.round(p.armor)} · H ${Math.round(p.hull)}`, cx, cy - 64);
-    g.fillText(`CAP ${Math.round(p.cap)} GJ`, cx, cy - 44);
+    const cols = [
+      ['SHD', p.shield / p.maxShield, '#2f6f9e', Math.round(p.shield)],
+      ['ARM', p.armor / p.maxArmor, '#8a7440', Math.round(p.armor)],
+      ['HUL', p.hull / p.maxHull, '#8e3b2f', Math.round(p.hull)],
+      ['CAP', p.cap / p.maxCap, '#8f7a4a', Math.round(p.cap)],
+      ['THR', Math.min(1, p.throttle), G.boosting ? '#a8742e' : '#6c7178', Math.round(p.throttle * 100) + '%'],
+    ];
+    const gap = 44, x0 = W / 2 - ((cols.length - 1) * gap) / 2;
+    g.font = '10px sans-serif'; g.textAlign = 'center';
+    cols.forEach(([lb, f, col, v], i) => {
+      const x = x0 + i * gap - bw / 2, fr = Math.max(0, Math.min(1, f));
+      g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(x, top, bw, bh);
+      g.fillStyle = col;
+      if (lb === 'CAP') {
+        const segs = 16, sh = bh / segs;
+        for (let k = 0; k < segs; k++) if (k / segs < fr) g.fillRect(x, top + bh - (k + 1) * sh + 1, bw, sh - 2);
+      } else {
+        const h = bh * fr; g.fillRect(x, top + bh - h, bw, h);
+      }
+      g.shadowColor = '#000'; g.shadowBlur = 4;
+      g.fillStyle = '#8a9098'; g.fillText(String(v), x + bw / 2, top - 6);
+      g.fillStyle = '#737981'; g.fillText(lb, x + bw / 2, top + bh + 12);
+      g.shadowBlur = 0;
+    });
+
   }
 }
