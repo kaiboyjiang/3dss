@@ -1823,7 +1823,7 @@ async function boot() {
       if (save) {
         hud.log(`Save loaded: ${G.dockedAt.name}, ${SYSTEMS[G.system].name}. ${G.explored.size} system${G.explored.size > 1 ? 's' : ''} charted, ${fmtIsk(G.credits)}.`, 'i');
         hud.log('Space warps, H jumps at a gate, M opens the star map. The game saves while you are docked.', 'i');
-        undock();
+        enterDocked();
         return;
       }
       saveGame(true);
