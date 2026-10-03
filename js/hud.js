@@ -139,6 +139,7 @@ export class HUD {
 
     // ---- target panel
     const tp = tgt || (G.selected && G.selected.ship ? G.selected : null);
+    this.shown = tp && tp.alive ? tp : null;
     if (tp && tp.alive) {
       this.el.target.classList.remove('hidden');
       this.el.tname.textContent = tp.name;

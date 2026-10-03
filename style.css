@@ -49,6 +49,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 .bars .bar { height: 5px; background: rgba(255, 255, 255, 0.08); margin: 3px 0; }
 .bars .bar i { display: block; height: 100%; transition: width 0.15s; }
 .bar.s i { background: #4ab3ff; } .bar.a i { background: #e9c46a; } .bar.h i { background: #e85d4a; }
+#tholo { position: absolute; left: 30px; right: 30px; top: calc(100% + 6px); height: 140px; pointer-events: none;
+  background: linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 0 / 1px 12px,
+    linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 0 / 1px 12px,
+    linear-gradient(#a4a9b0, #a4a9b0) 0 100% / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 0 100% / 1px 12px,
+    linear-gradient(#a4a9b0, #a4a9b0) 100% 100% / 12px 1px, linear-gradient(#a4a9b0, #a4a9b0) 100% 100% / 1px 12px;
+  background-repeat: no-repeat; opacity: 0.6; }
 #target .tlock { margin-top: 5px; font-size: 11px; letter-spacing: 2px; color: #ffb040; }
 
 #overview { right: 14px; top: 14px; width: 360px; pointer-events: auto; }

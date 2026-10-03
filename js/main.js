@@ -12,6 +12,7 @@ import { Hangar } from './hangar.js';
 import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } from './combat.js';
 import { Audio } from './audio.js';
 import { HUD, fmtDist } from './hud.js';
+import { TargetHolo } from './holo.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3();
@@ -88,6 +89,7 @@ window.addEventListener('resize', resize);
 // ---------------------------------------------------------------- game state
 const audio = new Audio();
 const hud = new HUD();
+const holo = new TargetHolo($('tholo'));
 let world, fx, bolts, missiles, hangar;
 
 const G = {
@@ -1593,6 +1595,7 @@ function frame(now) {
   const jh = jp ? `JUMP GATE IN RANGE — H TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
   if ($('jumphint').textContent !== jh) $('jumphint').textContent = jh;
   composer.render(dt);
+  holo.render(renderer, G.state === 'flying' ? hud.shown : null, camera, G.time, dt);
 }
 
 // ---------------------------------------------------------------- star systems
@@ -1902,6 +1905,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, cine, camera, renderer, get fx() { return fx; }, get bolts() { return bolts; }, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
+window.__game = { G, holo, hud, cine, camera, renderer, get fx() { return fx; }, get bolts() { return bolts; }, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
 requestAnimationFrame(frame);
 boot();
