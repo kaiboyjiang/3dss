@@ -892,7 +892,7 @@ function bayWorld(dock, i) {
   const st = dock.root, b = dock.bays[i];
   return { pos: b.pos.clone().applyQuaternion(st.quaternion).add(st.position), dir: b.dir.clone().applyQuaternion(st.quaternion).normalize(), depth: b.depth, h: b.h };
 }
-// how far inside the pod the ship parks, leaving room for the trailing camera behind it
+// how far inside the pod the ship parks
 const trailBack = (r) => r * 2.2 + 25;
 const bayDepth = (b, r) => THREE.MathUtils.clamp(b.depth - trailBack(r) - 20, b.depth * 0.3, b.depth * 0.6);
 function bezier(P, s, out) {
@@ -928,8 +928,10 @@ function startCine(mode, bay, path, dur, caption) {
   const side = _v.copy(bay.dir).cross(Y).normalize();
   if (Math.random() < 0.5) side.negate();
   Object.assign(cine, { mode, t: 0, dur, path, bay, ending: false, crossed: false });
-  cine.side = side.clone();
-  cine.ext.copy(bay.pos).addScaledVector(bay.dir, r * 4 + 130).addScaledVector(side, r * 3 + 85).addScaledVector(Y, r * 1.2 + 30);
+  // a fixed external camera: beside the bay mouth for docking/undocking, off to one side of the gate for jumps
+  if (mode === 'docking' || mode === 'undocking') cine.ext.copy(bay.pos).addScaledVector(bay.dir, r * 5 + 260).addScaledVector(side, r * 2.5 + 110).addScaledVector(Y, r * 1.2 + 45);
+  else cine.ext.copy(bay.pos).addScaledVector(bay.dir, mode === 'jumpout' ? -(r * 6 + 700) : r * 6 + 900).addScaledVector(side, r * 3 + 560).addScaledVector(Y, r * 2 + 160);
+  cine.tEnd = -1;
   cine.q0.copy(p.obj.quaternion);
   cine.c0.copy(camera.position); cine.cq0.copy(camera.quaternion);
   cine.prev.copy(path[0].P[0]);
@@ -938,19 +940,6 @@ function startCine(mode, bay, path, dur, caption) {
   $('hud').classList.add('hidden');
   if (mode === 'undocking') { fx.flash(path[0].P[0], r * 3 + 40, 0xbfe4ff, 0.5); audio.ui(); }
   cineStep(0);
-}
-// camera tucked in behind the ship along its flight direction; h limits its height inside a bay
-function trailCam(out, pos, tan, r, h) {
-  return out.copy(pos).addScaledVector(tan, -trailBack(r)).addScaledVector(Y, Math.min(r * 0.45 + 6, h * 0.3));
-}
-// wide shot that trails the ship toward the gate with the event horizon framed ahead of it
-function jumpCam(out, pos, dir, r) {
-  return out.copy(pos).addScaledVector(dir, -(r * 7 + 40)).addScaledVector(cine.side, r * 4 + 25).addScaledVector(Y, r * 2 + 12);
-}
-// once the trailing camera is clear of a bay mouth or gate, swing it out to a three-quarter view
-function exitSwing(r) {
-  const out = THREE.MathUtils.smoothstep(_ct.copy(cine.cam).sub(cine.bay.pos).dot(cine.bay.dir), 0, 220);
-  cine.cam.addScaledVector(cine.side, (r * 3 + 50) * out).addScaledVector(Y, (r + 20) * out);
 }
 function setFade(on, color) {
   const f = $('fade');
@@ -993,33 +982,23 @@ function cineStep(dt) {
   p.throttle = cine.mode === 'docking' ? 0.35 * (1 - u) + 0.05 : cine.mode === 'jumpout' ? 0.4 + 0.6 * u : cine.mode === 'jumpin' ? 1 - 0.5 * u : 0.2 + 0.6 * u;
   G.boosting = cine.mode === 'jumpout' && u > 0.45;
   playerAngVel.set(0, 0, 0);
-  // camera: an establishing shot that settles in behind the ship and follows it in, or starts behind it and follows it out
+  // camera: a fixed external camera that pans to keep the ship in frame
   const dz = _ct.copy(p.obj.position).sub(B.pos).dot(B.dir);
-  if (cine.mode === 'docking') {
-    const w = THREE.MathUtils.smoothstep(u, 0.3, 0.5);
-    trailCam(cine.cam, p.obj.position, tan, r, B.h).lerpVectors(cine.ext, cine.cam, w);
-    cine.look.copy(p.obj.position).addScaledVector(tan, r * 1.5 * w);
-  } else if (cine.mode === 'jumpout') {
-    const w = THREE.MathUtils.smoothstep(u, 0.35, 0.6);
-    jumpCam(cine.look, p.obj.position, B.dir, r);
-    trailCam(cine.cam, p.obj.position, tan, r, Infinity).lerpVectors(cine.look, cine.cam, w);
-    cine.look.copy(p.obj.position).addScaledVector(tan, r * 1.5 * w);
-  } else {
-    trailCam(cine.cam, p.obj.position, tan, r, cine.mode === 'undocking' ? B.h : Infinity);
-    exitSwing(r);
-    cine.look.copy(p.obj.position);
-  }
+  cine.cam.copy(cine.ext);
+  cine.look.copy(p.obj.position).addScaledVector(tan, r);
   if (cine.mode === 'jumpout') {
-    // the gate spools up, the ship punches through the event horizon and the camera follows it in
+    // the gate spools up and the ship vanishes into the event horizon in a flash
     if (cine.gate.horizon) cine.gate.horizon.value = THREE.MathUtils.smoothstep(u, 0.1, 0.6);
     cine.warpFx = THREE.MathUtils.smoothstep(u, 0.5, 0.9);
-    G.shake = Math.max(G.shake, cine.warpFx * 0.9);
     if (dz > 0 && !cine.ending) {
       cine.ending = true;
+      cine.tEnd = cine.t;
+      p.obj.visible = false;
       fx.flash(cine.gate.pos, 1400, 0x9fc8ff, 0.9);
       audio.warpStart();
     }
-    if (_ct.copy(cine.cam).sub(B.pos).dot(B.dir) > 0 && !cine.crossed) {
+    if (cine.ending) cine.look.copy(cine.gate.pos);
+    if (cine.ending && cine.t - cine.tEnd > 0.7 && !cine.crossed) {
       cine.crossed = true;
       endCine();
       return;
@@ -1051,7 +1030,10 @@ function cineCamera() {
     camera.position.lerp(cine.cam, w);
     camera.quaternion.slerp(_cq, w);
   }
-  camera.fov += (52 - camera.fov) * w;
+  // frame the ship (and for jumps, a good part of the gate) as it moves relative to the fixed camera
+  const ext = G.player.ship.radius * 4 + (cine.mode === 'jumpout' || cine.mode === 'jumpin' ? 220 : 40);
+  const fovT = THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(ext / Math.max(1, cine.cam.distanceTo(cine.look)))), 14, 55);
+  camera.fov += (fovT - camera.fov) * w;
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld();
 }
@@ -1756,6 +1738,7 @@ function startJump(jp) {
 function arriveJump(to, from) {
   enterSystem(to, from);
   const p = G.player;
+  p.obj.visible = true;
   const back = LOCATIONS.find((l) => l.jump === from);
   setFade(false);
   audio.warpEnd();
@@ -1782,6 +1765,7 @@ function arriveJump(to, from) {
 
 function finishJump() {
   const p = G.player;
+  p.obj.visible = true;
   if (cine.gate && cine.gate.horizon) cine.gate.horizon.value = 0;
   cine.warpFx = 0;
   p.vel.copy(_v.set(0, 0, 1).applyQuaternion(p.obj.quaternion)).multiplyScalar(Math.max(200, p.vel.length()));

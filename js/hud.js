@@ -204,15 +204,14 @@ export class HUD {
     // compass ring around the reticle: centre = dead ahead, outer edge = directly behind
     g.lineWidth = 1;
     g.strokeStyle = 'rgba(204,207,211,0.22)';
-    const sq = (ph, r) => { const c = Math.cos(ph), s = Math.sin(ph), k = r / Math.max(Math.abs(c), Math.abs(s)); return [cx + c * k, cy + s * k]; };
-    g.strokeRect(cx - R, cy - R, R * 2, R * 2);
+    const sq = (ph, r) => [cx + Math.cos(ph) * r, cy + Math.sin(ph) * r];
+    g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
     g.setLineDash([2, 4]);
     g.strokeStyle = 'rgba(204,207,211,0.14)';
-    const Rm = (R0 + R) / 2;
-    g.strokeRect(cx - Rm, cy - Rm, Rm * 2, Rm * 2);
+    g.beginPath(); g.arc(cx, cy, (R0 + R) / 2, 0, Math.PI * 2); g.stroke();
     g.setLineDash([]);
     for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4, l = i % 2 ? 4 : 6, [x0, y0] = sq(a, R), [x1, y1] = sq(a, R + l);
+      const a = i * Math.PI / 4, l = i % 2 ? 3 : 6, [x0, y0] = sq(a, R), [x1, y1] = sq(a, R + l);
       g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
     }
     const inv = cam.matrixWorldInverse;
@@ -233,8 +232,10 @@ export class HUD {
       if (e === tgt) { tdir = D; continue; }
       const col = COLORS[factionCls(e)];
       const [x, y] = sq(D.ph, D.r);
-      const a = d < 15000 ? 0.95 : 0.5, hs = e.ship.radius > 30 ? 3 : 2.2;
-      if (D.th > Math.PI / 2) { g.strokeStyle = `rgba(${col},${a})`; g.strokeRect(x - hs, y - hs, hs * 2, hs * 2); } else { g.fillStyle = `rgba(${col},${a})`; g.fillRect(x - hs, y - hs, hs * 2, hs * 2); }
+      const a = d < 15000 ? 0.95 : 0.5;
+      g.beginPath();
+      g.arc(x, y, e.ship.radius > 30 ? 3.2 : 2.4, 0, Math.PI * 2);
+      if (D.th > Math.PI / 2) { g.strokeStyle = `rgba(${col},${a})`; g.stroke(); } else { g.fillStyle = `rgba(${col},${a})`; g.fill(); }
     }
     if (tdir && tgt) {
       const locked = G.lock && G.lock.ent === tgt && G.lock.progress >= 1;
@@ -266,7 +267,7 @@ export class HUD {
       }
       if (G.gunAssist) {
         g.strokeStyle = 'rgba(255,90,72,0.85)';
-        g.strokeRect(cx - 13, cy - 13, 26, 26);
+        g.beginPath(); g.arc(cx, cy, 13, 0, Math.PI * 2); g.stroke();
       }
       if (!G.mouseLocked) {
         g.strokeStyle = 'rgba(220,222,225,0.8)';
