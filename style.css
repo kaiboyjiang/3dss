@@ -222,3 +222,9 @@ table.st .up { color: #7fe0a0; } table.st .dn { color: #ff7a66; }
 .opts .odesc { flex-basis: 100%; font-size: 11px; color: #80858b; }
 #fps { position: fixed; right: 8px; bottom: 6px; z-index: 60; pointer-events: none; font: 10px "Share Tech Mono", monospace; letter-spacing: 1px; color: rgba(200, 204, 209, 0.6); text-shadow: 0 0 3px #000; }
 #docktop button { flex: none; white-space: nowrap; }
+.caps { display: grid; gap: 5px; margin: 6px 0 10px; }
+.caps .cap { position: relative; display: flex; justify-content: space-between; padding: 4px 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #a3a8ad; border: 1px solid rgba(164, 169, 176, 0.25); background: rgba(20, 22, 24, 0.6); overflow: hidden; }
+.caps .cap b { font-weight: normal; color: #f6f6f7; position: relative; } .caps .cap span { position: relative; }
+.caps .cap i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(110, 118, 128, 0.35), rgba(150, 158, 168, 0.55)); }
+.caps .cap.over { border-color: #ff7a66; } .caps .cap.over i { background: rgba(255, 122, 102, 0.45); }
+.ocats { flex-wrap: wrap; margin: 4px 0 10px; } .ocats b { padding: 4px 8px; font-size: 10px; letter-spacing: 1px; }

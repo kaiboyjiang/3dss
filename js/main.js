@@ -7,7 +7,7 @@ import { buildWorld, LOCATIONS } from './world.js';
 import { SYSTEMS, GOVS, systemDef, route, allPorts, hops, fullRoute } from './systems.js';
 import { StarMap } from './map.js';
 import { buildRaider, buildCruiser, buildHauler, animateShip } from './ships.js';
-import { HULLS, OUTFITS, YARDS, emptyFit, bareFit, normFit, cloneFit, fitItems, roleOf, slotAccepts, SLOT_KEYS, buildFitted, outfitPreview, fittedStats } from './catalog.js';
+import { HULLS, OUTFITS, YARDS, emptyFit, bareFit, normFit, cloneFit, fitItems, roleOf, slotAccepts, SLOT_KEYS, MOUNT_KEYS, OUTFIT_CATS, CAP_NAME, catOf, fitLoad, fitProblem, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
 import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } from './combat.js';
 import { Audio } from './audio.js';
@@ -1131,25 +1131,60 @@ function hangarShow(hullId, keepView) {
 }
 
 function statRows(s, cmp) {
-  const rows = [['Shield', s.shield, 'HP'], ['Armor', s.armor, 'HP'], ['Hull', s.hull, 'HP'], ['Max velocity', s.speed, 'm/s'], ['Afterburner', s.boost, 'm/s'],
+  const rows = [['Shield', s.shield, 'HP'], ['Armor', s.armor, 'HP'], ['Hull', s.hull, 'HP'], ['Max velocity', s.speed, 'm/s'], ['Afterburner', s.boost, 'm/s'], ['Acceleration', s.accel, 'm/s²'],
     ['Agility', Math.round(THREE.MathUtils.radToDeg(s.turn[1])), '°/s'], ['Capacitor', s.cap, 'GJ'], ['Cap recharge', Math.round(s.capRegen * 10) / 10, 'GJ/s'],
     ['Shield regen', Math.round(s.shieldRegen * 10) / 10, 'HP/s'], ['Lock range', Math.round(s.lockRange / 1000), 'km'], ['Signature', s.sig, '']];
-  const keys = ['shield', 'armor', 'hull', 'speed', 'boost', null, 'cap', 'capRegen', 'shieldRegen', 'lockRange', null];
+  const keys = ['shield', 'armor', 'hull', 'speed', 'boost', 'accel', 'agility', 'cap', 'capRegen', 'shieldRegen', 'lockRange', null];
   return `<table class="st">${rows.map(([n, v, u], i) => {
     let c = '';
-    if (cmp && keys[i]) { const o = cmp[keys[i]]; c = s[keys[i]] > o + 0.01 ? ' class="up"' : s[keys[i]] < o - 0.01 ? ' class="dn"' : ''; }
+    const val = (x) => (keys[i] === 'agility' ? x.turn[1] : x[keys[i]]);
+    if (cmp && keys[i]) { const a = val(s), o = val(cmp); c = a > o + 0.001 ? ' class="up"' : a < o - 0.001 ? ' class="dn"' : ''; }
     return `<tr><td>${n}</td><td${c}>${typeof v === 'number' ? v.toLocaleString() : v} ${u}</td></tr>`;
   }).join('')}</table>`;
 }
 
-const SLOT_HEAD = { g: 'Gun mounts', t: 'Turret mounts', m: 'Missile bays', u: 'Utility slots' };
-const SLOT_EMPTY = { g: 'Empty gun mount', t: 'Empty turret mount', m: 'Empty missile bay', u: 'Empty utility slot' };
+const SLOT_HEAD = { g: 'Gun mounts', t: 'Turret mounts', m: 'Missile bays', e: 'Engines', u: 'Systems' };
+const SLOT_EMPTY = { g: 'Empty gun mount', t: 'Empty turret mount', m: 'Empty missile bay' };
+const CAT_NAME = Object.fromEntries(OUTFIT_CATS);
+const MOUNT_OF_CAT = { gun: 'g', turret: 't', bay: 'm' };
+function capBars(hullId, fit) {
+  const C = HULLS[hullId].cap, L = fitLoad(fit);
+  return `<div class="caps">${['o', 'w', 'e'].map((k) => `<div class="cap${L[k] > C[k] ? ' over' : ''}"><span>${CAP_NAME[k]}</span><b>${L[k]} / ${C[k]}</b><i style="width:${Math.min(100, (100 * L[k]) / C[k])}%"></i></div>`).join('')}</div>`;
+}
+function shopOk(O) {
+  if (O.shop === 'pirate') return G.dockedAt.dock === 'pirate';
+  if (O.shop === 'corp') return SYSTEMS[G.system].gov === 'corp';
+  return O.tech === 'basic' || isHigh();
+}
+const shopNote = (O) => (O.shop === 'pirate' ? 'Only sold at Clan ports.' : O.shop === 'corp' ? 'Only sold in Combine systems.' : 'Only sold at high-tech stations.');
+// Where an outfit would go on the active ship: the selected mount if it matches, else the first empty matching mount,
+// else replacing the first matching mount; engines and systems are appended.
+function planFit(id) {
+  const fit = G.owned[G.hull], O = OUTFITS[id], tf = cloneFit(fit);
+  const mk = MOUNT_OF_CAT[catOf(id)];
+  let k, i;
+  if (mk) {
+    if (!fit[mk].length) return { err: `This hull has no ${SLOT_NAME_L[mk]}` };
+    k = mk; i = D.slot.k === mk ? D.slot.i : fit[mk].indexOf(null);
+    if (i < 0) i = 0;
+    if (fit[k][i] === id) return { k, i, tf, same: true };
+    tf[k][i] = id; tf.r[k] && (tf.r[k][i] = O.group);
+  } else {
+    k = O.type === 'engine' ? 'e' : 'u'; i = fit[k].length;
+    tf[k].push(id);
+  }
+  const err = fitProblem(G.hull, tf) || (capOk(G.hull, tf) ? '' : 'Active cargo or passengers would lose their space');
+  return { k, i, tf, err, old: mk ? fit[k][i] : null };
+}
+const SLOT_NAME_L = { g: 'gun mounts', t: 'turret mounts', m: 'missile bays' };
+const spaceLine = (O) => `Uses ${O.space} outfit space${O.type === 'weapon' ? ` and ${O.space} weapon capacity` : O.type === 'engine' ? ` and ${O.space} engine capacity` : ''}.`;
+const engineLine = (O) => (O.type === 'engine' ? `Thrust ${O.thrust} · steering ${O.steer}` : '');
 function weaponLine(O) {
   if (O.type !== 'weapon') return '';
   if (O.mount === 'bay') return `Missile bay — always secondary, needs a target lock · ${O.salvo} × ${O.dmg} dmg per salvo · ${(O.range / 1000).toFixed(1)} km · ${O.rof} s reload · ${O.ammoPer} missile${O.ammoPer > 1 ? 's' : ''} per shot`;
   return `${O.mount === 'turret' ? 'Turret — tracks targets on its own' : 'Fixed gun — aims up to 6° off the nose'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
 }
-const mountType = (O) => (O.type !== 'weapon' ? 'Utility' : O.mount === 'bay' ? 'Missile bay · secondary' : `${O.mount === 'gun' ? 'Fixed gun' : 'Turret'} · ${O.group === 'primary' ? 'primary' : 'secondary'} by default`);
+const mountType = (O) => (O.type !== 'weapon' ? CAT_NAME[O.cat] : O.mount === 'bay' ? 'Missile bay · secondary' : `${O.mount === 'gun' ? 'Fixed gun' : 'Turret'} · ${O.group === 'primary' ? 'primary' : 'secondary'} by default`);
 const roleName = (fit, k, j) => (roleOf(fit, k, j) === 'primary' ? 'PRIMARY' : 'SECONDARY');
 
 function renderDock() {
@@ -1167,8 +1202,8 @@ function renderDock() {
       <button data-a="repair" ${repairCost() === 0 || G.credits < repairCost() ? 'disabled' : ''}>Repair (${fmtIsk(repairCost())})</button>
       <button data-a="rearm" ${rearmCost() === 0 || G.credits < rearmCost() ? 'disabled' : ''}>Rearm (${fmtIsk(rearmCost())})</button>
       <p style="margin-top:14px">${servicesText()}</p>`;
-    R.innerHTML = `<h3>Fitting</h3>${SLOT_KEYS.map((k) => fit[k].map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">${k.toUpperCase()}${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[k]}</span></span>${id && k !== 'u' ? `<span class="pr">${roleName(fit, k, i)}</span>` : ''}</div>`).join('')).join('')}
-      <h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}`;
+    R.innerHTML = `<h3>Fitting</h3>${SLOT_KEYS.map((k) => fit[k].map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">${k.toUpperCase()}${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[k]}</span></span>${id && MOUNT_KEYS.includes(k) ? `<span class="pr">${roleName(fit, k, i)}</span>` : ''}</div>`).join('')).join('')}
+      ${capBars(G.hull, fit)}<h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}`;
   } else if (D.tab === 'shipyard') {
     const Y0 = yardOf(), forSale = new Set(Y0.hulls);
     L.innerHTML = `<h3>${Y0.name}</h3>${[...Y0.hulls, ...Object.keys(G.owned).filter((id) => !forSale.has(id))].map((id) => {
@@ -1180,9 +1215,11 @@ function renderDock() {
     const s = fittedStats(D.browse, G.owned[D.browse] || emptyFit(D.browse));
     const f = G.owned[D.browse] || h.fit;
     R.innerHTML = `<h2>${h.name}</h2><div class="sub">${h.cls}</div><p>${h.desc}</p>
-      <table class="st">${SLOT_KEYS.map((k) => `<tr><td>${SLOT_HEAD[k]}</td><td>${h.fit[k].length}</td></tr>`).join('')}
+      <table class="st">${MOUNT_KEYS.map((k) => `<tr><td>${SLOT_HEAD[k]}</td><td>${h.fit[k].length}</td></tr>`).join('')}
+      ${['o', 'w', 'e'].map((k) => `<tr><td>${CAP_NAME[k][0].toUpperCase()}${CAP_NAME[k].slice(1)}</td><td>${own ? `${fitLoad(f)[k]} / ` : ''}${h.cap[k]}</td></tr>`).join('')}
       <tr><td>Cargo hold</td><td>${s.cargo} t</td></tr><tr><td>Passenger bunks</td><td>${s.bunks}</td></tr>
-      <tr><td>${own ? 'Fitted' : 'Stock'} weapons</td><td>${fitItems(f).filter((id) => OUTFITS[id].type === 'weapon').map((id) => OUTFITS[id].name).join(', ') || '—'}</td></tr></table>
+      <tr><td>${own ? 'Fitted' : 'Stock'} weapons</td><td>${fitItems(f).filter((id) => OUTFITS[id].type === 'weapon').map((id) => OUTFITS[id].name).join(', ') || '—'}</td></tr>
+      <tr><td>${own ? 'Fitted' : 'Stock'} engines</td><td>${f.e.map((id) => OUTFITS[id].name).join(', ') || '—'}</td></tr></table>
       ${statRows(s, D.browse === G.hull ? null : p.stats)}
       ${D.browse === G.hull ? '<button disabled>Active ship</button>' : own ? `<button data-a="board" class="primary">Board this ship</button><button data-a="sellship">Sell hull (${fmtIsk(h.price * 0.5)}, fittings to cargo)</button>`
     : forSale.has(D.browse) ? `<button data-a="buy" class="primary" ${G.credits < h.price ? 'disabled' : ''}>Buy &amp; board (${fmtIsk(h.price)})</button>` : '<button disabled>Not sold here</button>'}
@@ -1190,32 +1227,34 @@ function renderDock() {
   } else if (D.tab === 'jobs') {
     renderJobs(L, R);
   } else {
-    if (!fit[D.slot.k] || D.slot.i >= fit[D.slot.k].length) D.slot = { k: SLOT_KEYS.find((kk) => fit[kk].length) || 'u', i: 0 };
+    if (!fit[D.slot.k] || D.slot.i >= fit[D.slot.k].length) D.slot = { k: MOUNT_KEYS.find((kk) => fit[kk].length) || 'e', i: 0 };
+    if (!D.cat) D.cat = { g: 'gun', t: 'turret', m: 'bay', e: 'engine' }[D.slot.k] || 'reactor';
     const k = D.slot.k, i = D.slot.i;
-    const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${kk.toUpperCase()}${j + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[kk]}</span></span>${kk === 'g' || kk === 't' ? `<span class="pr role" data-a="role" data-slot="${kk}${j}" title="Switch firing role">${roleName(fit, kk, j)}</span>` : kk === 'm' ? '<span class="pr">SECONDARY</span>' : ''}</div>`;
+    const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${kk.toUpperCase()}${j + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[kk]}</span></span>${kk === 'g' || kk === 't' ? `<span class="pr role" data-a="role" data-slot="${kk}${j}" title="Switch firing role">${roleName(fit, kk, j)}</span>` : kk === 'm' ? '<span class="pr">SECONDARY</span>' : `<span class="pr">${OUTFITS[id].space}</span>`}</div>`;
     const inv = Object.entries(G.inventory).filter(([, n]) => n > 0);
-    L.innerHTML = `<h3>${H.name} — mounts</h3><p>Primary weapons fire on their own at hostiles in reach; secondary weapons fire on LMB / U. Click a role to switch it.</p>
-      ${SLOT_KEYS.filter((kk) => fit[kk].length).map((kk) => `<h3 style="margin-top:12px">${SLOT_HEAD[kk]}</h3>${fit[kk].map((id, j) => slotRow(kk, id, j)).join('')}`).join('')}
-      ${fit[k][i] ? '<button data-a="unfit">Unfit selected slot</button>' : ''}
+    L.innerHTML = `<h3>${H.name} — fitting</h3>${capBars(G.hull, fit)}<p>Weapons and engines count against outfit space as well as their own capacity. Primary weapons fire on their own at hostiles in reach; secondary weapons fire on LMB / U. Click a role to switch it.</p>
+      ${MOUNT_KEYS.filter((kk) => fit[kk].length).map((kk) => `<h3 style="margin-top:12px">${SLOT_HEAD[kk]}</h3>${fit[kk].map((id, j) => slotRow(kk, id, j)).join('')}`).join('')}
+      ${['e', 'u'].map((kk) => `<h3 style="margin-top:12px">${SLOT_HEAD[kk]}</h3>${fit[kk].map((id, j) => slotRow(kk, id, j)).join('') || `<p class="${kk === 'e' ? 'warn' : ''}">${kk === 'e' ? 'No engines: the ship cannot leave the dock.' : 'No systems fitted.'}</p>`}`).join('')}
+      ${fit[k]?.[i] ? `<button data-a="unfit">Unfit ${OUTFITS[fit[k][i]].name}</button>` : ''}
       <h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}
       ${inv.length ? `<h3>Cargo hold</h3>${inv.map(([id, n]) => `<div class="item" data-out="${id}"><span class="nm">${OUTFITS[id].name}</span><span class="pr own">×${n}</span></div>`).join('')}` : ''}`;
-    const list = Object.entries(OUTFITS).filter(([id]) => slotAccepts(k, id));
+    const list = Object.entries(OUTFITS).filter(([id]) => catOf(id) === D.cat).sort((x, y) => x[1].space - y[1].space || x[1].price - y[1].price);
     let det = '';
     if (D.preview && OUTFITS[D.preview]) {
-      const O = OUTFITS[D.preview], have = G.inventory[D.preview] > 0, avail = O.tech === 'basic' || isHigh(), fits = slotAccepts(k, D.preview);
-      const tf = cloneFit(fit); if (fits) tf[k][i] = D.preview;
-      det = `<h2 style="margin-top:12px">${O.name}</h2><div class="sub">${O.tech === 'high' ? 'HIGH-TECH · ' : ''}${mountType(O).toUpperCase()}</div><p>${O.desc}</p><p>${weaponLine(O)}</p>
-        ${O.type === 'utility' ? statRows(fittedStats(G.hull, tf), p.stats) : ''}
-        <button data-a="fit" class="primary" ${!fits || !avail || (!have && G.credits < O.price) || fit[k][i] === D.preview ? 'disabled' : ''}>${!fits ? 'No matching slot on this hull' : fit[k][i] === D.preview ? 'Fitted' : `${have ? 'Fit from cargo' : `Buy &amp; fit (${fmtIsk(O.price)})`} → ${k.toUpperCase()}${i + 1}`}</button>
-        ${!avail ? '<p>Only sold at high-tech stations.</p>' : ''}
+      const O = OUTFITS[D.preview], have = G.inventory[D.preview] > 0, avail = shopOk(O), plan = planFit(D.preview);
+      const stats = plan.tf && !plan.err ? fittedStats(G.hull, plan.tf) : null;
+      const where = plan.k ? (MOUNT_KEYS.includes(plan.k) ? `${plan.k.toUpperCase()}${plan.i + 1}` : SLOT_HEAD[plan.k].toLowerCase()) : '';
+      const label = plan.same ? 'Fitted' : plan.err || `${have ? 'Fit from cargo' : avail ? `Buy &amp; fit (${fmtIsk(O.price)})` : 'Not sold here'} → ${where}`;
+      det = `<h2 style="margin-top:12px">${O.name}</h2><div class="sub">${O.tech === 'high' ? 'HIGH-TECH · ' : ''}${O.shop === 'pirate' ? 'CLAN · ' : O.shop === 'corp' ? 'COMBINE · ' : ''}${mountType(O).toUpperCase()}</div><p>${O.desc}</p><p>${weaponLine(O)}${engineLine(O)}</p><p>${spaceLine(O)}</p>
+        ${O.type !== 'weapon' && stats ? statRows(stats, p.stats) : ''}
+        <button data-a="fit" class="primary" ${plan.err || plan.same || (!have && (!avail || G.credits < O.price)) ? 'disabled' : ''}>${label}</button>
+        ${!avail && !have ? `<p>${shopNote(O)}</p>` : ''}
         ${have ? `<button data-a="sell">Sell one from cargo (${fmtIsk(O.price * 0.5)})</button>` : ''}`;
     }
-    const type = SLOT_HEAD[k].toLowerCase();
-    R.innerHTML = `<h3>${isHigh() ? 'Helion outfitter' : 'Basic outfitter'} — ${type}</h3>${list.map(([id, O]) => {
-      const avail = O.tech === 'basic' || isHigh();
-      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${mountType(O)}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
-        <span class="pr${G.inventory[id] ? ' own' : ''}">${G.inventory[id] ? `×${G.inventory[id]} in cargo` : fmtIsk(O.price)}</span></div>`;
-    }).join('')}${det}`;
+    R.innerHTML = `<h3>${G.dockedAt.dock === 'pirate' ? 'Black-market outfitter' : isHigh() ? 'Helion outfitter' : 'Basic outfitter'}</h3>
+      <div class="dtabs ocats">${OUTFIT_CATS.map(([c, n]) => `<b data-cat="${c}" class="${D.cat === c ? 'on' : ''}">${n}</b>`).join('')}</div>
+      ${list.map(([id, O]) => `<div class="item${D.preview === id ? ' on' : ''}${shopOk(O) || G.inventory[id] ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${O.space} space${O.type === 'engine' ? ` · thrust ${O.thrust}` : ''}${O.tech === 'high' ? ' · High-tech' : ''}${O.shop === 'pirate' ? ' · Clan' : O.shop === 'corp' ? ' · Combine' : ''}</div></span>
+        <span class="pr${G.inventory[id] ? ' own' : ''}">${G.inventory[id] ? `×${G.inventory[id]} in cargo` : fmtIsk(O.price)}</span></div>`).join('')}${det}`;
   }
   slotMarkers();
 }
@@ -1224,14 +1263,14 @@ function slotMarkers() {
   const s = hangar.ship;
   if (D.tab === 'services' || D.tab === 'jobs' || !s) { hangar.setSlots(null); return; }
   const fit = D.tab === 'shipyard' ? (G.owned[D.browse] || HULLS[D.browse].fit) : G.owned[G.hull];
-  const list = SLOT_KEYS.flatMap((k) => (s.slots ? s.slots[k] : []).slice(0, fit[k].length).map((h, i) => ({ k, i, ...h })));
+  const list = MOUNT_KEYS.flatMap((k) => (s.slots ? s.slots[k] : []).slice(0, fit[k].length).map((h, i) => ({ k, i, ...h })));
   hangar.setSlots(list, D.tab === 'outfitter' ? D.slot : null, D.focusSlot);
   D.focusSlot = false;
 }
 
 function setDockTab(tab) {
   if (tab === 'shipyard' && !yardOf()) { flashDockMsg('No shipyard here — the star map lists shipyards under Facilities'); return; }
-  D.tab = tab; D.preview = null;
+  D.tab = tab; D.preview = null; D.cat = null;
   hangar.setOutfit(null);
   if (tab === 'shipyard') { D.browse = D.browse || G.hull; if (D.shown !== D.browse) hangarShow(D.browse); } else if (D.shown !== G.hull) hangarShow(G.hull);
   audio.ui();
@@ -1548,7 +1587,7 @@ function rebuildPlayer() {
 $('docktop').addEventListener('click', (ev) => { const b = ev.target.closest('.dtabs b'); if (b) setDockTab(b.dataset.tab); });
 for (const id of ['dockleft', 'dockright']) {
   $(id).addEventListener('click', (ev) => {
-    const t = ev.target.closest('[data-a],[data-hull],[data-slot],[data-out]');
+    const t = ev.target.closest('[data-a],[data-hull],[data-slot],[data-out],[data-cat]');
     if (!t) return;
     const fit = G.owned[G.hull];
     if (t.dataset.j) { jobAction(t.dataset.a, t.dataset.j); audio.ui(); renderDock(); return; }
@@ -1558,14 +1597,13 @@ for (const id of ['dockleft', 'dockright']) {
       D.slot = { k, i }; D.preview = fit[k][i];
       rebuildPlayer(); hangarShow(G.hull, true); audio.ui(); renderDock(); return;
     }
+    if (t.dataset.cat) { D.cat = t.dataset.cat; D.preview = null; hangar.setOutfit(null); audio.ui(); renderDock(); return; }
     if (t.dataset.hull) { D.browse = t.dataset.hull; hangarShow(D.browse); audio.ui(); }
-    else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.focusSlot = true; hangar.setOutfit(null); audio.ui(); }
+    else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.cat = cur ? catOf(cur) : { g: 'gun', t: 'turret', m: 'bay' }[D.slot.k] || D.cat; D.focusSlot = MOUNT_KEYS.includes(D.slot.k); hangar.setOutfit(null); audio.ui(); }
     else if (t.dataset.out) {
-      const O = OUTFITS[t.dataset.out];
-      if (!slotAccepts(D.slot.k, t.dataset.out)) {
-        const kk = SLOT_KEYS.find((x) => fit[x].length && slotAccepts(x, t.dataset.out));
-        if (kk) D.slot = { k: kk, i: Math.max(0, fit[kk].indexOf(null)) };
-      }
+      const kk = MOUNT_OF_CAT[catOf(t.dataset.out)];
+      if (kk && D.slot.k !== kk && fit[kk].length) { D.slot = { k: kk, i: Math.max(0, fit[kk].indexOf(null)) }; D.focusSlot = true; }
+      D.cat = catOf(t.dataset.out);
       D.preview = t.dataset.out; hangar.setOutfit(outfitPreview(D.preview, G.player.ship.M)); audio.ui();
     } else {
       const a = t.dataset.a, k = D.slot.k, i = D.slot.i;
@@ -1582,19 +1620,21 @@ for (const id of ['dockleft', 'dockright']) {
         hud.log(`Sold ${h.cls} ${h.name} for ${fmtIsk(h.price * 0.5)}`, 'g');
       }
       if (a === 'fit' && D.preview) {
-        const id = D.preview, O = OUTFITS[id];
-        if (!slotAccepts(k, id)) return;
+        const id = D.preview, O = OUTFITS[id], plan = planFit(id);
+        if (plan.err || plan.same) { if (plan.err) flashDockMsg(plan.err); renderDock(); return; }
         const have = G.inventory[id] > 0;
-        if (have) G.inventory[id]--; else if (G.credits >= O.price) G.credits -= O.price; else return;
-        const old = fit[k][i];
-        const tf = cloneFit(fit); tf[k][i] = id;
-        if (!capOk(G.hull, tf)) { if (have) G.inventory[id]++; else G.credits += O.price; flashDockMsg('Removing that module would leave active cargo or passengers without space'); renderDock(); return; }
-        if (old) G.inventory[old] = (G.inventory[old] || 0) + 1;
-        fit[k][i] = id;
-        if (fit.r[k]) fit.r[k][i] = O.group;
+        if (have) G.inventory[id]--; else if (shopOk(O) && G.credits >= O.price) G.credits -= O.price; else return;
+        if (plan.old) G.inventory[plan.old] = (G.inventory[plan.old] || 0) + 1;
+        G.owned[G.hull] = plan.tf;
+        if (!MOUNT_KEYS.includes(plan.k)) D.slot = { k: plan.k, i: plan.i };
         rebuildPlayer(); hangarShow(G.hull, true); hangar.setOutfit(null);
       }
-      if (a === 'unfit') { const old = fit[k][i]; const tf = cloneFit(fit); tf[k][i] = null; if (old && !capOk(G.hull, tf)) { flashDockMsg('Active cargo or passengers need that module'); renderDock(); return; } if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; fit[k][i] = null; rebuildPlayer(); hangarShow(G.hull, true); } }
+      if (a === 'unfit') {
+        const old = fit[k][i], tf = cloneFit(fit);
+        if (MOUNT_KEYS.includes(k)) tf[k][i] = null; else tf[k].splice(i, 1);
+        if (old && !capOk(G.hull, tf)) { flashDockMsg('Active cargo or passengers need that module'); renderDock(); return; }
+        if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; G.owned[G.hull] = tf; D.preview = null; rebuildPlayer(); hangarShow(G.hull, true); }
+      }
       if (a === 'sell' && D.preview && G.inventory[D.preview] > 0) { G.inventory[D.preview]--; G.credits += OUTFITS[D.preview].price * 0.5; }
       audio.ui();
     }
@@ -1624,7 +1664,10 @@ function enterDocked() {
   hangar.snap();
   renderDock();
 }
-$('undock').onclick = () => { $('docked').classList.add('hidden'); undock(); };
+$('undock').onclick = () => {
+  if (!G.player.stats.thrust) { flashDockMsg('Fit an engine before undocking'); return; }
+  $('docked').classList.add('hidden'); undock();
+};
 
 function undock() {
   const p = G.player;
@@ -1890,6 +1933,7 @@ function frame(now) {
     // capacitor and shield regeneration
     p.cap = Math.min(p.maxCap, p.cap + p.stats.capRegen * dt);
     if (G.time - p.lastHit > 4 && p.alive) p.shield = Math.min(p.maxShield, p.shield + p.stats.shieldRegen * dt);
+    if (p.stats.armorRegen && p.alive) p.armor = Math.min(p.maxArmor, p.armor + p.stats.armorRegen * dt);
     for (const e of G.entities) {
       if (e === p || !e.alive) continue;
       if (e.obj.position.distanceTo(p.obj.position) < 80000 || e.kind === 'hauler') updateAI(e, dt);

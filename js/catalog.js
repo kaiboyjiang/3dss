@@ -173,42 +173,132 @@ export const HULL_ORDER = ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'm
 // mount: gun = forward-fixed with a small gimbal, turret = free-tracking, bay = missile bay (always secondary).
 // group is the default firing role: primary = fires automatically at hostiles, secondary = fires on LMB / U. tech: basic (any station) / high (shipyard stations only)
 export const OUTFITS = {
-  pulse: { name: 'Pulse Laser Turret', type: 'weapon', mount: 'turret', group: 'primary', turret: 'laser', price: 45000, tech: 'basic', bolt: 'laser', dmg: 22, rof: 0.16, cap: 6, speed: 3200, range: 5200, track: 2.6, spread: 0.002, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Twin-barrel pulsed laser turret. Tracks and engages hostiles automatically; cheap on capacitor.' },
-  blaster: { name: 'Pulse Blaster', type: 'weapon', mount: 'gun', group: 'primary', turret: 'laser', scale: 1.1, price: 60000, tech: 'basic', bolt: 'laser', dmg: 30, rof: 0.18, cap: 7, speed: 3600, range: 5500, track: 3, spread: 0.0015, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Fixed forward pulse cannon. Fires along the bow and auto-aims when the target is near the reticle.' },
-  heavypulse: { name: 'Heavy Pulse Turret', type: 'weapon', mount: 'turret', group: 'primary', turret: 'laser', scale: 1.35, price: 190000, tech: 'high', bolt: 'laser', dmg: 46, rof: 0.28, cap: 12, speed: 3400, range: 6500, track: 1.9, spread: 0.0015, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Up-scaled pulse laser turret with heavier focusing optics. Double the damage per shot; engages automatically.' },
-  auto: { name: 'Rotary Autocannon', type: 'weapon', mount: 'gun', group: 'primary', turret: 'auto', price: 85000, tech: 'basic', bolt: 'tracer', dmg: 8, rof: 0.065, cap: 0, speed: 2800, range: 3800, track: 3.2, spread: 0.007, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Six-barrel kinetic cannon. Huge rate of fire and no capacitor draw, short range.' },
-  rail: { name: 'Railgun', type: 'weapon', mount: 'gun', group: 'secondary', turret: 'rail', scale: 0.9, price: 120000, tech: 'basic', hitscan: true, ammo: true, dmg: 175, rof: 1.6, cap: 45, range: 9000, track: 1.6, spread: 0, profile: 'kinetic', flash: 0x80c0ff, sound: 'rail', desc: 'Magnetic coil accelerator firing tungsten slugs at near-instant velocity. Uses rail ammo.' },
-  plasma: { name: 'Plasma Lance', type: 'weapon', mount: 'gun', group: 'secondary', turret: 'plasma', scale: 0.85, price: 420000, tech: 'high', bolt: 'plasma', dmg: 330, rof: 2.6, cap: 120, speed: 1900, range: 6500, track: 1.3, spread: 0.001, profile: 'thermal', flash: 0x60ffa0, sound: 'plasma', desc: 'Magnetically contained plasma bolt. Devastating thermal damage, slow projectile, heavy capacitor cost.' },
-  flak: { name: 'Flak Turret', type: 'weapon', mount: 'turret', group: 'primary', turret: 'flak', price: 70000, tech: 'basic', bolt: 'tracer', dmg: 9, pellets: 4, rof: 0.24, cap: 0, speed: 2400, range: 2600, track: 3.4, spread: 0.03, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Twin-barrel flak mount. Bursts of shrapnel shells that shred fast, close targets. Engages automatically.' },
-  beam: { name: 'Beam Laser Turret', type: 'weapon', mount: 'turret', group: 'primary', turret: 'beam', scale: 1.1, price: 260000, tech: 'high', bolt: 'laser', dmg: 60, rof: 0.45, cap: 16, speed: 5200, range: 8000, track: 1.6, spread: 0.0008, profile: 'em', flash: 0x80b0ff, sound: 'laser', desc: 'Long-focus emitter with a crystal lens. Hard-hitting, very long range turret that engages automatically.' },
-  scatter: { name: 'Scatter Cannon', type: 'weapon', mount: 'gun', group: 'primary', turret: 'scatter', price: 75000, tech: 'basic', bolt: 'tracer', dmg: 11, pellets: 6, rof: 0.45, cap: 4, speed: 2600, range: 3200, track: 3, spread: 0.035, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Quad-barrel fixed shotgun. A devastating cone of slugs at close range.' },
-  gauss: { name: 'Gauss Cannon', type: 'weapon', mount: 'gun', group: 'secondary', turret: 'gauss', scale: 0.9, price: 150000, tech: 'basic', bolt: 'tracer', dmg: 140, rof: 1.1, cap: 30, speed: 4600, range: 7000, track: 1.4, spread: 0.0005, profile: 'kinetic', flash: 0xffc070, sound: 'rail', desc: 'Fixed coilgun firing heavy ferrous slugs. Long range, no ammunition required.' },
-  srm: { name: 'Missile Bay', type: 'weapon', mount: 'bay', group: 'secondary', bay: 'srm', price: 90000, tech: 'basic', tubes: 2, salvo: 2, dmg: 150, rof: 4, mspeed: 850, range: 10000, ammoPer: 1, desc: 'Armoured twin-cell bay of guided anti-ship missiles. Needs a full target lock; fires a pair per salvo.' },
-  swarm: { name: 'Swarm Rocket Pod', type: 'weapon', mount: 'bay', group: 'secondary', bay: 'swarm', price: 110000, tech: 'basic', tubes: 6, salvo: 4, dmg: 70, rof: 5, mspeed: 1000, range: 8000, ammoPer: 1, desc: 'Six-cell pod of fast, light seekers. Four at a time saturate point defence on small craft.' },
-  torp: { name: 'Torpedo Bay', type: 'weapon', mount: 'bay', group: 'secondary', bay: 'torp', price: 320000, tech: 'high', tubes: 1, salvo: 1, dmg: 620, rof: 9, mspeed: 620, range: 8000, ammoPer: 3, desc: 'Single heavy anti-capital torpedo. Slow and expensive (3 missiles of ammunition per shot), but it guts cruisers.' },
-  shieldext: { name: 'Shield Extender', type: 'utility', price: 60000, tech: 'basic', mods: { shield: 350 }, desc: '+350 shield HP.' },
-  armorplate: { name: 'Reinforced Armor Plates', type: 'utility', price: 55000, tech: 'basic', mods: { armor: 450, speedMul: 0.94 }, desc: '+450 armor HP, −6% max velocity.' },
-  capbattery: { name: 'Capacitor Battery', type: 'utility', price: 50000, tech: 'basic', mods: { cap: 400 }, desc: '+400 capacitor.' },
-  sensor: { name: 'Sensor Booster', type: 'utility', price: 70000, tech: 'basic', mods: { lockMul: 0.55, lockRange: 15000 }, desc: '−45% lock time, +15 km lock range.' },
-  caprecharger: { name: 'Capacitor Recharger', type: 'utility', price: 140000, tech: 'high', mods: { capRegenMul: 1.45 }, desc: '+45% capacitor recharge.' },
-  shieldbooster: { name: 'Shield Booster', type: 'utility', price: 160000, tech: 'high', mods: { shieldRegenMul: 1.8 }, desc: '+80% shield regeneration.' },
-  cargopod: { name: 'Expanded Cargo Pod', type: 'utility', price: 40000, tech: 'basic', mods: { cargo: 40 }, desc: '+40 t cargo capacity.' },
-  bunkmod: { name: 'Passenger Bunk Module', type: 'utility', price: 45000, tech: 'basic', mods: { bunks: 8 }, desc: '+8 passenger bunks.' },
-  overdrive: { name: 'Overdrive Injector', type: 'utility', price: 150000, tech: 'high', mods: { speedMul: 1.15, boostMul: 1.1 }, desc: '+15% max velocity, +10% afterburner.' },
+  pulse: { name: 'Pulse Laser Turret', type: 'weapon', space: 8, mount: 'turret', group: 'primary', turret: 'laser', price: 45000, tech: 'basic', bolt: 'laser', dmg: 22, rof: 0.16, cap: 6, speed: 3200, range: 5200, track: 2.6, spread: 0.002, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Twin-barrel pulsed laser turret. Tracks and engages hostiles automatically; cheap on capacitor.' },
+  blaster: { name: 'Pulse Blaster', type: 'weapon', space: 8, mount: 'gun', group: 'primary', turret: 'laser', scale: 1.1, price: 60000, tech: 'basic', bolt: 'laser', dmg: 30, rof: 0.18, cap: 7, speed: 3600, range: 5500, track: 3, spread: 0.0015, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Fixed forward pulse cannon. Fires along the bow and auto-aims when the target is near the reticle.' },
+  heavypulse: { name: 'Heavy Pulse Turret', type: 'weapon', space: 18, mount: 'turret', group: 'primary', turret: 'laser', scale: 1.35, price: 190000, tech: 'high', bolt: 'laser', dmg: 46, rof: 0.28, cap: 12, speed: 3400, range: 6500, track: 1.9, spread: 0.0015, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Up-scaled pulse laser turret with heavier focusing optics. Double the damage per shot; engages automatically.' },
+  auto: { name: 'Rotary Autocannon', type: 'weapon', space: 7, mount: 'gun', group: 'primary', turret: 'auto', price: 85000, tech: 'basic', bolt: 'tracer', dmg: 8, rof: 0.065, cap: 0, speed: 2800, range: 3800, track: 3.2, spread: 0.007, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Six-barrel kinetic cannon. Huge rate of fire and no capacitor draw, short range.' },
+  rail: { name: 'Railgun', type: 'weapon', space: 14, mount: 'gun', group: 'secondary', turret: 'rail', scale: 0.9, price: 120000, tech: 'basic', hitscan: true, ammo: true, dmg: 175, rof: 1.6, cap: 45, range: 9000, track: 1.6, spread: 0, profile: 'kinetic', flash: 0x80c0ff, sound: 'rail', desc: 'Magnetic coil accelerator firing tungsten slugs at near-instant velocity. Uses rail ammo.' },
+  plasma: { name: 'Plasma Lance', type: 'weapon', space: 30, mount: 'gun', group: 'secondary', turret: 'plasma', scale: 0.85, price: 420000, tech: 'high', bolt: 'plasma', dmg: 330, rof: 2.6, cap: 120, speed: 1900, range: 6500, track: 1.3, spread: 0.001, profile: 'thermal', flash: 0x60ffa0, sound: 'plasma', desc: 'Magnetically contained plasma bolt. Devastating thermal damage, slow projectile, heavy capacitor cost.' },
+  flak: { name: 'Flak Turret', type: 'weapon', space: 9, mount: 'turret', group: 'primary', turret: 'flak', price: 70000, tech: 'basic', bolt: 'tracer', dmg: 9, pellets: 4, rof: 0.24, cap: 0, speed: 2400, range: 2600, track: 3.4, spread: 0.03, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Twin-barrel flak mount. Bursts of shrapnel shells that shred fast, close targets. Engages automatically.' },
+  beam: { name: 'Beam Laser Turret', type: 'weapon', space: 22, mount: 'turret', group: 'primary', turret: 'beam', scale: 1.1, price: 260000, tech: 'high', bolt: 'laser', dmg: 60, rof: 0.45, cap: 16, speed: 5200, range: 8000, track: 1.6, spread: 0.0008, profile: 'em', flash: 0x80b0ff, sound: 'laser', desc: 'Long-focus emitter with a crystal lens. Hard-hitting, very long range turret that engages automatically.' },
+  scatter: { name: 'Scatter Cannon', type: 'weapon', space: 8, mount: 'gun', group: 'primary', turret: 'scatter', price: 75000, tech: 'basic', bolt: 'tracer', dmg: 11, pellets: 6, rof: 0.45, cap: 4, speed: 2600, range: 3200, track: 3, spread: 0.035, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Quad-barrel fixed shotgun. A devastating cone of slugs at close range.' },
+  gauss: { name: 'Gauss Cannon', type: 'weapon', space: 14, mount: 'gun', group: 'secondary', turret: 'gauss', scale: 0.9, price: 150000, tech: 'basic', bolt: 'tracer', dmg: 140, rof: 1.1, cap: 30, speed: 4600, range: 7000, track: 1.4, spread: 0.0005, profile: 'kinetic', flash: 0xffc070, sound: 'rail', desc: 'Fixed coilgun firing heavy ferrous slugs. Long range, no ammunition required.' },
+  srm: { name: 'Missile Bay', type: 'weapon', space: 10, mount: 'bay', group: 'secondary', bay: 'srm', price: 90000, tech: 'basic', tubes: 2, salvo: 2, dmg: 150, rof: 4, mspeed: 850, range: 10000, ammoPer: 1, desc: 'Armoured twin-cell bay of guided anti-ship missiles. Needs a full target lock; fires a pair per salvo.' },
+  swarm: { name: 'Swarm Rocket Pod', type: 'weapon', space: 12, mount: 'bay', group: 'secondary', bay: 'swarm', price: 110000, tech: 'basic', tubes: 6, salvo: 4, dmg: 70, rof: 5, mspeed: 1000, range: 8000, ammoPer: 1, desc: 'Six-cell pod of fast, light seekers. Four at a time saturate point defence on small craft.' },
+  torp: { name: 'Torpedo Bay', type: 'weapon', space: 26, mount: 'bay', group: 'secondary', bay: 'torp', price: 320000, tech: 'high', tubes: 1, salvo: 1, dmg: 620, rof: 9, mspeed: 620, range: 8000, ammoPer: 3, desc: 'Single heavy anti-capital torpedo. Slow and expensive (3 missiles of ammunition per shot), but it guts cruisers.' },
+  shieldext: { name: 'Shield Extender', type: 'utility', cat: 'shield', space: 10, price: 60000, tech: 'basic', mods: { shield: 350 }, desc: '+350 shield HP.' },
+  armorplate: { name: 'Reinforced Armor Plates', type: 'utility', cat: 'armor', space: 12, price: 55000, tech: 'basic', mods: { armor: 450, speedMul: 0.94 }, desc: '+450 armor HP, −6% max velocity.' },
+  capbattery: { name: 'Capacitor Battery', type: 'utility', cat: 'battery', space: 8, price: 50000, tech: 'basic', mods: { cap: 400 }, desc: '+400 capacitor.' },
+  sensor: { name: 'Sensor Booster', type: 'utility', cat: 'sensor', space: 6, price: 70000, tech: 'basic', mods: { lockMul: 0.55, lockRange: 15000 }, desc: '−45% lock time, +15 km lock range.' },
+  caprecharger: { name: 'Capacitor Recharger', type: 'utility', cat: 'reactor', space: 10, price: 140000, tech: 'high', mods: { capRegenMul: 1.45 }, desc: '+45% capacitor recharge.' },
+  shieldbooster: { name: 'Shield Booster', type: 'utility', cat: 'shield', space: 12, price: 160000, tech: 'high', mods: { shieldRegenMul: 1.8 }, desc: '+80% shield regeneration.' },
+  cargopod: { name: 'Expanded Cargo Pod', type: 'utility', cat: 'system', space: 10, price: 40000, tech: 'basic', mods: { cargo: 40 }, desc: '+40 t cargo capacity.' },
+  bunkmod: { name: 'Passenger Bunk Module', type: 'utility', cat: 'system', space: 10, price: 45000, tech: 'basic', mods: { bunks: 8 }, desc: '+8 passenger bunks.' },
+  overdrive: { name: 'Overdrive Injector', type: 'engine', cat: 'engine', space: 8, thrust: 0, steer: 0, price: 150000, tech: 'high', mods: { speedMul: 1.15, boostMul: 1.1 }, desc: '+15% max velocity, +10% afterburner.' },
+  // ---- more guns
+  lpulse: { name: 'Light Pulse Gun', type: 'weapon', space: 5, mount: 'gun', group: 'primary', turret: 'laser', scale: 0.85, price: 30000, tech: 'basic', bolt: 'laser', dmg: 16, rof: 0.15, cap: 4, speed: 3400, range: 4800, track: 3.2, spread: 0.002, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Compact fixed pulse emitter. Weak, but light enough to fit on anything.' },
+  massdriver: { name: 'Mass Driver', type: 'weapon', space: 9, mount: 'gun', group: 'primary', turret: 'gauss', scale: 0.75, price: 55000, tech: 'basic', bolt: 'tracer', dmg: 34, rof: 0.42, cap: 3, speed: 3600, range: 5200, track: 2.6, spread: 0.002, profile: 'kinetic', flash: 0xffc070, sound: 'cannon', desc: 'Simple electromagnetic slug thrower. Steady kinetic damage for almost no capacitor.' },
+  ion: { name: 'Ion Cannon', type: 'weapon', space: 12, mount: 'gun', group: 'primary', turret: 'plasma', scale: 0.7, price: 140000, tech: 'basic', bolt: 'plasma', dmg: 60, rof: 0.6, cap: 18, speed: 2600, range: 5600, track: 2.2, spread: 0.001, profile: 'em', flash: 0x80c0ff, sound: 'plasma', desc: 'Fires charged ion packets that tear through shields.' },
+  neutron: { name: 'Neutron Blaster', type: 'weapon', space: 24, mount: 'gun', group: 'secondary', turret: 'plasma', scale: 1.0, price: 360000, tech: 'high', bolt: 'plasma', dmg: 210, rof: 1.4, cap: 70, speed: 2300, range: 6000, track: 1.6, spread: 0.001, profile: 'thermal', flash: 0xa0ff80, sound: 'plasma', desc: 'Heavy thermal blaster. Smaller and faster-firing than a Plasma Lance, but still a capacitor hog.' },
+  hrail: { name: 'Heavy Railgun', type: 'weapon', space: 24, mount: 'gun', group: 'secondary', turret: 'rail', scale: 1.15, price: 300000, tech: 'high', hitscan: true, ammo: true, dmg: 320, rof: 2.4, cap: 80, range: 11000, track: 1.2, spread: 0, profile: 'kinetic', flash: 0x80c0ff, sound: 'rail', desc: 'Long-barrel coil accelerator for cruisers. Huge alpha strike at extreme range. Uses rail ammo.' },
+  shredder: { name: 'Clan Shredder', type: 'weapon', space: 9, mount: 'gun', group: 'primary', turret: 'scatter', scale: 1.1, price: 50000, tech: 'basic', shop: 'pirate', bolt: 'tracer', dmg: 9, pellets: 8, rof: 0.5, cap: 2, speed: 2400, range: 2800, track: 3, spread: 0.045, profile: 'kinetic', flash: 0xff9040, sound: 'cannon', desc: 'Welded-together shotgun cannon loaded with scrap. Brutal up close. Clan ports only.' },
+  autogun: { name: 'Combine Autogun Mk.I', type: 'weapon', space: 6, mount: 'gun', group: 'primary', turret: 'auto', scale: 0.85, price: 40000, tech: 'basic', shop: 'corp', bolt: 'tracer', dmg: 6, rof: 0.08, cap: 0, speed: 2600, range: 3400, track: 3, spread: 0.009, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Mass-produced rotary gun. Cheap, light and mediocre. Combine ports only.' },
+  // ---- more turrets
+  pd: { name: 'Point-Defense Turret', type: 'weapon', space: 5, mount: 'turret', group: 'primary', turret: 'flak', scale: 0.75, price: 35000, tech: 'basic', bolt: 'tracer', dmg: 6, pellets: 3, rof: 0.16, cap: 0, speed: 2600, range: 2000, track: 4.5, spread: 0.03, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Tiny fast-slewing flak mount for swatting fighters at knife range.' },
+  gatling: { name: 'Gatling Turret', type: 'weapon', space: 12, mount: 'turret', group: 'primary', turret: 'auto', price: 95000, tech: 'basic', bolt: 'tracer', dmg: 9, rof: 0.07, cap: 0, speed: 2800, range: 3600, track: 3.0, spread: 0.008, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Rotary cannon on a tracking mount. No capacitor draw.' },
+  iont: { name: 'Ion Turret', type: 'weapon', space: 14, mount: 'turret', group: 'primary', turret: 'laser', scale: 1.15, price: 150000, tech: 'basic', bolt: 'laser', dmg: 40, rof: 0.4, cap: 12, speed: 3000, range: 5800, track: 2.0, spread: 0.0015, profile: 'em', flash: 0x80c0ff, sound: 'laser', desc: 'Tracking ion emitter. Strips shields fast.' },
+  hflak: { name: 'Heavy Flak Turret', type: 'weapon', space: 18, mount: 'turret', group: 'primary', turret: 'flak', scale: 1.35, price: 160000, tech: 'high', bolt: 'tracer', dmg: 14, pellets: 6, rof: 0.3, cap: 0, speed: 2400, range: 3200, track: 2.8, spread: 0.035, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Large-calibre flak battery. Walls of shrapnel around the ship.' },
+  hbeam: { name: 'Heavy Beam Turret', type: 'weapon', space: 34, mount: 'turret', group: 'secondary', turret: 'beam', scale: 1.4, price: 520000, tech: 'high', bolt: 'laser', dmg: 140, rof: 0.8, cap: 40, speed: 6000, range: 9500, track: 1.2, spread: 0.0006, profile: 'em', flash: 0x80b0ff, sound: 'laser', desc: 'Capital-grade beam emitter. Enormous range and damage, and a mount to match.' },
+  mdturret: { name: 'Mass Driver Turret', type: 'weapon', space: 22, mount: 'turret', group: 'secondary', turret: 'gauss', scale: 1.2, price: 240000, tech: 'high', bolt: 'tracer', dmg: 120, rof: 1.0, cap: 25, speed: 4400, range: 7500, track: 1.4, spread: 0.0006, profile: 'kinetic', flash: 0xffc070, sound: 'rail', desc: 'Turreted heavy coilgun. Slow to traverse, hits hard at long range.' },
+  clanburst: { name: 'Clan Burst Turret', type: 'weapon', space: 12, mount: 'turret', group: 'primary', turret: 'laser', scale: 1.1, price: 70000, tech: 'basic', shop: 'pirate', bolt: 'laser', dmg: 26, rof: 0.14, cap: 9, speed: 3000, range: 4600, track: 2.4, spread: 0.006, profile: 'thermal', flash: 0xff7040, sound: 'laser', desc: 'Overcharged, badly shielded laser. Sprays hot bolts. Clan ports only.' },
+  // ---- more missile bays
+  hsrm: { name: 'Heavy Missile Bay', type: 'weapon', space: 18, mount: 'bay', group: 'secondary', bay: 'srm', price: 220000, tech: 'high', tubes: 4, salvo: 3, dmg: 200, rof: 5, mspeed: 800, range: 12000, ammoPer: 1, desc: 'Four-cell bay of long-range heavy missiles. Three per salvo.' },
+  rocketrack: { name: 'Clan Rocket Rack', type: 'weapon', space: 10, mount: 'bay', group: 'secondary', bay: 'swarm', price: 70000, tech: 'basic', shop: 'pirate', tubes: 6, salvo: 6, dmg: 50, rof: 6, mspeed: 950, range: 6500, ammoPer: 1, desc: 'Open rack of dumb-fire-grade seekers, emptied all at once. Clan ports only.' },
+  // ---- engines: thrust drives acceleration and top speed, steer drives turn rate
+  ions: { name: 'Ion Thruster S', type: 'engine', cat: 'engine', space: 6, thrust: 10, steer: 10, price: 30000, tech: 'basic', desc: 'Small, reliable ion thruster. Standard on light hulls.' },
+  ionm: { name: 'Ion Thruster M', type: 'engine', cat: 'engine', space: 14, thrust: 24, steer: 22, price: 70000, tech: 'basic', desc: 'Mid-size ion thruster for frigates and freighters.' },
+  ionl: { name: 'Ion Thruster L', type: 'engine', cat: 'engine', space: 30, thrust: 54, steer: 46, price: 160000, tech: 'basic', desc: 'Large ion thruster block for cruisers.' },
+  fuss: { name: 'Fusion Drive S', type: 'engine', cat: 'engine', space: 7, thrust: 14, steer: 12, price: 65000, tech: 'basic', desc: 'Compact fusion drive. More thrust per tonne than ion.' },
+  fusm: { name: 'Fusion Drive M', type: 'engine', cat: 'engine', space: 16, thrust: 34, steer: 28, price: 150000, tech: 'high', desc: 'Military fusion drive for frigates and destroyers.' },
+  fusl: { name: 'Fusion Drive L', type: 'engine', cat: 'engine', space: 34, thrust: 76, steer: 60, price: 340000, tech: 'high', desc: 'Heavy fusion drive for cruisers and battlecruisers.' },
+  capdrive: { name: 'Capital Drive Block', type: 'engine', cat: 'engine', space: 64, thrust: 120, steer: 96, price: 520000, tech: 'basic', desc: 'Huge clustered drive block for battleships and dreadnoughts.' },
+  torch: { name: 'Plasma Torch', type: 'engine', cat: 'engine', space: 18, thrust: 30, steer: 12, price: 260000, tech: 'high', mods: { boostMul: 1.3 }, desc: 'Plasma drive with a savage afterburner. Steers poorly.' },
+  vector: { name: 'Vector Thruster Array', type: 'engine', cat: 'engine', space: 6, thrust: 2, steer: 18, price: 55000, tech: 'basic', desc: 'Gimballed manoeuvring thrusters. Almost no forward thrust, lots of turn.' },
+  salvage: { name: 'Clan Salvage Burner', type: 'engine', cat: 'engine', space: 12, thrust: 22, steer: 16, price: 40000, tech: 'basic', shop: 'pirate', mods: { sigMul: 1.1 }, desc: 'Stripped from a wreck and bolted back together. Cheap thrust, loud signature. Clan ports only.' },
+  combinedrive: { name: 'Combine Standard Drive Unit', type: 'engine', cat: 'engine', space: 12, thrust: 16, steer: 13, price: 35000, tech: 'basic', shop: 'corp', desc: 'Cheapest drive in the Combine catalogue. Heavy for its output. Combine ports only.' },
+  // ---- reactors
+  fission: { name: 'Fission Pile', type: 'utility', cat: 'reactor', model: 'caprecharger', space: 8, price: 40000, tech: 'basic', mods: { capRegen: 8 }, desc: '+8 GJ/s capacitor recharge.' },
+  fusionr: { name: 'Fusion Reactor', type: 'utility', cat: 'reactor', model: 'caprecharger', space: 16, price: 110000, tech: 'basic', mods: { capRegen: 20 }, desc: '+20 GJ/s capacitor recharge.' },
+  hfusionr: { name: 'Heavy Fusion Reactor', type: 'utility', cat: 'reactor', model: 'caprecharger', space: 34, price: 260000, tech: 'high', mods: { capRegen: 45 }, desc: '+45 GJ/s capacitor recharge.' },
+  antimatter: { name: 'Antimatter Core', type: 'utility', cat: 'reactor', model: 'caprecharger', space: 28, price: 650000, tech: 'high', mods: { capRegen: 75 }, desc: '+75 GJ/s capacitor recharge in a smaller package. Very expensive.' },
+  scrapreactor: { name: 'Clan Scrap Reactor', type: 'utility', cat: 'reactor', model: 'caprecharger', space: 22, price: 60000, tech: 'basic', shop: 'pirate', mods: { capRegen: 26, sigMul: 1.15 }, desc: '+26 GJ/s, +15% signature from the leaking shielding. Clan ports only.' },
+  combinecell: { name: 'Combine Mk.II Power Cell', type: 'utility', cat: 'reactor', model: 'caprecharger', space: 14, price: 50000, tech: 'basic', shop: 'corp', mods: { capRegen: 14 }, desc: '+14 GJ/s capacitor recharge. Combine ports only.' },
+  // ---- shields
+  shields: { name: 'Light Shield Emitter', type: 'utility', cat: 'shield', model: 'shieldext', space: 5, price: 30000, tech: 'basic', mods: { shield: 180 }, desc: '+180 shield HP.' },
+  shieldl: { name: 'Heavy Shield Extender', type: 'utility', cat: 'shield', model: 'shieldext', space: 24, price: 160000, tech: 'basic', mods: { shield: 900 }, desc: '+900 shield HP.' },
+  capshield: { name: 'Capital Shield Array', type: 'utility', cat: 'shield', model: 'shieldbooster', space: 55, price: 480000, tech: 'high', mods: { shield: 2400 }, desc: '+2,400 shield HP. Built for capital ships.' },
+  adaptive: { name: 'Adaptive Shield Matrix', type: 'utility', cat: 'shield', model: 'shieldbooster', space: 14, price: 300000, tech: 'high', mods: { shield: 450, shieldRegenMul: 1.3 }, desc: '+450 shield HP, +30% shield regeneration.' },
+  shieldrech: { name: 'Shield Recharger', type: 'utility', cat: 'shield', model: 'shieldbooster', space: 8, price: 70000, tech: 'basic', mods: { shieldRegen: 12 }, desc: '+12 HP/s shield regeneration.' },
+  // ---- armour
+  armors: { name: 'Light Armor Plating', type: 'utility', cat: 'armor', model: 'armorplate', space: 6, price: 25000, tech: 'basic', mods: { armor: 200, speedMul: 0.985 }, desc: '+200 armor HP, −1.5% max velocity.' },
+  armorh: { name: 'Heavy Armor Slab', type: 'utility', cat: 'armor', model: 'armorplate', space: 30, price: 150000, tech: 'basic', mods: { armor: 1200, speedMul: 0.9 }, desc: '+1,200 armor HP, −10% max velocity.' },
+  ablative: { name: 'Ablative Ceramic Plating', type: 'utility', cat: 'armor', model: 'armorplate', space: 14, price: 220000, tech: 'high', mods: { armor: 600 }, desc: '+600 armor HP with no speed penalty.' },
+  nanorep: { name: 'Nanite Armor Repairer', type: 'utility', cat: 'armor', model: 'shieldbooster', space: 12, price: 240000, tech: 'high', mods: { armorRegen: 6 }, desc: 'Repairs 6 armor HP/s in flight.' },
+  bracing: { name: 'Hull Bracing Frame', type: 'utility', cat: 'armor', model: 'armorplate', space: 10, price: 60000, tech: 'basic', mods: { hull: 350 }, desc: '+350 hull HP.' },
+  scrapplate: { name: 'Clan Scrap Plating', type: 'utility', cat: 'armor', model: 'armorplate', space: 20, price: 40000, tech: 'basic', shop: 'pirate', mods: { armor: 750, speedMul: 0.92, sigMul: 1.1 }, desc: '+750 armor HP, −8% max velocity, +10% signature. Clan ports only.' },
+  combineplate: { name: 'Combine Pressed Plate', type: 'utility', cat: 'armor', model: 'armorplate', space: 12, price: 30000, tech: 'basic', shop: 'corp', mods: { armor: 380, speedMul: 0.96 }, desc: '+380 armor HP, −4% max velocity. Combine ports only.' },
+  // ---- batteries
+  bats: { name: 'Small Capacitor Cell', type: 'utility', cat: 'battery', model: 'capbattery', space: 4, price: 20000, tech: 'basic', mods: { cap: 200 }, desc: '+200 capacitor.' },
+  batl: { name: 'Capacitor Bank', type: 'utility', cat: 'battery', model: 'capbattery', space: 18, price: 120000, tech: 'basic', mods: { cap: 1000 }, desc: '+1,000 capacitor.' },
+  supercell: { name: 'Superconducting Cell', type: 'utility', cat: 'battery', model: 'capbattery', space: 8, price: 230000, tech: 'high', mods: { cap: 800 }, desc: '+800 capacitor in a tiny package.' },
+  // ---- sensors
+  lrarray: { name: 'Long-Range Sensor Array', type: 'utility', cat: 'sensor', model: 'sensor', space: 14, price: 140000, tech: 'high', mods: { lockRange: 30000 }, desc: '+30 km lock range.' },
+  tcomp: { name: 'Targeting Computer', type: 'utility', cat: 'sensor', model: 'sensor', space: 5, price: 90000, tech: 'basic', mods: { lockMul: 0.7 }, desc: '−30% lock time.' },
+  ecm: { name: 'ECM Jammer', type: 'utility', cat: 'sensor', model: 'sensor', space: 8, price: 160000, tech: 'high', mods: { sigMul: 0.75 }, desc: '−25% signature: harder to lock, takes less missile damage.' },
+  spoofer: { name: 'Clan Signal Spoofer', type: 'utility', cat: 'sensor', model: 'sensor', space: 6, price: 70000, tech: 'basic', shop: 'pirate', mods: { sigMul: 0.85 }, desc: '−15% signature. Clan ports only.' },
+  // ---- systems
+  cargol: { name: 'Cargo Bay Expansion', type: 'utility', cat: 'system', model: 'cargopod', space: 28, price: 110000, tech: 'basic', mods: { cargo: 120 }, desc: '+120 t cargo capacity.' },
+  cabin: { name: 'Luxury Cabin Block', type: 'utility', cat: 'system', model: 'bunkmod', space: 24, price: 160000, tech: 'high', mods: { bunks: 20 }, desc: '+20 passenger bunks.' },
+  smuggler: { name: "Smuggler's Compartment", type: 'utility', cat: 'system', model: 'cargopod', space: 6, price: 60000, tech: 'basic', shop: 'pirate', mods: { cargo: 20 }, desc: '+20 t hidden cargo space. Clan ports only.' },
+
 };
 
-export const SLOT_KEYS = ['g', 't', 'm', 'u'];
+export const MOUNT_KEYS = ['g', 't', 'm'];
+export const SLOT_KEYS = ['g', 't', 'm', 'e', 'u'];
 export const SLOT_MOUNT = { g: 'gun', t: 'turret', m: 'bay' };
 const KEY_OF = { gun: 'g', turret: 't', bay: 'm' };
-export const SLOT_NAME = { g: 'Gun', t: 'Turret', m: 'Missile bay', u: 'Utility' };
-export const slotAccepts = (k, id) => !!OUTFITS[id] && (k === 'u' ? OUTFITS[id].type === 'utility' : OUTFITS[id].mount === SLOT_MOUNT[k]);
+export const SLOT_NAME = { g: 'Gun', t: 'Turret', m: 'Missile bay', e: 'Engine', u: 'System' };
+export const OUTFIT_CATS = [['gun', 'Guns'], ['turret', 'Turrets'], ['bay', 'Missile bays'], ['engine', 'Engines'], ['reactor', 'Reactors'], ['shield', 'Shields'], ['armor', 'Armor'], ['battery', 'Batteries'], ['sensor', 'Sensors'], ['system', 'Systems']];
+export const catOf = (id) => (OUTFITS[id].type === 'weapon' ? OUTFITS[id].mount : OUTFITS[id].cat);
+export const slotAccepts = (k, id) => !!OUTFITS[id] && (k === 'u' ? OUTFITS[id].type === 'utility' : k === 'e' ? OUTFITS[id].type === 'engine' : OUTFITS[id].mount === SLOT_MOUNT[k]);
+export const CAP_NAME = { o: 'outfit space', w: 'weapon capacity', e: 'engine capacity' };
+
+const STOCK_ENGINES = {
+  hornet: ['ions', 'ions'], wisp: ['fuss', 'fuss'], kestrel: ['fuss', 'fuss', 'vector'], corvid: ['fuss', 'ions'], valkyrie: ['ionm'], mule: ['ionm'],
+  mantis: ['ionm', 'ions'], warden: ['ionl'], sabre: ['fusm', 'fusm'], aurora: ['ionl'], atlas: ['ionl', 'ionm'], bastion: ['ionl', 'ionm'], paladin: ['fusl'],
+  sovereign: ['capdrive'], leviathan: ['capdrive', 'ionl'], raider: ['salvage'], cutlass: ['salvage'], reaver: ['salvage', 'salvage'],
+  marauder: ['salvage', 'salvage', 'salvage'], ravager: ['capdrive', 'salvage'], unit: ['combinedrive'], enforcer: ['combinedrive', 'combinedrive'],
+  crate: ['combinedrive', 'combinedrive'], commuter: ['combinedrive', 'combinedrive', 'combinedrive'], compliance: ['combinedrive', 'combinedrive', 'combinedrive'],
+};
+const ceil5 = (x) => Math.ceil(x / 5) * 5;
+const MOUNT_MIN = { g: 7, t: 8, m: 10 };
+const sumOf = (ids, f) => ids.reduce((n, id) => n + (id ? OUTFITS[id][f] || 0 : 0), 0);
 
 // Hulls still described with a legacy generic weapon list get typed gun/turret slots from each stock weapon's mount,
-// plus missile bays placed on their old launcher points.
-for (const H of Object.values(HULLS)) {
-  if (!H.fit.w) continue;
-  H.hpKinds = H.fit.w.map((id) => (id && OUTFITS[id].mount === 'gun' ? 'g' : 't'));
-  H.fit = { g: H.fit.w.filter((_, i) => H.hpKinds[i] === 'g'), t: H.fit.w.filter((_, i) => H.hpKinds[i] === 't'), m: H.bays || [], u: H.fit.u };
+// plus missile bays placed on their old launcher points. Capacities are sized so the stock fit leaves some headroom,
+// and the stock engines define the hull's rated thrust (its listed speed, acceleration and agility).
+for (const [hid, H] of Object.entries(HULLS)) {
+  if (H.fit.w) {
+    H.hpKinds = H.fit.w.map((id) => (id && OUTFITS[id].mount === 'gun' ? 'g' : 't'));
+    H.fit = { g: H.fit.w.filter((_, i) => H.hpKinds[i] === 'g'), t: H.fit.w.filter((_, i) => H.hpKinds[i] === 't'), m: H.bays || [], u: H.fit.u };
+  }
+  const sys = H.fit.u.length;
+  H.fit.e = STOCK_ENGINES[hid] || ['ionm'];
+  H.fit.u = [];
+  const w = MOUNT_KEYS.reduce((n, k) => n + H.fit[k].reduce((a, id) => a + Math.max(id ? OUTFITS[id].space : 0, MOUNT_MIN[k]), 0), 0);
+  const e = sumOf(H.fit.e, 'space');
+  H.cap = { o: ceil5(w + e + sys * 14), w: ceil5(w * 1.15), e: ceil5(e * 1.25) };
+  H.rated = { thrust: sumOf(H.fit.e, 'thrust'), steer: sumOf(H.fit.e, 'steer') };
 }
 
 export function roleOf(fit, k, i) {
@@ -221,32 +311,52 @@ export function roleOf(fit, k, i) {
 
 export function emptyFit(hullId) {
   const f = HULLS[hullId].fit;
-  const d = { g: [...f.g], t: [...f.t], m: [...f.m], u: [...f.u] };
+  const d = { g: [...f.g], t: [...f.t], m: [...f.m], e: [...f.e], u: [...f.u] };
   d.r = { g: d.g.map((id) => (id ? OUTFITS[id].group : 'primary')), t: d.t.map((id) => (id ? OUTFITS[id].group : 'primary')) };
   return d;
 }
 
 export function bareFit(hullId) {
   const d = emptyFit(hullId);
-  for (const k of SLOT_KEYS) d[k] = d[k].map(() => null);
+  for (const k of MOUNT_KEYS) d[k] = d[k].map(() => null);
+  d.e = []; d.u = [];
   return d;
 }
 
-export const cloneFit = (f) => ({ g: [...f.g], t: [...f.t], m: [...f.m], u: [...f.u], r: { g: [...f.r.g], t: [...f.r.t] } });
+export const cloneFit = (f) => ({ g: [...f.g], t: [...f.t], m: [...f.m], e: [...f.e], u: [...f.u], r: { g: [...f.r.g], t: [...f.r.t] } });
+export const fitItems = (f) => SLOT_KEYS.flatMap((k) => f[k] || []).filter(Boolean);
 
-// Validates a saved fit against the hull. Legacy { w, u } fits are redistributed by each weapon's mount;
-// anything that no longer has a slot is pushed to `spare` so the caller can return it to the cargo hold.
+export function fitLoad(f) {
+  const L = { o: 0, w: 0, e: 0 };
+  for (const id of fitItems(f)) {
+    const O = OUTFITS[id];
+    L.o += O.space;
+    if (O.type === 'weapon') L.w += O.space;
+    if (O.type === 'engine') L.e += O.space;
+  }
+  return L;
+}
+
+export function fitProblem(hullId, f) {
+  const C = HULLS[hullId].cap, L = fitLoad(f);
+  for (const k of ['w', 'e', 'o']) if (L[k] > C[k]) return `Needs ${L[k] - C[k]} more ${CAP_NAME[k]}`;
+  return '';
+}
+
+// Validates a saved fit against the hull. Legacy { w, u } fits are redistributed by each weapon's mount; saves without
+// engines get the stock engines. Anything without a slot, or beyond the hull's capacities, is pushed to `spare` so the
+// caller can return it to the cargo hold.
 export function normFit(hullId, f, spare = []) {
   const d = emptyFit(hullId);
   if (!f || typeof f !== 'object') return d;
-  const valid = (k, x) => x === null || slotAccepts(k, x);
+  const loose = [];
   if (Array.isArray(f.g) || Array.isArray(f.t) || Array.isArray(f.m)) {
-    for (const k of SLOT_KEYS) {
+    for (const k of MOUNT_KEYS) {
       if (!Array.isArray(f[k])) continue;
-      d[k] = d[k].map((_, i) => null);
+      d[k] = d[k].map(() => null);
       f[k].forEach((x, i) => {
         if (x === null || x === undefined) return;
-        if (i < d[k].length && valid(k, x)) d[k][i] = x; else if (OUTFITS[x]) spare.push(x);
+        if (i < d[k].length && slotAccepts(k, x)) d[k][i] = x; else if (OUTFITS[x]) spare.push(x);
       });
     }
     for (const k of ['g', 't']) {
@@ -255,9 +365,7 @@ export function normFit(hullId, f, spare = []) {
         return v === 'primary' || v === 'secondary' ? v : id ? OUTFITS[id].group : 'primary';
       });
     }
-    return d;
-  }
-  if (Array.isArray(f.w)) {
+  } else if (Array.isArray(f.w)) {
     d.g = d.g.map(() => null); d.t = d.t.map(() => null);
     for (const x of f.w) {
       if (!x || !OUTFITS[x] || OUTFITS[x].type !== 'weapon') continue;
@@ -267,17 +375,23 @@ export function normFit(hullId, f, spare = []) {
     }
     d.r = { g: d.g.map((id) => (id ? OUTFITS[id].group : 'primary')), t: d.t.map((id) => (id ? OUTFITS[id].group : 'primary')) };
   }
-  if (Array.isArray(f.u)) {
-    d.u = d.u.map(() => null);
-    f.u.forEach((x, i) => {
-      if (x === null || x === undefined) return;
-      if (i < d.u.length && slotAccepts('u', x)) d.u[i] = x; else if (OUTFITS[x]) spare.push(x);
-    });
+  if (Array.isArray(f.e)) d.e = [];
+  if (Array.isArray(f.u)) d.u = [];
+  for (const x of [...(Array.isArray(f.e) ? f.e : []), ...(Array.isArray(f.u) ? f.u : [])]) if (x && OUTFITS[x]) loose.push(x);
+  for (const x of loose) {
+    const t = OUTFITS[x].type;
+    if (t === 'engine') d.e.push(x); else if (t === 'utility') d.u.push(x); else spare.push(x);
+  }
+  const C = HULLS[hullId].cap;
+  const over = () => { const L = fitLoad(d); return L.w > C.w ? 'w' : L.e > C.e ? 'e' : L.o > C.o ? 'o' : null; };
+  for (let k = over(); k; k = over()) {
+    if (k === 'e') { spare.push(d.e.pop()); continue; }
+    if (k === 'o' && d.u.length) { spare.push(d.u.pop()); continue; }
+    const mk = ['m', 't', 'g'].find((kk) => d[kk].some(Boolean));
+    if (mk) { const i = d[mk].map(Boolean).lastIndexOf(true); spare.push(d[mk][i]); d[mk][i] = null; } else if (d.e.length) spare.push(d.e.pop()); else break;
   }
   return d;
 }
-
-export const fitItems = (f) => SLOT_KEYS.flatMap((k) => f[k]).filter(Boolean);
 
 function socket(M, m, kind) {
   const k = new Kit();
@@ -320,7 +434,7 @@ export function mountSlots(ship, hullId) {
 }
 
 export function buildFitted(hullId, fit0, env, liv) {
-  const fit = fit0 && Array.isArray(fit0.g) && fit0.r ? fit0 : normFit(hullId, fit0);
+  const fit = fit0 && Array.isArray(fit0.g) && Array.isArray(fit0.e) && fit0.r ? fit0 : normFit(hullId, fit0);
   const ship = HULLS[hullId].build(env, liv);
   const S = mountSlots(ship, hullId);
   for (const k of ['g', 't']) {
@@ -350,11 +464,10 @@ export function buildFitted(hullId, fit0, env, liv) {
     ship.group.add(b.root);
     ship.missileBays.push(b);
   });
-  fit.u.forEach((id, i) => {
-    const m = S.u[i];
-    if (!m) return;
+  (S.u || []).forEach((m, i) => {
+    const id = fit.u[i];
     if (!id) { ship.group.add(socket(ship.M, m, 'u')); return; }
-    const g = buildOutfitModel(id, ship.M);
+    const g = buildOutfitModel(OUTFITS[id].model || id, ship.M);
     g.position.fromArray(m.p);
     if (m.flip) g.rotation.z = Math.PI;
     g.scale.setScalar(m.s);
@@ -365,28 +478,33 @@ export function buildFitted(hullId, fit0, env, liv) {
 
 export function outfitPreview(id, M) {
   const O = OUTFITS[id];
-  if (O.type !== 'weapon') return buildOutfitModel(id, M);
+  if (O.type !== 'weapon') return buildOutfitModel(O.model || (O.type === 'engine' ? 'engine' : id), M);
   return O.mount === 'bay' ? buildMissileBay(M, O, 1).root : O.mount === 'gun' ? buildGun(M, O.turret, 1).root : buildTurret(M, O.turret, 1).root;
 }
 
 export function fittedStats(hullId, fit) {
   const H = HULLS[hullId];
-  const s = { ...H.stats, turn: [...H.stats.turn], cls: H.cls, lockMul: 1, lockRange: H.stats.lockRange || 30000 };
-  for (const id of fit.u) {
-    if (!id) continue;
-    const m = OUTFITS[id].mods;
-    s.shield += m.shield || 0;
-    s.armor += m.armor || 0;
-    s.cap += m.cap || 0;
-    s.lockRange += m.lockRange || 0;
-    s.cargo += m.cargo || 0;
-    s.bunks += m.bunks || 0;
+  const s = { ...H.stats, turn: [...H.stats.turn], cls: H.cls, lockMul: 1, lockRange: H.stats.lockRange || 30000, armorRegen: 0 };
+  const mul = { capRegen: 1, shieldRegen: 1, speed: 1, boost: 1, sig: 1 };
+  let thrust = 0, steer = 0;
+  for (const id of [...(fit.e || []), ...(fit.u || [])]) {
+    const O = OUTFITS[id];
+    if (!O) continue;
+    const m = O.mods || {};
+    thrust += O.thrust || 0; steer += O.steer || 0;
+    for (const k of ['shield', 'armor', 'hull', 'cap', 'lockRange', 'cargo', 'bunks', 'capRegen', 'shieldRegen', 'armorRegen']) s[k] += m[k] || 0;
     s.lockMul *= m.lockMul || 1;
-    s.capRegen *= m.capRegenMul || 1;
-    s.shieldRegen *= m.shieldRegenMul || 1;
-    s.speed *= m.speedMul || 1;
-    s.boost *= m.boostMul || 1;
+    mul.capRegen *= m.capRegenMul || 1; mul.shieldRegen *= m.shieldRegenMul || 1;
+    mul.speed *= m.speedMul || 1; mul.boost *= m.boostMul || 1; mul.sig *= m.sigMul || 1;
   }
-  s.speed = Math.round(s.speed); s.boost = Math.round(s.boost);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const kt = thrust / H.rated.thrust, kv = clamp(Math.sqrt(kt), 0.1, 1.35), kr = clamp(Math.sqrt(steer / H.rated.steer), 0.15, 1.4);
+  s.accel = Math.round(s.accel * clamp(kt, 0.05, 2) * 10) / 10;
+  s.speed = Math.round(s.speed * kv * mul.speed);
+  s.boost = Math.round(s.boost * kv * mul.speed * mul.boost);
+  s.turn = s.turn.map((x) => x * kr);
+  s.capRegen *= mul.capRegen; s.shieldRegen *= mul.shieldRegen;
+  s.sig = Math.round(s.sig * mul.sig * 100) / 100;
+  s.thrust = thrust; s.steer = steer;
   return s;
 }

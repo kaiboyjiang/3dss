@@ -33,6 +33,18 @@ Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a de
 - Esc: pause and show controls
 - H: help
 
+## Fitting
+
+Every hull has three capacities, shown in the outfitter and shipyard:
+
+- **Outfit space**: the total size of everything fitted (weapons, engines and systems).
+- **Weapon capacity**: the total size of fitted guns, turrets and missile bays.
+- **Engine capacity**: the total size of fitted engines.
+
+Weapons and engines use their own capacity *and* outfit space, so a small hull cannot carry the heaviest weapons, and big guns leave less room for systems. Guns, turrets and missile bays still need a matching mount; engines and systems need only capacity. Engine thrust sets acceleration and top speed, and steering sets turn rate, relative to the hull's stock engines. A ship with no engines cannot undock.
+
+The outfitter sells guns, turrets, missile bays, engines, reactors, shields, armour, batteries, sensors and other systems. High-tech items are sold at high-tech stations, and Clan or Combine gear only at their own ports.
+
 ## Saving
 
 Every port has a job board: freight and passenger contracts to other ports (freighters like the Mule and Atlas have big cargo holds, the Aurora liner has 160 bunks, and cargo pods or passenger modules add space), sometimes at high risk of Clan hijackers who will board you and steal the load if your shields drop, plus bounties on Clan warlords flying Reavers and Ravager battleships. Accepted jobs mark their destination on the star map and have a jump deadline.

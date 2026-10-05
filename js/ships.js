@@ -1146,6 +1146,14 @@ export function buildOutfitModel(id, M) {
       k.add('metal', G.cyl(0.74, 0.74, 0.12, 20), mat([1.0, 0.95, 0], [0, 0, Math.PI / 2]));
       k.add('metal', G.cyl(0.74, 0.74, 0.12, 20), mat([-1.0, 0.95, 0], [0, 0, Math.PI / 2]));
       break;
+    case 'engine':
+      k.add('dark', G.rbox(2.0, 0.35, 3.0, 0.08), mat([0, 0.18, 0]));
+      k.add('hull', G.cyl(0.7, 0.8, 2.0, 24), mat([0, 0.95, 0.4], [Math.PI / 2, 0, 0]));
+      for (let i = 0; i < 3; i++) k.add('metal', G.torus(0.78, 0.06, 8, 28), mat([0, 0.95, -0.2 + i * 0.5]));
+      k.add('nozzle', G.lathe([[0.55, 0.4], [0.6, 0], [0.8, -0.5], [0.9, -0.9]], 28), mat([0, 0.95, -0.7], [Math.PI / 2, 0, 0]));
+      k.add('amber', G.cyl(0.55, 0.55, 0.04, 24), mat([0, 0.95, -0.72], [Math.PI / 2, 0, 0]));
+      k.add('accent', G.rbox(0.8, 0.3, 0.9, 0.06), mat([0, 1.75, 0.6]));
+      break;
     default:
       k.add('dark', G.box(1, 1, 1), mat(up));
   }
