@@ -1330,7 +1330,7 @@ $('respawn').onclick = () => {
   G.dockedAt = LOCATIONS.find((l) => l.id === G.dockId) || LOCATIONS.find((l) => l.dock);
   G.navTarget = null;
   hud.log(sv ? 'Clone revived. Everything has reverted to your last docked save.' : 'Clone revived.', 'i');
-  undock();
+  enterDocked();
 };
 
 // ---------------------------------------------------------------- input
