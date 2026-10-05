@@ -2,7 +2,6 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, LOCATIONS } from './world.js';
 import { SYSTEMS, GOVS, systemDef, route, allPorts, hops, fullRoute } from './systems.js';
 import { StarMap } from './map.js';
@@ -31,8 +30,10 @@ const GFX = {
   max: { label: 'Max', desc: 'Maximum graphics: full display resolution, 8× MSAA, soft high-resolution shadows, full asteroid belts.', prMax: 2, prMin: 0.85, msaa: 8, shadow: 2048, soft: true, sky: 1024, detail: 1, clouds: true, belt: 1, rockLod: 2.5, dust: 1, stars: 1 },
 };
 const SETTINGS_KEY = 'gvcsg-settings-v1';
-const settings = (() => { try { return { gfx: 'normal', fps: false, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { gfx: 'normal', fps: false }; } })();
+const FPS_CAPS = [30, 60];
+const settings = (() => { try { return { gfx: 'normal', fps: false, cap: 60, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') }; } catch { return { gfx: 'normal', fps: false, cap: 60 }; } })();
 if (!GFX[settings.gfx]) settings.gfx = 'normal';
+if (!FPS_CAPS.includes(settings.cap)) settings.cap = 60;
 let prMax = Math.min(window.devicePixelRatio || 1, GFX[settings.gfx].prMax), prMin = Math.min(prMax, GFX[settings.gfx].prMin);
 let pixelRatio = prMax;
 renderer.setPixelRatio(pixelRatio);
@@ -49,6 +50,7 @@ const camera = new THREE.PerspectiveCamera(68, window.innerWidth / window.innerH
 const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { type: THREE.HalfFloatType, samples: GFX[settings.gfx].msaa });
 const composer = new EffectComposer(renderer, rt);
 composer.addPass(new RenderPass(scene, camera));
+// final pass: lens effects plus the renderer's tone mapping and sRGB output, applied when drawing to the canvas
 const lensPass = new ShaderPass({
   uniforms: { tDiffuse: { value: null }, uWarp: { value: 0 }, uHit: { value: 0 }, uAspect: { value: 1 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
@@ -68,10 +70,11 @@ const lensPass = new ShaderPass({
       col *= 1.0 - smoothstep(0.35, 1.05, length(cc)) * 0.55;
       col = mix(col, col * vec3(1.5, 0.55, 0.45) + vec3(0.04, 0.0, 0.0), uHit * 0.45 * smoothstep(0.2, 0.9, length(cc)));
       gl_FragColor = vec4(max(col, 0.0), 1.0);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
     }`,
 });
 composer.addPass(lensPass);
-composer.addPass(new OutputPass());
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -1893,7 +1896,7 @@ function updateCamera(dt) {
 
 // ---------------------------------------------------------------- main loop
 let last = performance.now();
-// 60 fps cap plus adaptive render resolution
+// frame-rate cap plus adaptive render resolution
 const perf = { acc: 0, n: 0 };
 const fpsMeter = { n: 0, t: 0 };
 // menu and pause screens only redraw when something changed
@@ -1909,13 +1912,14 @@ function setMsaa(n) {
 function adaptResolution(ms) {
   perf.acc += ms; perf.n++;
   if (perf.acc < 2000) return;
-  const avg = perf.acc / perf.n;
+  const avg = perf.acc / perf.n, budget = 1000 / settings.cap;
   perf.acc = perf.n = 0;
   let pr = pixelRatio;
+  const slow = avg > budget * 1.26, fast = avg < budget * 1.05;
   // once resolution is at its floor, shed anti-aliasing: multisampled targets dominate fill cost on weak GPUs
-  if (avg > 21 && pr <= prMin && msaa > 0) { setMsaa(msaa > 4 ? 4 : msaa > 2 ? 2 : 0); return; }
-  if (avg > 21 && pr > prMin) pr = Math.max(prMin, pr - 0.1);
-  else if (avg < 17.5 && pr < prMax) pr = Math.min(prMax, pr + 0.05);
+  if (slow && pr <= prMin && msaa > 0) { setMsaa(msaa > 4 ? 4 : msaa > 2 ? 2 : 0); return; }
+  if (slow && pr > prMin) pr = Math.max(prMin, pr - 0.1);
+  else if (fast && pr < prMax) pr = Math.min(prMax, pr + 0.05);
   if (pr === pixelRatio) return;
   pixelRatio = pr;
   renderer.setPixelRatio(pr);
@@ -1924,7 +1928,7 @@ function adaptResolution(ms) {
 
 function frame(now) {
   requestAnimationFrame(frame);
-  if (now - last < 1000 / 62) return;
+  if (now - last < 1000 / (settings.cap + 2)) return;
   const ms = now - last;
   let dt = Math.min(0.05, ms / 1000);
   last = now;
@@ -2323,6 +2327,12 @@ function applyGfx(name) {
   for (const b of document.querySelectorAll('[data-gfx]')) b.classList.toggle('on', b.dataset.gfx === settings.gfx);
   for (const d of document.querySelectorAll('.opts .odesc')) d.textContent = q.desc;
 }
+function setCap(n) {
+  settings.cap = FPS_CAPS.includes(n) ? n : 60;
+  perf.acc = perf.n = 0;
+  for (const b of document.querySelectorAll('[data-cap]')) b.classList.toggle('on', +b.dataset.cap === settings.cap);
+  saveSettings();
+}
 function setFps(on) {
   settings.fps = on;
   $('fps').classList.toggle('hidden', !on);
@@ -2332,11 +2342,16 @@ function setFps(on) {
 }
 for (const el of document.querySelectorAll('.opts')) {
   el.innerHTML = `<span class="ol">Graphics</span><span class="seg">${Object.entries(GFX).map(([k, q]) => `<b data-gfx="${k}">${q.label}</b>`).join('')}</span>`
+    + `<span class="ol">Frame cap</span><span class="seg">${FPS_CAPS.map((n) => `<b data-cap="${n}" title="${n === 30 ? 'Halves GPU work: cooler and quieter on laptops' : 'Smoothest'}">${n}</b>`).join('')}</span>`
     + '<label class="chk"><input type="checkbox" data-fps> Show FPS</label><div class="odesc"></div>';
 }
-document.addEventListener('click', (ev) => { const b = ev.target.closest('[data-gfx]'); if (b) applyGfx(b.dataset.gfx); });
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('[data-gfx]'); if (b) applyGfx(b.dataset.gfx);
+  const c = ev.target.closest('[data-cap]'); if (c) setCap(+c.dataset.cap);
+});
 document.addEventListener('change', (ev) => { if (ev.target.matches('[data-fps]')) { setFps(ev.target.checked); ev.target.blur(); } });
 setFps(settings.fps);
+setCap(settings.cap);
 for (const b of document.querySelectorAll('[data-gfx]')) b.classList.toggle('on', b.dataset.gfx === settings.gfx);
 for (const d of document.querySelectorAll('.opts .odesc')) d.textContent = GFX[settings.gfx].desc;
 

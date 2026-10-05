@@ -53,13 +53,13 @@ The game auto-saves to browser local storage whenever you are docked (on docking
 
 ## Graphics
 
-The start menu and pause screen have a **Graphics** preset and a **Show FPS** toggle (frame rate and current render scale, bottom-right). Both are remembered in the browser.
+The start menu and pause screen have a **Graphics** preset, a **Frame cap** (30 or 60 fps; 30 roughly halves GPU work, so laptops run cooler and quieter) and a **Show FPS** toggle (frame rate and current render scale, bottom-right). All are remembered in the browser.
 
 - **Min**: for low-end hardware. 75% render scale, no shadows or anti-aliasing, low-res sky, simpler planet shading, no cloud layers, thinner asteroid belts and dust.
 - **Normal**: balance of looks and speed. Native render scale up to 1×, 4× MSAA, 1024 shadows.
 - **Max**: full display resolution (up to 2×), 8× MSAA, soft 2048 shadows, 1024 sky, extra planet detail, full belts.
 
-Render scale also adapts automatically within each preset's range to hold 60 fps.
+Render scale also adapts automatically within each preset's range to hold the frame cap.
 
 ## Local development
 
