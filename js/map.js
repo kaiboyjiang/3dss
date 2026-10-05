@@ -83,7 +83,8 @@ export class StarMap {
       <p>Security <b class="sec" style="color:${S.sec >= 0.5 ? '#6f6' : S.sec > 0 ? '#f0a020' : '#f44'}">${sec}</b></p>
       <p>Star: ${D.starInfo.name}</p>
       <h3>Bodies</h3>${D.planets.map((p) => `<p>${p.name} <span class="dim">${p.moon ? 'Moon' : p.label}${p.ring ? ', ringed' : ''}</span></p>`).join('')}
-      <h3>Facilities</h3>${D.stations.length ? D.stations.map((s) => `<p>${s.name}${s.dock === 'high' ? ' <span class="yard">Shipyard</span>' : ''}</p>`).join('') : '<p class="dim">None (lawless space)</p>'}
+      <h3>Facilities</h3>${D.stations.length ? D.stations.map((s) => `<p${s.dock === 'pirate' ? ' class="pir"' : ''}>${s.name}${s.yard ? ' <span class="yard">Shipyard</span>' : ''}${s.dock === 'pirate' ? ' <span class="dim">bribe to land</span>' : ''}</p>`).join('') : '<p class="dim">None</p>'}
+      ${G.jobs.filter((j) => j.to.sys === id).map((j) => `<p class="route">Job: ${j.type === 'bounty' ? `bounty on ${j.target.name}` : `deliver to ${j.to.name}`}</p>`).join('')}
       ${D.outposts.map((o) => `<p class="pir">${o.name}</p>`).join('')}
       ${routeTxt}`;
   }
@@ -140,6 +141,12 @@ export class StarMap {
       g.fillStyle = '#fff'; g.font = '13px "Mono Digits", "Chakra Petch", sans-serif'; g.fillText(n.name, x, y + 30);
       g.fillStyle = `rgb(${GOV_RGB[n.gov]})`; g.font = '9px "Mono Digits", "Chakra Petch", sans-serif'; g.fillText(`${GOVS[n.gov].short} · ${n.sec.toFixed(1)}`, x, y + 42);
       if (n.id === G.system) { g.fillStyle = '#dbdddf'; g.fillText('YOU ARE HERE', x, y - 22); }
+      if (G.jobs.some((j) => j.to.sys === n.id)) {
+        const bounty = G.jobs.some((j) => j.to.sys === n.id && j.type === 'bounty');
+        g.fillStyle = bounty ? '#f05040' : '#ffd060';
+        g.beginPath(); g.moveTo(x + 15, y - 21); g.lineTo(x + 20, y - 16); g.lineTo(x + 15, y - 11); g.lineTo(x + 10, y - 16); g.closePath(); g.fill();
+        g.font = '9px "Mono Digits", "Chakra Petch", sans-serif'; g.textAlign = 'left'; g.fillText(bounty ? 'BOUNTY' : 'JOB', x + 23, y - 13);
+      }
     }
   }
 }

@@ -4,10 +4,10 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, LOCATIONS } from './world.js';
-import { SYSTEMS, GOVS, systemDef, route } from './systems.js';
+import { SYSTEMS, GOVS, systemDef, route, allPorts, hops, fullRoute } from './systems.js';
 import { StarMap } from './map.js';
 import { buildRaider, buildCruiser, buildHauler, animateShip } from './ships.js';
-import { HULLS, HULL_ORDER, OUTFITS, emptyFit, buildFitted, outfitPreview, fittedStats } from './catalog.js';
+import { HULLS, OUTFITS, YARDS, emptyFit, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
 import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } from './combat.js';
 import { Audio } from './audio.js';
@@ -104,12 +104,16 @@ const G = {
   aimDir: new THREE.Vector3(0, 0, 1), aimPoint: new THREE.Vector3(), aimActive: false, mouseLocked: false,
   hull: 'valkyrie', owned: { valkyrie: emptyFit('valkyrie') }, inventory: {}, dockedAt: null,
   system: 'kaltos', explored: new Set(['kaltos']), routeTo: null, autoJump: null, dockSys: 'kaltos', dockId: 'station',
+  jobs: [], access: {}, jumps: 0, ambush: null, boardT: 0, bribe: null, bribeT: 0,
   nearestName: '', time: 0, shake: 0, hitFlash: 0,
 };
 
 const STATS = {
   raider: { cls: 'Corsair Raider', shield: 210, armor: 170, hull: 150, speed: 330, accel: 150, turn: 1.25, bounty: 18500, sig: 0.6 },
   cruiser: { cls: 'Corsair Marauder Cruiser', shield: 1700, armor: 2300, hull: 1900, speed: 95, accel: 20, turn: 0.22, bounty: 145000, sig: 3 },
+  cutlass: { cls: 'Cutlass Scrap Gunboat', shield: 300, armor: 300, hull: 240, speed: 320, accel: 140, turn: 1.15, bounty: 30000, sig: 0.75, hullId: 'cutlass', ai: 'fighter', gunDmg: 13 },
+  reaver: { cls: 'Reaver Boarding Frigate', shield: 1000, armor: 1300, hull: 950, speed: 200, accel: 55, turn: 0.55, bounty: 95000, sig: 1.4, hullId: 'reaver', ai: 'gunship', gunDmg: 24, orbit: 2600 },
+  ravager: { cls: 'Ravager Warlord Battleship', shield: 5500, armor: 7500, hull: 5600, speed: 80, accel: 12, turn: 0.16, bounty: 750000, sig: 5, hullId: 'ravager', ai: 'gunship', gunDmg: 55, orbit: 5000, scram: true },
   hauler: { cls: 'Bestower Hauler', shield: 500, armor: 1100, hull: 1000, speed: 140, accel: 15, turn: 0.28, bounty: 0, sig: 3 },
   navyKestrel: { cls: 'Helion Navy Kestrel', shield: 520, armor: 380, hull: 340, speed: 330, accel: 130, turn: 1.1, bounty: 0, sig: 0.6 },
   navyWarden: { cls: 'Helion Navy Warden', shield: 1800, armor: 1700, hull: 1300, speed: 175, accel: 50, turn: 0.4, bounty: 0, sig: 1.8 },
@@ -118,6 +122,7 @@ const STATS = {
   navyMantis: { cls: 'Helion Navy Mantis', shield: 1150, armor: 1150, hull: 850, speed: 210, accel: 72, turn: 0.75, bounty: 0, sig: 1.2 },
 };
 const NAVY_HULL = { navyKestrel: 'kestrel', navyWarden: 'warden', navyBastion: 'bastion', navyMantis: 'mantis', navySabre: 'sabre' };
+const pirateName = (kind) => (kind === 'raider' ? PIRATE_NAMES[Math.floor(Math.random() * PIRATE_NAMES.length)] : kind === 'cruiser' ? 'Corsair Marauder' : `Corsair ${HULLS[STATS[kind].hullId].name}`);
 const PIRATE_NAMES = ['Corsair Raider', 'Corsair Cutthroat', 'Corsair Wrecker', 'Corsair Outlaw', 'Corsair Plunderer', 'Corsair Despoiler'];
 const PROFILES = { em: { s: 1.25, a: 0.7, h: 1 }, kinetic: { s: 0.85, a: 1.2, h: 1 }, explosive: { s: 0.9, a: 1.1, h: 1.2 }, thermal: { s: 1.0, a: 0.95, h: 1.1 } };
 
@@ -136,6 +141,7 @@ function makeEntity(kind, faction, pos, name, civHull) {
     s = fittedStats(G.hull, fit);
   } else if (NAVY_HULL[kind]) ship = buildFitted(NAVY_HULL[kind], emptyFit(NAVY_HULL[kind]), env, 'navy');
   else if (civHull) ship = buildFitted(civHull, { w: [], u: [] }, env);
+  else if (s.hullId) ship = buildFitted(s.hullId, emptyFit(s.hullId), env);
   else ship = kind === 'raider' ? buildRaider(env) : kind === 'cruiser' ? buildCruiser(env) : buildHauler(env, 1 + Math.floor(Math.random() * 50));
   setShadows(ship.group);
   ship.group.position.copy(pos);
@@ -145,7 +151,7 @@ function makeEntity(kind, faction, pos, name, civHull) {
     vel: new THREE.Vector3(), angVel: new THREE.Vector3(), throttle: 0,
     shield: s.shield, armor: s.armor, hull: s.hull, maxShield: s.shield, maxArmor: s.armor, maxHull: s.hull,
     cap: s.cap || 0, maxCap: s.cap || 0, lastHit: -99, alive: true, stats: s,
-    ai: { state: 'idle', t: 0, fire: 0, missile: 6 + Math.random() * 4, home: pos.clone(), evade: new THREE.Vector3(), turretCd: [] },
+    ai: { state: 'idle', t: 0, seed: Math.random(), fire: 0, missile: 6 + Math.random() * 4, home: pos.clone(), evade: new THREE.Vector3(), turretCd: [] },
   };
   attachShield(e, faction === 'player' ? new THREE.Color(0.4, 0.9, 2.2) : faction === 'pirate' ? new THREE.Color(2.2, 0.8, 0.35) : new THREE.Color(0.8, 1.6, 1.0));
   G.entities.push(e);
@@ -209,11 +215,12 @@ function damage(e, amount, profile, hp, source) {
 }
 
 function destroy(e, source) {
-  const scale = e.kind === 'cruiser' ? 13 : e.kind === 'hauler' ? 9 : Math.max(3.2, e.ship.radius * 0.24);
+  const big = e.kind === 'cruiser' || e.kind === 'hauler' || e.ship.radius > 60;
+  const scale = e.kind === 'cruiser' || e.ship.radius > 60 ? 13 : e.kind === 'hauler' ? 9 : Math.max(3.2, e.ship.radius * 0.24);
   const pos = e.obj.position.clone();
   fx.explosion(pos, scale, e.vel.clone().multiplyScalar(0.5));
   audio.explosion(pos.distanceTo(camera.position), scale);
-  if (e.kind === 'cruiser' || e.kind === 'hauler') {
+  if (big) {
     for (let i = 1; i <= 5; i++) {
       setTimeout(() => {
         const p = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 80, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 120));
@@ -223,6 +230,7 @@ function destroy(e, source) {
     }
   }
   if (e === G.player) { playerDied(); return; }
+  if (e.ai.bountyJob) bountyKilled(e, source);
   if (source === G.player) {
     if (e.stats.bounty) {
       G.credits += e.stats.bounty; G.kills++;
@@ -507,11 +515,11 @@ function updateAI(e, dt) {
     const dir = tgt.sub(e.obj.position).normalize();
     steer(e, avoid(e, dir), dt, S.turn * 0.5);
     moveAI(e, dt, S.speed * 0.35, S.accel);
-    if (playerOk && dist < (e.kind === 'cruiser' ? 22000 : 16000)) { A.state = 'attack'; A.t = 0; if (e.kind === 'cruiser') hud.log(`${e.name} is targeting you!`, 'd'); }
+    if (playerOk && dist < (S.sig >= 1.4 ? 22000 : 16000)) { A.state = 'attack'; A.t = 0; if (S.sig >= 1.4) hud.log(`${e.name} is targeting you!`, 'd'); }
     return;
   }
   if (!playerOk) { A.state = 'idle'; A.home.copy(e.obj.position); return; }
-  if (e.kind === 'raider') {
+  if (e.kind === 'raider' || S.ai === 'fighter') {
     const lead = intercept(e.obj.position, e.vel, p.obj.position, p.vel, 2600) || p.obj.position;
     let dir;
     if (A.state === 'break') {
@@ -541,15 +549,15 @@ function updateAI(e, dt) {
       const from = _v3.setFromMatrixPosition(g.matrixWorld);
       const d = toLead.clone();
       d.x += (Math.random() - 0.5) * 0.02; d.y += (Math.random() - 0.5) * 0.02; d.z += (Math.random() - 0.5) * 0.02; d.normalize();
-      bolts.fire('pirate', from, d, 2600, e.vel, 3400, 10, e, 'thermal');
+      bolts.fire('pirate', from, d, 2600, e.vel, 3400, S.gunDmg || 10, e, 'thermal');
       fx.muzzle(from, d, 0xff5030, 1.6);
       audio.laser(from.distanceTo(camera.position), true);
     }
-  } else if (e.kind === 'cruiser') {
+  } else if (e.kind === 'cruiser' || S.ai === 'gunship') {
     // orbit the player at ~4.5 km, broadside towards them
     const radial = _v3.copy(toP).normalize();
     const tangent = new THREE.Vector3().crossVectors(radial, Y).normalize();
-    const dir = tangent.clone().addScaledVector(radial, (dist - 4500) / 2000).normalize();
+    const dir = tangent.clone().addScaledVector(radial, (dist - (S.orbit || 4500)) / 2000).normalize();
     steer(e, avoid(e, dir), dt, S.turn, 0.4);
     moveAI(e, dt, S.speed, S.accel);
     if (!A.turretCd.length) A.turretCd = e.ship.turrets.map(() => Math.random());
@@ -563,7 +571,7 @@ function updateAI(e, dt) {
         muzzleWorld(t, t.side, _v, _v2);
         const d = _v2.subVectors(lead, _v).normalize();
         d.x += (Math.random() - 0.5) * 0.012; d.y += (Math.random() - 0.5) * 0.012; d.normalize();
-        bolts.fire('heavy', _v, d, 2400, e.vel, 9000, 42, e, 'thermal');
+        bolts.fire('heavy', _v, d, 2400, e.vel, 9000, S.gunDmg || 42, e, 'thermal');
         fx.muzzle(_v, d, 0xff8020, 6);
         t.recoil[t.side] = 1;
         audio.laser(_v.distanceTo(camera.position), true);
@@ -591,8 +599,8 @@ function buildEncounters(def) {
   if (dg > 0) for (const loc of LOCATIONS.filter((l) => l.icon === 'belt')) {
     out.push({ loc, ships: [], timer: 0, wave: 0, spawn() {
       const n = 2 + dg + Math.min(3, this.wave), o = [];
-      if (dg >= 2 && this.wave >= 1) o.push(['cruiser', 3500]);
-      for (let i = 0; i < n; i++) o.push(['raider', 2500 + Math.random() * 3000]);
+      if (dg >= 2 && this.wave >= 1) o.push([Math.random() < 0.5 ? 'cruiser' : 'reaver', 3500]);
+      for (let i = 0; i < n; i++) o.push([Math.random() < 0.3 ? 'cutlass' : 'raider', 2500 + Math.random() * 3000]);
       return o;
     } });
   }
@@ -600,7 +608,8 @@ function buildEncounters(def) {
     out.push({ loc, ships: [], timer: 0, wave: 0, spawn() {
       const o = [['cruiser', 3000]];
       if (this.wave >= 2 || dg >= 3) o.push(['cruiser', 4200]);
-      for (let i = 0; i < 2 + dg + Math.min(3, this.wave); i++) o.push(['raider', 3500 + Math.random() * 2000]);
+      if (dg >= 2) o.push(['reaver', 3800]);
+      for (let i = 0; i < 2 + dg + Math.min(3, this.wave); i++) o.push([Math.random() < 0.35 ? 'cutlass' : 'raider', 3500 + Math.random() * 2000]);
       return o;
     } });
   }
@@ -626,15 +635,16 @@ function updateEncounters(dt) {
       for (const [kind, r] of spec) {
         const dir = new THREE.Vector3(Math.random() - 0.5, (Math.random() - 0.5) * 0.3, Math.random() - 0.5).normalize();
         const pos = center.clone().addScaledVector(dir, r);
-        const name = kind === 'cruiser' ? 'Corsair Marauder' : PIRATE_NAMES[Math.floor(Math.random() * PIRATE_NAMES.length)];
+        const name = pirateName(kind);
         const e = makeEntity(kind, 'pirate', pos, name);
         e.obj.lookAt(pp);
         e.vel.copy(fwdOf(e)).multiplyScalar(e.stats.speed * 0.5);
         e.ai.seed = Math.random();
         e.ai.state = 'attack';
         e.ai.home.copy(pos);
-        fx.flash(pos, kind === 'cruiser' ? 300 : 80, 0x88bbff, 0.6);
-        fx.shock(pos, kind === 'cruiser' ? 400 : 120, 1.0);
+        const sz = e.ship.radius > 25 ? 300 : 80;
+        fx.flash(pos, sz, 0x88bbff, 0.6);
+        fx.shock(pos, sz * 1.3, 1.0);
         enc.ships.push(e);
       }
       hud.log(`Warp signatures detected — ${spec.length} hostiles at ${enc.loc.name}`, 'd');
@@ -733,7 +743,7 @@ function warpTo(dest) {
   if (p.cap < 250) { hud.notice('INSUFFICIENT CAPACITOR FOR WARP', 1.8); return; }
   p.cap -= 200;
   // arrival point: just outside the destination on the side facing the ship
-  const dir = _v.subVectors(p.obj.position, dest.pos).normalize();
+  const dir = dest.up ? _v.copy(dest.up) : _v.subVectors(p.obj.position, dest.pos).normalize();
   const arrive = dest.pos.clone().addScaledVector(dir, dest.arrive).add(new THREE.Vector3((Math.random() - 0.5) * 600, (Math.random() - 0.5) * 300, (Math.random() - 0.5) * 600));
   G.warp = { dest, arrive, phase: 'align', speed: 0, t: 0, remaining: d, start: p.obj.position.clone() };
   G.lock = null;
@@ -861,7 +871,8 @@ function tryDock() {
   const range = st.dock === 'high' ? 4500 : 3500;
   if (d > range) { hud.notice(`DOCKING RANGE ${range / 1000} km — ${st.name.toUpperCase()} AT ${fmtDist(d)}`, 2); audio.beep(220, 0.15); return; }
   if (G.entities.some((e) => e.faction === 'pirate' && e.alive && e.ai.state === 'attack' && e.obj.position.distanceTo(p.obj.position) < 15000)) { hud.notice('CANNOT DOCK WHILE IN COMBAT', 2); return; }
-  hud.log(`Docking request accepted: ${st.name}`, 'i');
+  if (!bribeGate(st)) return;
+  hud.log(`${st.kind === 'port' ? 'Landing' : 'Docking'} request accepted: ${st.name}`, 'i');
   G.dockedAt = st;
   G.dockSys = G.system; G.dockId = st.id;
   G.state = 'docking';
@@ -873,11 +884,25 @@ function tryDock() {
   const bays = dock.bays.map((_, i) => bayWorld(dock, i));
   const b = bays.reduce((m, x) => (x.pos.clone().addScaledVector(x.dir, 900).distanceTo(pp) < m.pos.clone().addScaledVector(m.dir, 900).distanceTo(pp) ? x : m));
   const r = p.ship.radius;
+  const fwd = _v.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
+  if (b.pad) {
+    // come in high over the field, hover above the pad, then settle onto it
+    const A = b.pos.clone().addScaledVector(b.dir, r * 6 + 700);
+    const hover = b.pos.clone().addScaledVector(b.dir, r * 3 + 140);
+    const end = b.pos.clone().addScaledVector(b.dir, r * 0.45 + 2);
+    const dist = pp.distanceTo(A);
+    const path = [
+      seg(0.6, [pp.clone(), pp.clone().addScaledVector(fwd, THREE.MathUtils.clamp(dist * 0.35, 200, 1200)), A.clone().addScaledVector(b.dir, Math.max(300, dist * 0.3)), A]),
+      seg(0.2, [A, hover]),
+      seg(0.2, [hover, end]),
+    ];
+    startCine('docking', b, path, THREE.MathUtils.clamp(6 + dist / 700, 7, 11), `LANDING — ${st.name.toUpperCase()}`);
+    return;
+  }
   // line up on the bay axis outside the mouth, then fly straight in and stop inside the pod
   const end = b.pos.clone().addScaledVector(b.dir, -bayDepth(b, r));
   const A = b.pos.clone().addScaledVector(b.dir, r * 4 + 200);
   const dist = pp.distanceTo(A);
-  const fwd = _v.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
   const path = [
     seg(0.7, [pp.clone(), pp.clone().addScaledVector(fwd, THREE.MathUtils.clamp(dist * 0.35, 200, 1200)), A.clone().addScaledVector(b.dir, Math.max(lead(A.distanceTo(end), 0.3, 0.7), dist * 0.3)), A]),
     seg(0.3, [A, end]),
@@ -890,7 +915,9 @@ const cine = { mode: null, t: 0, dur: 1, path: null, bay: null, gate: null, to: 
 const _cq = new THREE.Quaternion(), _cm = new THREE.Matrix4(), _ct = new THREE.Vector3();
 function bayWorld(dock, i) {
   const st = dock.root, b = dock.bays[i];
-  return { pos: b.pos.clone().applyQuaternion(st.quaternion).add(st.position), dir: b.dir.clone().applyQuaternion(st.quaternion).normalize(), depth: b.depth, h: b.h };
+  const w = { pos: b.pos.clone().applyQuaternion(st.quaternion).add(st.position), dir: b.dir.clone().applyQuaternion(st.quaternion).normalize(), depth: b.depth, h: b.h, pad: !!b.pad };
+  if (b.pad) { w.fwd = b.fwd.clone().applyQuaternion(st.quaternion).normalize(); w.side = w.dir.clone().cross(w.fwd).normalize(); }
+  return w;
 }
 // how far inside the pod the ship parks
 const trailBack = (r) => r * 2.2 + 25;
@@ -929,7 +956,8 @@ function startCine(mode, bay, path, dur, caption) {
   if (Math.random() < 0.5) side.negate();
   Object.assign(cine, { mode, t: 0, dur, path, bay, ending: false, crossed: false });
   // a fixed external camera: beside the bay mouth for docking/undocking, off to one side of the gate for jumps
-  if (mode === 'docking' || mode === 'undocking') cine.ext.copy(bay.pos).addScaledVector(bay.dir, r * 5 + 260).addScaledVector(side, r * 2.5 + 110).addScaledVector(Y, r * 1.2 + 45);
+  if (bay.pad && (mode === 'docking' || mode === 'undocking')) cine.ext.copy(bay.pos).addScaledVector(bay.fwd, r * 7 + 380).addScaledVector(bay.side, (Math.random() < 0.5 ? -1 : 1) * (r * 3 + 200)).addScaledVector(bay.dir, r * 1.5 + 60);
+  else if (mode === 'docking' || mode === 'undocking') cine.ext.copy(bay.pos).addScaledVector(bay.dir, r * 5 + 260).addScaledVector(side, r * 2.5 + 110).addScaledVector(Y, r * 1.2 + 45);
   else cine.ext.copy(bay.pos).addScaledVector(bay.dir, mode === 'jumpout' ? -(r * 6 + 700) : r * 6 + 900).addScaledVector(side, r * 3 + 560).addScaledVector(Y, r * 2 + 160);
   cine.tEnd = -1;
   cine.q0.copy(p.obj.quaternion);
@@ -974,7 +1002,11 @@ function cineStep(dt) {
   const u = cine.t / cine.dur, s = cineEase(cine.mode, u);
   const tan = _v2;
   pathAt(cine.path, s, p.obj.position, tan);
-  _cm.lookAt(cine.mode === 'undocking' ? _v3.copy(B.dir).lerp(tan, 0.5).normalize() : tan, ORIGIN, Y);
+  if (B.pad) {
+    // stay level over a landing pad: heading follows the horizontal path, nose pitches only a little
+    const aim = _v3.copy(tan).projectOnPlane(B.dir).addScaledVector(B.fwd, 0.35).normalize().addScaledVector(B.dir, 0.3 * tan.dot(B.dir)).normalize();
+    _cm.lookAt(aim, ORIGIN, B.dir);
+  } else _cm.lookAt(cine.mode === 'undocking' ? _v3.copy(B.dir).lerp(tan, 0.5).normalize() : tan, ORIGIN, Y);
   _cq.setFromRotationMatrix(_cm);
   p.obj.quaternion.copy(cineIn(cine.mode) ? cine.q0.clone().slerp(_cq, Math.min(1, u * 3.5)) : _cq);
   if (dt > 0) p.vel.copy(p.obj.position).sub(cine.prev).divideScalar(dt);
@@ -1021,7 +1053,7 @@ function cineCamera() {
   if (!cine.mode) return;
   const u = cine.t / cine.dur;
   const w = cineIn(cine.mode) ? THREE.MathUtils.smoothstep(u, 0, 0.22) : 1 - THREE.MathUtils.smoothstep(u, 0.72, 1);
-  _m.lookAt(cine.cam, cine.look, Y);
+  _m.lookAt(cine.cam, cine.look, cine.bay?.pad ? cine.bay.dir : Y);
   _cq.setFromRotationMatrix(_m);
   if (cineIn(cine.mode)) {
     camera.position.lerpVectors(cine.c0, cine.cam, w);
@@ -1038,11 +1070,12 @@ function cineCamera() {
   camera.updateMatrixWorld();
 }
 
-const D = { tab: 'services', browse: 'valkyrie', slot: { k: 'w', i: 0 }, preview: null, shown: null };
+const D = { tab: 'services', browse: 'valkyrie', slot: { k: 'w', i: 0 }, preview: null, shown: null, board: [], boardAt: null };
 const fmtIsk = (n) => `${Math.round(n).toLocaleString()} ISK`;
 function repairCost() { const p = G.player; return Math.round((p.maxArmor - p.armor) * 40 + (p.maxHull - p.hull) * 80); }
 function rearmCost() { return G.usesAmmo ? (40 - G.ammo.rail) * 300 + (24 - G.ammo.missile) * 1200 : (24 - G.ammo.missile) * 1200; }
-const isHigh = () => G.dockedAt.dock === 'high';
+const isHigh = () => G.dockedAt.dock === 'high' || G.dockedAt.dock === 'pirate';
+const yardOf = () => (G.dockedAt.yard ? YARDS[G.dockedAt.yard] : null);
 
 function hangarShow(hullId, keepView) {
   const fit = G.owned[hullId] || emptyFit(hullId);
@@ -1072,21 +1105,22 @@ function renderDock() {
   $('dockwallet').innerHTML = `Wallet <b>${fmtIsk(G.credits)}</b>`;
   document.querySelectorAll('#docktop .dtabs b').forEach((b) => {
     b.classList.toggle('on', b.dataset.tab === D.tab);
-    b.classList.toggle('na', b.dataset.tab === 'shipyard' && !isHigh());
+    b.classList.toggle('na', b.dataset.tab === 'shipyard' && !yardOf());
   });
   const p = G.player, H = HULLS[G.hull], fit = G.owned[G.hull];
   if (D.tab === 'services') {
     L.innerHTML = `<h3>Active ship</h3><h2>${H.name}</h2><div class="sub">${H.cls}</div>
       <table class="st"><tr><td>Shield</td><td>${Math.round(p.shield)} / ${p.maxShield}</td></tr><tr><td>Armor</td><td>${Math.round(p.armor)} / ${p.maxArmor}</td></tr>
-      <tr><td>Hull</td><td>${Math.round(p.hull)} / ${p.maxHull}</td></tr><tr><td>Railgun slugs</td><td>${G.ammo.rail} / 40</td></tr><tr><td>Missiles</td><td>${G.ammo.missile} / 24</td></tr></table>
+      <tr><td>Hull</td><td>${Math.round(p.hull)} / ${p.maxHull}</td></tr><tr><td>Cargo hold</td><td>${usedCargo()} / ${p.stats.cargo} t</td></tr><tr><td>Passenger bunks</td><td>${usedBunks()} / ${p.stats.bunks}</td></tr><tr><td>Railgun slugs</td><td>${G.ammo.rail} / 40</td></tr><tr><td>Missiles</td><td>${G.ammo.missile} / 24</td></tr></table>
       <button data-a="repair" ${repairCost() === 0 || G.credits < repairCost() ? 'disabled' : ''}>Repair (${fmtIsk(repairCost())})</button>
       <button data-a="rearm" ${rearmCost() === 0 || G.credits < rearmCost() ? 'disabled' : ''}>Rearm (${fmtIsk(rearmCost())})</button>
-      <p style="margin-top:14px">${isHigh() ? 'Helion Orbital Shipyard offers the full hull catalogue and high-tech outfitting.' : 'This station has a basic outfitter. Hulls and high-tech modules are sold at Helion Orbital Shipyard (destination 7).'}</p>`;
+      <p style="margin-top:14px">${servicesText()}</p>`;
     R.innerHTML = `<h3>Fitting</h3>${fit.w.map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">W${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : 'Empty hardpoint'}</span></span></div>`).join('')}
       ${fit.u.map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">U${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : 'Empty utility slot'}</span></span></div>`).join('')}
       <h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}`;
   } else if (D.tab === 'shipyard') {
-    L.innerHTML = `<h3>Helion Yards hull catalogue</h3>${HULL_ORDER.map((id) => {
+    const Y0 = yardOf(), forSale = new Set(Y0.hulls);
+    L.innerHTML = `<h3>${Y0.name}</h3>${[...Y0.hulls, ...Object.keys(G.owned).filter((id) => !forSale.has(id))].map((id) => {
       const h = HULLS[id], own = !!G.owned[id];
       return `<div class="item${D.browse === id ? ' on' : ''}" data-hull="${id}"><span><div class="nm">${h.name}</div><div class="ty">${h.cls}</div></span>
         <span class="pr${own ? ' own' : ''}">${id === G.hull ? 'ACTIVE' : own ? 'OWNED' : fmtIsk(h.price)}</span></div>`;
@@ -1096,10 +1130,14 @@ function renderDock() {
     const f = G.owned[D.browse] || h.fit;
     R.innerHTML = `<h2>${h.name}</h2><div class="sub">${h.cls}</div><p>${h.desc}</p>
       <table class="st"><tr><td>Weapon hardpoints</td><td>${h.fit.w.length}</td></tr><tr><td>Utility slots</td><td>${h.fit.u.length}</td></tr>
+      <tr><td>Cargo hold</td><td>${s.cargo} t</td></tr><tr><td>Passenger bunks</td><td>${s.bunks}</td></tr>
       <tr><td>${own ? 'Fitted' : 'Stock'} weapons</td><td>${f.w.filter(Boolean).map((id) => OUTFITS[id].name).join(', ') || '—'}</td></tr></table>
       ${statRows(s, D.browse === G.hull ? null : p.stats)}
       ${D.browse === G.hull ? '<button disabled>Active ship</button>' : own ? `<button data-a="board" class="primary">Board this ship</button><button data-a="sellship">Sell hull (${fmtIsk(h.price * 0.5)}, fittings to cargo)</button>`
-    : `<button data-a="buy" class="primary" ${G.credits < h.price ? 'disabled' : ''}>Buy &amp; board (${fmtIsk(h.price)})</button>`}`;
+    : forSale.has(D.browse) ? `<button data-a="buy" class="primary" ${G.credits < h.price ? 'disabled' : ''}>Buy &amp; board (${fmtIsk(h.price)})</button>` : '<button disabled>Not sold here</button>'}
+      ${capOk(D.browse, G.owned[D.browse] || emptyFit(D.browse)) ? '' : `<p class="warn">Too small for your active jobs (${usedCargo()} t cargo, ${usedBunks()} passengers).</p>`}`;
+  } else if (D.tab === 'jobs') {
+    renderJobs(L, R);
   } else {
     const k = D.slot.k, i = D.slot.i;
     const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${kk.toUpperCase()}${j + 1}</span><span class="nm">${id ? OUTFITS[id].name : kk === 'w' ? 'Empty hardpoint' : 'Empty utility slot'}</span></span></div>`;
@@ -1132,7 +1170,7 @@ function renderDock() {
 
 function slotMarkers() {
   const s = hangar.ship;
-  if (D.tab === 'services' || !s) { hangar.setSlots(null); return; }
+  if (D.tab === 'services' || D.tab === 'jobs' || !s) { hangar.setSlots(null); return; }
   const fit = D.tab === 'shipyard' ? (G.owned[D.browse] || HULLS[D.browse].fit) : G.owned[G.hull];
   const list = [...s.hardpoints.slice(0, fit.w.length).map((h, i) => ({ k: 'w', i, ...h })), ...s.utilMounts.slice(0, fit.u.length).map((h, i) => ({ k: 'u', i, ...h }))];
   hangar.setSlots(list, D.tab === 'outfitter' ? D.slot : null, D.focusSlot);
@@ -1140,17 +1178,231 @@ function slotMarkers() {
 }
 
 function setDockTab(tab) {
-  if (tab === 'shipyard' && !isHigh()) { flashDockMsg('No shipyard here — warp to Helion Orbital Shipyard (7)'); return; }
+  if (tab === 'shipyard' && !yardOf()) { flashDockMsg('No shipyard here — the star map lists shipyards under Facilities'); return; }
   D.tab = tab; D.preview = null;
   hangar.setOutfit(null);
   if (tab === 'shipyard') { D.browse = D.browse || G.hull; if (D.shown !== D.browse) hangarShow(D.browse); } else if (D.shown !== G.hull) hangarShow(G.hull);
   audio.ui();
   renderDock();
 }
+// ---------------------------------------------------------------- job board: freight, passengers, bounties
+const CARGO_KINDS = [['Machine parts', 0], ['Hydroponic seed stock', 0], ['Water ice', 0], ['Mining charges', 1], ['Medical supplies', 1], ['Luxury goods', 2], ['Military hardware', 2], ['Refined iridium', 2], ['Unmarked crates', 3]];
+const PAX_KINDS = [['Colonists', 0], ['Contract miners', 0], ['Tourists', 0], ['Pilgrims', 1], ['Corporate executives', 2], ['A defecting Clan engineer', 3], ['A protected witness', 3]];
+const WARLORDS = ['Red Vasko', 'Mother Ilsk', 'Kaine the Flayer', 'Old Gutter', 'Saffron Jax', 'The Widow Marr', 'Brannoc Ironjaw', 'Six-Finger Tal'];
+const RISK = ['Low', 'Moderate', 'High', 'Extreme'];
+const usedCargo = () => G.jobs.reduce((n, j) => n + (j.type === 'cargo' ? j.amt : 0), 0);
+const usedBunks = () => G.jobs.reduce((n, j) => n + (j.type === 'pax' ? j.amt : 0), 0);
+const shipCap = (id = G.hull) => fittedStats(id, G.owned[id] || emptyFit(id));
+function capOk(id, fit) { const s = fittedStats(id, fit); return s.cargo >= usedCargo() && s.bunks >= usedBunks(); }
+const jumpsLeft = (j) => j.deadline - G.jumps;
+
+function servicesText() {
+  const L0 = G.dockedAt, Y0 = yardOf();
+  const parts = [`${L0.name} is a ${L0.type.toLowerCase()}.`];
+  parts.push(Y0 ? `Its shipyard sells the ${Y0.name.toLowerCase()}.` : 'There is no shipyard here.');
+  parts.push(L0.dock === 'pirate' ? 'The black-market outfitter carries everything, no questions asked.' : isHigh() ? 'The outfitter stocks high-tech modules.' : 'The outfitter only stocks basic modules.');
+  parts.push('Check the Job Board for freight, passenger and bounty contracts.');
+  return parts.join(' ');
+}
+
+function bribeCost() { return Math.round((25000 + SYSTEMS[G.system].danger * 20000 + HULLS[G.hull].price * 0.03) / 1000) * 1000; }
+// pirate ports wave a ship off until it pays once; the first G asks, the second pays
+function bribeGate(st) {
+  const key = `${G.system}:${st.id}`;
+  if (st.dock !== 'pirate' || G.access[key]) return true;
+  const c = bribeCost();
+  if (G.bribe !== key || G.time - G.bribeT > 10) {
+    G.bribe = key; G.bribeT = G.time;
+    hud.log(`${st.name}: "Landing's not free, friend. ${fmtIsk(c)} and we never saw you."`, 'w');
+    hud.notice(`LANDING DENIED — PRESS G AGAIN TO PAY ${fmtIsk(c).toUpperCase()} BRIBE`, 4);
+    audio.beep(330, 0.15);
+    return false;
+  }
+  if (G.credits < c) { hud.notice(`CANNOT AFFORD THE ${fmtIsk(c).toUpperCase()} BRIBE`, 2.5); audio.beep(220, 0.15); return false; }
+  G.credits -= c; G.access[key] = true; G.bribe = null;
+  hud.log(`Paid ${fmtIsk(c)} to ${st.name}. Permanent landing rights granted.`, 'g');
+  return true;
+}
+
+const routeRisk = (from, to) => ((fullRoute(from, to) || []).slice(1).some((x) => SYSTEMS[x].gov === 'pirate') ? 1 : 0);
+
+function makeBoard() {
+  const here = G.dockedAt, pir = here.dock === 'pirate', R = Math.random;
+  const pick = (a) => a[Math.floor(R() * a.length)];
+  const dist = hops(G.system);
+  const ports = allPorts().filter((x) => !(x.sys === G.system && x.id === here.id) && dist[x.sys] <= 4);
+  const safe = ports.filter((x) => !x.pirate), dark = ports.filter((x) => x.pirate);
+  const dest = (shady) => pick((pir || shady) && dark.length && R() < 0.6 ? dark : safe.length ? safe : ports);
+  const where = (x) => ({ sys: x.sys, id: x.id, name: x.name });
+  const board = [];
+  const n = 7 + Math.floor(R() * 3);
+  const huntable = Object.keys(dist).filter((x) => SYSTEMS[x].gov === 'pirate' && dist[x] >= 0 && dist[x] <= 3);
+  for (let i = 0; i < n; i++) {
+    const roll = i === 0 && huntable.length ? 1 : R();
+    const id = `${Date.now().toString(36)}-${i}-${Math.floor(R() * 1e6).toString(36)}`;
+    if (roll > 0.82 && huntable.length) {
+      const sys = pick(huntable), heavy = R() < 0.45;
+      const h = Math.max(1, dist[sys]);
+      const hull = heavy ? 'ravager' : 'reaver';
+      const reward = Math.round(((heavy ? 1500000 : 420000) + R() * (heavy ? 900000 : 260000)) * (1 + h * 0.15) / 1000) * 1000;
+      board.push({ id, type: 'bounty', risk: 3, reward, deadline: G.jumps + h * 2 + 6, to: { sys, name: SYSTEMS[sys].name },
+        target: { sys, hull, name: pick(WARLORDS), escorts: heavy ? ['reaver', 'cutlass', 'cutlass'] : ['cutlass', 'raider'] } });
+      continue;
+    }
+    const pax = roll > 0.42;
+    const [what, base] = pick(pax ? PAX_KINDS : CARGO_KINDS);
+    const to = dest(base >= 2);
+    const h = Math.max(1, dist[to.sys]);
+    const bulk = R() < 0.45;
+    const amt = pax ? (bulk ? 20 + Math.floor(R() * 9) * 15 : 1 + Math.floor(R() * 6)) : (bulk ? 60 + Math.floor(R() * 9) * 40 : 2 + Math.floor(R() * 14));
+    const risk = Math.min(3, base + (to.pirate || routeRisk(G.system, to.sys) ? 1 : 0) + (pir && base > 0 ? 1 : 0));
+    const per = pax ? (bulk ? 2600 : 9000) : (bulk ? 520 : 2200);
+    const reward = Math.round((12000 + amt * per) * h * (1 + risk * 0.65) / 1000) * 1000;
+    board.push({ id, type: pax ? 'pax' : 'cargo', what, amt, risk, reward, deadline: G.jumps + h * 2 + 3, from: where({ sys: G.system, id: here.id, name: here.name }), to: where(to) });
+  }
+  return board;
+}
+
+function jobTitle(j) {
+  if (j.type === 'bounty') return `Bounty: ${j.target.name}`;
+  return j.type === 'cargo' ? `Deliver ${j.amt} t ${j.what.toLowerCase()}` : `Carry ${j.amt > 1 && !/^A /.test(j.what) ? `${j.amt} ${j.what.toLowerCase()}` : j.what.toLowerCase()}`;
+}
+function jobLine(j) {
+  const sysName = (x) => (G.explored.has(x) ? SYSTEMS[x].name : 'uncharted space');
+  const left = jumpsLeft(j), dist = hops(G.system)[j.to.sys];
+  const when = `${dist} jump${dist === 1 ? '' : 's'} away · ${left} jump${left === 1 ? '' : 's'} to deadline`;
+  if (j.type === 'bounty') return `${STATS[j.target.hull].cls} with escorts, last seen in ${sysName(j.target.sys)}. ${when}.`;
+  return `To ${j.to.name} (${sysName(j.to.sys)}). Needs ${j.amt} ${j.type === 'cargo' ? 't of cargo space' : `bunk${j.amt > 1 ? 's' : ''}`}. ${when}.`;
+}
+function jobRow(j, act) {
+  const free = j.type === 'cargo' ? shipCap().cargo - usedCargo() : j.type === 'pax' ? shipCap().bunks - usedBunks() : Infinity;
+  const short = act === 'accept' && j.amt > free;
+  return `<div class="job r${j.risk}"><div class="jh"><span class="nm">${jobTitle(j)}</span><span class="pr">${fmtIsk(j.reward)}</span></div>
+    <div class="ty">${jobLine(j)}</div><div class="jr">Risk: <b>${RISK[j.risk]}</b>${j.risk >= 2 && j.type !== 'bounty' ? ' · Clan hijackers want this' : ''}</div>
+    ${act === 'accept' ? `<button data-a="accept" data-j="${j.id}" ${short ? 'disabled' : ''}>${short ? `Not enough ${j.type === 'cargo' ? 'cargo space' : 'bunks'} (${Math.max(0, free)} free)` : 'Accept'}</button>`
+    : `<button data-a="abandon" data-j="${j.id}">Abandon</button>`}</div>`;
+}
+function renderJobs(L, R) {
+  const c = shipCap();
+  L.innerHTML = `<h3>Job board — ${G.dockedAt.name}</h3>${D.board.length ? D.board.map((j) => jobRow(j, 'accept')).join('') : '<p>No contracts left. Check back after your next trip.</p>'}`;
+  R.innerHTML = `<h3>Capacity — ${HULLS[G.hull].name}</h3><table class="st"><tr><td>Cargo hold</td><td>${usedCargo()} / ${c.cargo} t</td></tr><tr><td>Passenger bunks</td><td>${usedBunks()} / ${c.bunks}</td></tr></table>
+    <p>Freighters (Mule, Atlas) carry bulk cargo; liners (Aurora) carry many passengers. Cargo pods and passenger modules add space to any hull.</p>
+    <h3>Active jobs</h3>${G.jobs.length ? G.jobs.map((j) => jobRow(j, 'abandon')).join('') : '<p>None.</p>'}`;
+}
+function jobAction(a, id) {
+  if (a === 'accept') {
+    const j = D.board.find((x) => x.id === id);
+    if (!j) return;
+    const c = shipCap();
+    if (j.type === 'cargo' && usedCargo() + j.amt > c.cargo) { flashDockMsg('Not enough cargo space'); return; }
+    if (j.type === 'pax' && usedBunks() + j.amt > c.bunks) { flashDockMsg('Not enough passenger bunks'); return; }
+    D.board = D.board.filter((x) => x !== j);
+    G.jobs.push(j);
+    for (const x of fullRoute(G.system, j.to.sys) || []) G.explored.add(x);
+    if (!G.routeTo || G.routeTo === G.system) G.routeTo = j.to.sys !== G.system ? j.to.sys : null;
+    hud.log(`Job accepted: ${jobTitle(j)} — ${j.type === 'bounty' ? `hunt in ${SYSTEMS[j.to.sys].name}` : `to ${j.to.name}`}. Route charted.`, 'i');
+  } else if (a === 'abandon') {
+    const j = G.jobs.find((x) => x.id === id);
+    if (!j) return;
+    G.jobs = G.jobs.filter((x) => x !== j);
+    hud.log(`Job abandoned: ${jobTitle(j)}.`, 'w');
+  }
+  saveGame();
+}
+function deliverJobs() {
+  const here = G.dockedAt;
+  for (const j of [...G.jobs]) {
+    if (j.type === 'bounty' || j.to.sys !== G.system || j.to.id !== here.id) continue;
+    G.jobs = G.jobs.filter((x) => x !== j);
+    G.credits += j.reward;
+    hud.log(`Delivered: ${jobTitle(j)}. Paid ${fmtIsk(j.reward)}.`, 'g');
+    flashDockMsg(`Job complete: +${fmtIsk(j.reward)}`);
+    audio.beep(880, 0.12);
+  }
+}
+function jobDestHere() {
+  const j = G.jobs.find((x) => x.to.sys === G.system);
+  if (!j) return null;
+  return j.type === 'bounty' ? LOCATIONS.find((l) => l.id === 'bounty') : LOCATIONS.find((l) => l.id === j.to.id);
+}
+
+// a jump ticks deadlines and may tip off hijackers about valuable loads
+function jumpedInto(def) {
+  G.jumps++;
+  for (const j of [...G.jobs]) if (jumpsLeft(j) < 0) { G.jobs = G.jobs.filter((x) => x !== j); hud.log(`Job failed — deadline missed: ${jobTitle(j)}.`, 'd'); }
+  G.ambush = null;
+  const risky = G.jobs.filter((j) => j.type !== 'bounty' && j.risk > 0).sort((a, b) => b.risk - a.risk)[0];
+  if (risky && Math.random() < 0.12 + risky.risk * 0.2 + (def.gov === 'pirate' ? 0.15 : 0)) G.ambush = { t: 8 + Math.random() * 10, job: risky.id, risk: risky.risk };
+}
+function spawnAmbush() {
+  const A = G.ambush, p = G.player;
+  G.ambush = null;
+  const j = G.jobs.find((x) => x.id === A.job);
+  if (!j) return;
+  const kinds = [['raider', 'raider'], ['cutlass', 'raider', 'raider'], ['reaver', 'cutlass', 'raider'], ['reaver', 'cutlass', 'cutlass', 'raider']][A.risk];
+  const c = p.obj.position.clone().add(_v.set(Math.random() - 0.5, (Math.random() - 0.5) * 0.3, Math.random() - 0.5).normalize().multiplyScalar(5000));
+  for (const kind of kinds) {
+    const e = makeEntity(kind, 'pirate', c.clone().add(jitter(1500)), `Clan Hijacker ${HULLS[STATS[kind].hullId || 'raider'].name}`);
+    e.ai.state = 'attack'; e.ai.raidJob = j.id;
+    fx.flash(e.obj.position, e.ship.radius > 25 ? 300 : 80, 0x88bbff, 0.6);
+  }
+  hud.log(`Clan Hijackers: "We know what you're hauling. Drop your shields and let us board, and you might live."`, 'd');
+  hud.notice('HIJACKERS — DO NOT LET THEM BOARD', 3);
+  audio.beep(260, 0.3);
+}
+function spawnBounties(def) {
+  for (const j of G.jobs) {
+    if (j.type !== 'bounty' || j.target.sys !== def.id) continue;
+    const anchor = LOCATIONS.find((l) => l.icon === 'outpost') || LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS.find((l) => l.jump);
+    const pos = anchor.pos.clone().add(_v.set(Math.random() - 0.5, 0, Math.random() - 0.5).normalize().multiplyScalar(14000));
+    const boss = makeEntity(j.target.hull, 'pirate', pos.clone(), j.target.name);
+    boss.className = `BOUNTY · ${STATS[j.target.hull].cls}`;
+    boss.ai.bountyJob = j.id; boss.ai.home.copy(pos);
+    for (const kind of j.target.escorts) {
+      const e = makeEntity(kind, 'pirate', pos.clone().add(jitter(3000)), `${j.target.name}'s ${HULLS[STATS[kind].hullId || 'raider'].name}`);
+      e.ai.home.copy(pos);
+    }
+    LOCATIONS.push({ id: 'bounty', name: `Bounty: ${j.target.name}`, type: `Last known position of ${STATS[j.target.hull].cls}`, pos, arrive: 12000, icon: 'bounty' });
+    hud.log(`Bounty intel: ${j.target.name} (${STATS[j.target.hull].cls}) is in this system. Warp to "Bounty: ${j.target.name}".`, 'w');
+    break;
+  }
+}
+function bountyKilled(e, source) {
+  const j = G.jobs.find((x) => x.id === e.ai.bountyJob);
+  if (!j) return;
+  if (source !== G.player) { hud.log(`${e.name} died to someone else — no bounty paid.`, 'w'); G.jobs = G.jobs.filter((x) => x !== j); return; }
+  G.jobs = G.jobs.filter((x) => x !== j);
+  G.credits += j.reward;
+  hud.log(`Bounty collected on ${e.name}: ${fmtIsk(j.reward)}.`, 'g');
+  hud.notice(`BOUNTY COLLECTED — ${fmtIsk(j.reward).toUpperCase()}`, 4);
+  const i = LOCATIONS.findIndex((l) => l.id === 'bounty');
+  if (i >= 0) { if (G.navTarget === LOCATIONS[i]) G.navTarget = null; if (G.selected === LOCATIONS[i]) G.selected = null; LOCATIONS.splice(i, 1); }
+}
+// hijackers board a ship whose shields are down and steal the load
+function updateJobs(dt) {
+  if (G.ambush && (G.ambush.t -= dt) <= 0 && !G.warp) spawnAmbush();
+  const p = G.player;
+  if (!p.alive) return;
+  const raiders = G.entities.filter((e) => e.alive && e.ai.raidJob && G.jobs.some((j) => j.id === e.ai.raidJob));
+  const near = raiders.find((e) => e.obj.position.distanceTo(p.obj.position) < 1200 + e.ship.radius + p.ship.radius);
+  if (near && p.shield < p.maxShield * 0.05) {
+    G.boardT += dt;
+    hud.notice(`BOARDING IN PROGRESS ${Math.ceil(5 - G.boardT)}s — RESTORE SHIELDS OR GET CLEAR`, 0.3);
+    if (G.boardT > 5) {
+      const j = G.jobs.find((x) => x.id === near.ai.raidJob);
+      G.jobs = G.jobs.filter((x) => x !== j);
+      G.boardT = 0;
+      hud.log(`Hijackers seized ${j.type === 'pax' ? 'your passengers' : `the ${j.what.toLowerCase()}`}! Job failed: ${jobTitle(j)}.`, 'd');
+      hud.notice(j.type === 'pax' ? 'PASSENGERS ABDUCTED' : 'CARGO STOLEN', 3);
+      for (const e of raiders) if (e.ai.raidJob === j.id) { e.ai.state = 'flee'; e.ai.raidJob = null; }
+    }
+  } else G.boardT = Math.max(0, G.boardT - dt * 2);
+}
+
 const SAVE_KEY = 'gvcsg-save-v1';
 function snapshot() {
   return { v: 1, hull: G.hull, owned: G.owned, inventory: G.inventory, credits: G.credits, kills: G.kills, ammo: G.ammo,
-    explored: [...G.explored], dockSys: G.dockSys, dockId: G.dockId, turretsAuto: G.turretsAuto,
+    explored: [...G.explored], dockSys: G.dockSys, dockId: G.dockId, turretsAuto: G.turretsAuto, jobs: G.jobs, access: G.access, jumps: G.jumps,
     hp: G.player ? [G.player.armor / G.player.maxArmor, G.player.hull / G.player.maxHull] : [1, 1] };
 }
 function saveGame(force = false) {
@@ -1182,6 +1434,10 @@ function applySave(s) {
   G.dockSys = s.dockSys;
   G.dockId = systemDef(s.dockSys).stations.some((st) => st.id === s.dockId) ? s.dockId : (systemDef(s.dockSys).stations[0]?.id || 'station');
   G.turretsAuto = s.turretsAuto !== false;
+  G.jobs = Array.isArray(s.jobs) ? s.jobs.filter((j) => j && j.id && j.to && SYSTEMS[j.to.sys] && (j.type !== 'bounty' || STATS[j.target?.hull])) : [];
+  G.access = s.access && typeof s.access === 'object' ? { ...s.access } : {};
+  G.jumps = Math.max(0, Number(s.jumps) || 0);
+  G.ambush = null; G.boardT = 0;
 }
 function dockStationName(sys, id) { return systemDef(sys).stations.find((st) => st.id === id)?.name || `your last station in ${SYSTEMS[sys].name}`; }
 $('docked').addEventListener('click', () => setTimeout(saveGame, 0));
@@ -1208,6 +1464,7 @@ for (const id of ['dockleft', 'dockright']) {
     const t = ev.target.closest('[data-a],[data-hull],[data-slot],[data-out]');
     if (!t) return;
     const fit = G.owned[G.hull];
+    if (t.dataset.j) { jobAction(t.dataset.a, t.dataset.j); audio.ui(); renderDock(); return; }
     if (t.dataset.hull) { D.browse = t.dataset.hull; hangarShow(D.browse); audio.ui(); }
     else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.focusSlot = true; hangar.setOutfit(null); audio.ui(); }
     else if (t.dataset.out) {
@@ -1219,7 +1476,8 @@ for (const id of ['dockleft', 'dockright']) {
       const a = t.dataset.a, k = D.slot.k, i = D.slot.i;
       if (a === 'repair') { const c = repairCost(); if (G.credits >= c) { G.credits -= c; G.player.armor = G.player.maxArmor; G.player.hull = G.player.maxHull; } }
       if (a === 'rearm') { const c = rearmCost(); if (G.credits >= c) { G.credits -= c; G.ammo.rail = 40; G.ammo.missile = 24; } }
-      if (a === 'buy') { const h = HULLS[D.browse]; if (G.credits >= h.price) { G.credits -= h.price; G.owned[D.browse] = emptyFit(D.browse); G.hull = D.browse; rebuildPlayer(); hangarShow(G.hull, true); hud.log(`Purchased ${h.cls} ${h.name}`, 'g'); } }
+      if ((a === 'buy' || a === 'board') && !capOk(D.browse, G.owned[D.browse] || emptyFit(D.browse))) { flashDockMsg('That hull cannot carry your active cargo and passengers'); renderDock(); return; }
+      if (a === 'buy') { const h = HULLS[D.browse]; if (G.credits >= h.price && yardOf()?.hulls.includes(D.browse)) { G.credits -= h.price; G.owned[D.browse] = emptyFit(D.browse); G.hull = D.browse; rebuildPlayer(); hangarShow(G.hull, true); hud.log(`Purchased ${h.cls} ${h.name}`, 'g'); } }
       if (a === 'board') { G.hull = D.browse; rebuildPlayer(); hangarShow(G.hull, true); }
       if (a === 'sellship' && G.owned[D.browse] && D.browse !== G.hull) {
         const h = HULLS[D.browse], f = G.owned[D.browse];
@@ -1233,11 +1491,13 @@ for (const id of ['dockleft', 'dockright']) {
         const have = G.inventory[id] > 0;
         if (have) G.inventory[id]--; else if (G.credits >= O.price) G.credits -= O.price; else return;
         const old = fit[k][i];
+        const tf = { w: [...fit.w], u: [...fit.u] }; tf[k][i] = id;
+        if (!capOk(G.hull, tf)) { if (have) G.inventory[id]++; else G.credits += O.price; flashDockMsg('Removing that module would leave active cargo or passengers without space'); renderDock(); return; }
         if (old) G.inventory[old] = (G.inventory[old] || 0) + 1;
         fit[k][i] = id;
         rebuildPlayer(); hangarShow(G.hull, true); hangar.setOutfit(null);
       }
-      if (a === 'unfit') { const old = fit[k][i]; if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; fit[k][i] = null; rebuildPlayer(); hangarShow(G.hull, true); } }
+      if (a === 'unfit') { const old = fit[k][i]; const tf = { w: [...fit.w], u: [...fit.u] }; tf[k][i] = null; if (old && !capOk(G.hull, tf)) { flashDockMsg('Active cargo or passengers need that module'); renderDock(); return; } if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; fit[k][i] = null; rebuildPlayer(); hangarShow(G.hull, true); } }
       if (a === 'sell' && D.preview && G.inventory[D.preview] > 0) { G.inventory[D.preview]--; G.credits += OUTFITS[D.preview].price * 0.5; }
       audio.ui();
     }
@@ -1255,8 +1515,12 @@ function enterDocked() {
   $('docked').classList.remove('hidden');
   $('hud').classList.add('hidden');
   $('dockname').textContent = G.dockedAt.name.toUpperCase();
-  $('docksub').textContent = isHigh() ? 'HIGH-TECH STATION · SHIPYARD · FULL OUTFITTER · REPAIR' : 'STATION · BASIC OUTFITTER · REPAIR';
+  const L0 = G.dockedAt, Y0 = yardOf();
+  $('docksub').textContent = [L0.type, Y0 ? 'SHIPYARD' : null, L0.dock === 'pirate' ? 'BLACK-MARKET OUTFITTER' : isHigh() ? 'FULL OUTFITTER' : 'BASIC OUTFITTER', 'REPAIR', 'JOB BOARD'].filter(Boolean).join(' · ').toUpperCase();
   D.tab = 'services'; D.preview = null; D.browse = G.hull;
+  deliverJobs();
+  const bk = `${G.system}:${L0.id}:${G.jumps}`;
+  if (D.boardAt !== bk) { D.board = makeBoard(); D.boardAt = bk; }
   hangar.setOutfit(null);
   hangarShow(G.hull);
   saveGame();
@@ -1272,11 +1536,18 @@ function undock() {
   if (hangar) { hangar.restoreEnv(); hangar.setOutfit(null); }
   $('docked').classList.add('hidden');
   const r = p.ship.radius;
-  const start = b.pos.clone().addScaledVector(b.dir, -bayDepth(b, r));
-  const exit = b.pos.clone().addScaledVector(b.dir, r * 3 + 120);
-  const end = b.pos.clone().addScaledVector(b.dir, r * 7 + 900).addScaledVector(Y, 40);
+  let start, exit, end;
+  if (b.pad) {
+    start = b.pos.clone().addScaledVector(b.dir, r * 0.45 + 2);
+    exit = b.pos.clone().addScaledVector(b.dir, r * 3 + 150);
+    end = exit.clone().addScaledVector(b.fwd, r * 7 + 900).addScaledVector(b.dir, 1600);
+  } else {
+    start = b.pos.clone().addScaledVector(b.dir, -bayDepth(b, r));
+    exit = b.pos.clone().addScaledVector(b.dir, r * 3 + 120);
+    end = b.pos.clone().addScaledVector(b.dir, r * 7 + 900).addScaledVector(Y, 40);
+  }
   p.obj.position.copy(start);
-  _m.lookAt(b.dir, ORIGIN, Y);
+  if (b.pad) _m.lookAt(b.fwd, ORIGIN, b.dir); else _m.lookAt(b.dir, ORIGIN, Y);
   p.obj.quaternion.setFromRotationMatrix(_m);
   p.vel.set(0, 0, 0);
   camQuat.copy(p.obj.quaternion);
@@ -1286,9 +1557,10 @@ function undock() {
   updateCamera(0.016);
   const path = [
     seg(0.4, [start, exit]),
-    seg(0.6, [exit, exit.clone().addScaledVector(b.dir, lead(start.distanceTo(exit), 0.4, 0.6)), end.clone().addScaledVector(b.dir, -260).addScaledVector(Y, -15), end]),
+    b.pad ? seg(0.6, [exit, exit.clone().addScaledVector(b.dir, lead(start.distanceTo(exit), 0.4, 0.6)), end.clone().addScaledVector(b.fwd, -500).addScaledVector(b.dir, -300), end])
+      : seg(0.6, [exit, exit.clone().addScaledVector(b.dir, lead(start.distanceTo(exit), 0.4, 0.6)), end.clone().addScaledVector(b.dir, -260).addScaledVector(Y, -15), end]),
   ];
-  startCine('undocking', b, path, 7, `UNDOCKING — ${G.dockedAt.name.toUpperCase()}`);
+  startCine('undocking', b, path, b.pad ? 8 : 7, `${b.pad ? 'LIFTING OFF' : 'UNDOCKING'} — ${G.dockedAt.name.toUpperCase()}`);
   cineCamera();
   setFade(false);
 }
@@ -1302,7 +1574,9 @@ function finishUndock() {
   playerAngVel.set(0, 0, 0);
   G.state = 'flying';
   $('hud').classList.remove('hidden');
-  hud.log(`Undocked from ${G.dockedAt.name}`, 'i');
+  hud.log(`${G.dockedAt.kind === 'port' ? 'Lifted off from' : 'Undocked from'} ${G.dockedAt.name}`, 'i');
+  const active = G.jobs.length;
+  if (active) hud.log(`${active} active job${active > 1 ? 's' : ''}. Cargo ${usedCargo()} / ${shipCap().cargo} t, passengers ${usedBunks()} / ${shipCap().bunks}.`, 'i');
 }
 
 function playerDied() {
@@ -1524,8 +1798,9 @@ function frame(now) {
       if (e.obj.position.distanceTo(p.obj.position) < 80000 || e.kind === 'hauler') updateAI(e, dt);
       if (G.time - e.lastHit > 6) e.shield = Math.min(e.maxShield, e.shield + e.maxShield * 0.01 * dt);
     }
-    G.scrambled = !G.warp && G.entities.some((e) => e.alive && e.kind === 'cruiser' && e.ai.state === 'attack' && e.obj.position.distanceTo(p.obj.position) < 15000);
+    G.scrambled = !G.warp && G.entities.some((e) => e.alive && (e.kind === 'cruiser' || e.stats.scram) && e.ai.state === 'attack' && e.obj.position.distanceTo(p.obj.position) < 15000);
     updateEncounters(dt);
+    updateJobs(dt);
     updateLock(dt);
   }
   cineStep(dt);
@@ -1594,10 +1869,11 @@ function populate(def, from) {
   if (def.gov === 'gov') {
     let ni = 0;
     for (const st of LOCATIONS.filter((l) => l.dock)) {
-      const kinds = st.dock === 'high' ? ['navyWarden', 'navyKestrel', 'navyKestrel', 'navyBastion', 'navyMantis', 'navySabre'] : ['navyKestrel', 'navyMantis', 'navyWarden'].slice(0, Math.round(def.sec * 3));
+      const kinds = st.dock === 'high' ? ['navyWarden', 'navyKestrel', 'navyKestrel', 'navyBastion', 'navyMantis', 'navySabre'] : st.kind === 'station' ? ['navyKestrel', 'navyMantis', 'navyWarden'].slice(0, Math.round(def.sec * 3)) : ['navyKestrel'].slice(0, def.sec >= 0.5 ? 1 : 0);
+      const home = st.up ? st.pos.clone().addScaledVector(st.up, 5000) : st.pos;
       for (const kind of kinds) {
-        const n = makeEntity(kind, 'navy', st.pos.clone().add(jitter(6000)), NAVY_NAMES[ni++ % NAVY_NAMES.length]);
-        n.ai.seed = Math.random(); n.ai.home.copy(st.pos);
+        const n = makeEntity(kind, 'navy', home.clone().add(jitter(6000)), NAVY_NAMES[ni++ % NAVY_NAMES.length]);
+        n.ai.seed = Math.random(); n.ai.home.copy(home);
       }
     }
     const hub = LOCATIONS.find((l) => l.dock);
@@ -1616,7 +1892,8 @@ function populate(def, from) {
       if (g.jump === from || Math.random() < 0.35) continue;
       const home = g.pos.clone().add(jitter(9000));
       for (let i = 0; i < def.danger; i++) {
-        const e = makeEntity('raider', 'pirate', home.clone().add(jitter(1500)), PIRATE_NAMES[Math.floor(Math.random() * PIRATE_NAMES.length)]);
+        const kind = Math.random() < 0.3 ? 'cutlass' : 'raider';
+        const e = makeEntity(kind, 'pirate', home.clone().add(jitter(1500)), pirateName(kind));
         e.ai.seed = Math.random(); e.ai.home.copy(home);
       }
     }
@@ -1671,14 +1948,16 @@ function enterSystem(to, from) {
     camQuat.copy(p.obj.quaternion);
   }
   populate(def, from);
-  G.navTarget = nextHop() || LOCATIONS.find((l) => l.dock) || LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS[0];
+  if (from) jumpedInto(def);
+  spawnBounties(def);
+  G.navTarget = nextHop() || jobDestHere() || LOCATIONS.find((l) => l.dock) || LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS[0];
   updateSysInfo(def);
   hud.ovT = 0;
   if (starmap.isOpen) starmap.renderInfo();
   if (from) {
     hud.notice(`${def.name.toUpperCase()} — ${GOVS[def.gov].name.toUpperCase()}`, 3.5);
     hud.log(`Jumped into ${def.name} (${GOVS[def.gov].name}, security ${def.sec.toFixed(1)}).`, def.gov === 'pirate' ? 'd' : 'i');
-    if (def.gov === 'pirate') hud.log('Warning: lawless space. No navy, no stations.', 'w');
+    if (def.gov === 'pirate') hud.log('Warning: lawless space. No navy; pirate ports demand a bribe before you can land.', 'w');
   }
   if (fresh) hud.log(`New system charted: ${def.name}, ${def.starInfo.name}. It now appears on the star map (M).`, 'g');
 }
@@ -1882,7 +2161,8 @@ function undockPose() {
   const st = (world.docks[G.dockedAt?.id] || Object.values(world.docks)[0]).root;
   const a = Math.PI / 4;
   const p = G.player;
-  p.obj.position.copy(new THREE.Vector3(Math.cos(a) * 900, -180, Math.sin(a) * 900).applyQuaternion(st.quaternion).add(st.position));
+  if (G.dockedAt?.up) p.obj.position.copy(new THREE.Vector3(Math.cos(a) * 1400, 900, Math.sin(a) * 1400).applyQuaternion(st.quaternion).add(st.position));
+  else p.obj.position.copy(new THREE.Vector3(Math.cos(a) * 900, -180, Math.sin(a) * 900).applyQuaternion(st.quaternion).add(st.position));
   p.obj.lookAt(st.position);
   p.obj.rotateY(0.6);
   camQuat.copy(p.obj.quaternion);
@@ -1890,6 +2170,6 @@ function undockPose() {
 }
 
 // debug/testing hook
-window.__game = { G, holo, hud, cine, camera, renderer, get fx() { return fx; }, get bolts() { return bolts; }, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave };
+window.__game = { G, holo, hud, cine, camera, renderer, get fx() { return fx; }, get bolts() { return bolts; }, settings, applyGfx, LOCATIONS, SYSTEMS, get world() { return world; }, get hangar() { return hangar; }, get starmap() { return starmap; }, makeEntity, warpTo, startLock, damage, enterSystem, warpKey, jumpKey, nearJump, saveGame, readSave, tryDock, D, renderDock, setDockTab, STATS, destroy, enterDocked };
 requestAnimationFrame(frame);
 boot();

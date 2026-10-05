@@ -17,17 +17,26 @@ export const STAR_CLASSES = {
 
 // 2D map graph; map +x is world +x, map +y is world +z
 const RAW = [
-  { id: 'kaltos', name: 'Kaltos', gov: 'gov', sec: 0.8, danger: 1, map: [0, 0], star: 'G', links: ['vexal', 'orin', 'tessaly'] },
+  { id: 'kaltos', name: 'Kaltos', gov: 'gov', sec: 0.8, danger: 1, map: [0, 0], star: 'G', links: ['vexal', 'orin', 'tessaly', 'pellam'] },
   { id: 'vexal', name: 'Vexal', gov: 'gov', sec: 0.7, danger: 1, map: [150, -55], star: 'F', links: ['kaltos', 'sarn', 'mirel'] },
-  { id: 'orin', name: 'Orin', gov: 'gov', sec: 0.6, danger: 1, map: [-130, -95], star: 'K', links: ['kaltos', 'drak'] },
-  { id: 'tessaly', name: 'Tessaly', gov: 'gov', sec: 0.5, danger: 1, map: [45, 155], star: 'A', links: ['kaltos', 'khar', 'nyx'] },
-  { id: 'mirel', name: 'Mirel', gov: 'gov', sec: 0.9, danger: 0, map: [195, -200], star: 'G', links: ['vexal', 'aster'] },
-  { id: 'aster', name: 'Aster', gov: 'gov', sec: 0.9, danger: 0, map: [345, -215], star: 'B', links: ['mirel', 'ruin'], yard: true },
-  { id: 'sarn', name: 'Sarn', gov: 'pirate', sec: 0.1, danger: 2, map: [285, -10], star: 'M', links: ['vexal', 'ruin'] },
-  { id: 'ruin', name: 'Ruin', gov: 'pirate', sec: 0.0, danger: 3, map: [400, 70], star: 'K', links: ['sarn', 'aster'] },
-  { id: 'drak', name: 'Drak', gov: 'pirate', sec: 0.2, danger: 2, map: [-265, -40], star: 'M', links: ['orin', 'nyx'] },
-  { id: 'nyx', name: 'Nyx', gov: 'pirate', sec: 0.0, danger: 3, map: [-195, 170], star: 'B', links: ['tessaly', 'drak'] },
-  { id: 'khar', name: 'Khar', gov: 'pirate', sec: 0.1, danger: 2, map: [-40, 290], star: 'F', links: ['tessaly'] },
+  { id: 'orin', name: 'Orin', gov: 'gov', sec: 0.6, danger: 1, map: [-130, -95], star: 'K', links: ['kaltos', 'drak', 'corsa', 'oskar'] },
+  { id: 'tessaly', name: 'Tessaly', gov: 'gov', sec: 0.5, danger: 1, map: [45, 155], star: 'A', links: ['kaltos', 'khar', 'nyx', 'pellam', 'bastide'] },
+  { id: 'mirel', name: 'Mirel', gov: 'gov', sec: 0.9, danger: 0, map: [195, -200], star: 'G', links: ['vexal', 'aster', 'corsa'] },
+  { id: 'aster', name: 'Aster', gov: 'gov', sec: 0.9, danger: 0, map: [345, -215], star: 'B', links: ['mirel', 'ruin', 'lyra'], yard: true },
+  { id: 'corsa', name: 'Corsa', gov: 'gov', sec: 0.6, danger: 1, map: [-15, -185], star: 'F', links: ['orin', 'mirel'] },
+  { id: 'pellam', name: 'Pellam', gov: 'gov', sec: 0.7, danger: 1, map: [140, 85], star: 'K', links: ['kaltos', 'tessaly', 'sarn'] },
+  { id: 'lyra', name: 'Lyra', gov: 'gov', sec: 0.8, danger: 0, map: [500, -165], star: 'A', links: ['aster', 'quell'], yard: true },
+  { id: 'bastide', name: 'Bastide', gov: 'gov', sec: 0.4, danger: 1, map: [200, 250], star: 'G', links: ['tessaly', 'vane'] },
+  { id: 'oskar', name: 'Oskar', gov: 'gov', sec: 0.5, danger: 1, map: [-300, -215], star: 'G', links: ['orin', 'grav'] },
+  { id: 'sarn', name: 'Sarn', gov: 'pirate', sec: 0.1, danger: 2, map: [285, -10], star: 'M', links: ['vexal', 'ruin', 'pellam'] },
+  { id: 'ruin', name: 'Ruin', gov: 'pirate', sec: 0.0, danger: 3, map: [400, 70], star: 'K', links: ['sarn', 'aster', 'quell', 'vane'] },
+  { id: 'drak', name: 'Drak', gov: 'pirate', sec: 0.2, danger: 2, map: [-265, -40], star: 'M', links: ['orin', 'nyx', 'grav'] },
+  { id: 'nyx', name: 'Nyx', gov: 'pirate', sec: 0.0, danger: 3, map: [-195, 170], star: 'B', links: ['tessaly', 'drak', 'morrow'] },
+  { id: 'khar', name: 'Khar', gov: 'pirate', sec: 0.1, danger: 2, map: [-40, 290], star: 'F', links: ['tessaly', 'morrow'] },
+  { id: 'quell', name: 'Quell', gov: 'pirate', sec: 0.1, danger: 2, map: [555, -25], star: 'K', links: ['lyra', 'ruin'] },
+  { id: 'vane', name: 'Vane', gov: 'pirate', sec: 0.0, danger: 3, map: [360, 215], star: 'M', links: ['bastide', 'ruin'] },
+  { id: 'grav', name: 'Grav', gov: 'pirate', sec: 0.1, danger: 2, map: [-445, -115], star: 'K', links: ['oskar', 'drak'] },
+  { id: 'morrow', name: 'Morrow', gov: 'pirate', sec: 0.0, danger: 3, map: [-170, 375], star: 'M', links: ['khar', 'nyx'] },
 ];
 export const SYSTEMS = Object.fromEntries(RAW.map((s) => [s.id, s]));
 
@@ -72,7 +81,10 @@ export function systemDef(id) {
     p.seed = 0;
     const m = planet(r, 'Kaltos III - Moon 1', 'barren', v3([-150000, 52000, -210000]), 14000);
     m.seed = 0; m.tint = [0.42, 0.4, 0.38]; m.moon = true;
-    def.planets.push(p, m);
+    const q = planet(r, 'Kaltos IV', 'gas', v3([-420000, 30000, 260000]), 130000);
+    q.ring = true;
+    const l = planet(r, 'Kaltos I', 'lava', v3([300000, 60000, 120000]), 26000);
+    def.planets.push(p, m, q, l);
     def.stations.push({ id: 'station', kind: 'station', name: 'Ardent Relay Station', pos: v3([0, 0, 0]), dock: 'basic', rot: 0.4 });
     def.belts.push({ name: 'Kaltos III - Asteroid Belt 1', pos: v3([48000, 4000, -36000]), count: 520, spread: [14000, 3500, 14000], seed: 101, tint: [118, 108, 98] });
     def.outposts.push({ name: 'Corsair Hideout', pos: v3([-62000, -9000, -24000]), rocks: true });
@@ -85,7 +97,7 @@ export function systemDef(id) {
     def.sky = { dir: nd.toArray(), c1: col(hue, 0.75, 0.45), c2: col(hue + 0.35 + r() * 0.3, 0.7, 0.5), c3: col(hue + 0.1, 0.8, 0.55), amt: 0.25 + r() * 0.6 };
     const pirate = S.gov === 'pirate';
     const pool = pirate ? ['desert', 'lava', 'barren', 'gas', 'ice'] : ['temperate', 'ocean', 'gas', 'desert', 'ice', 'barren'];
-    const n = 1 + Math.floor(r() * 2.4);
+    const n = 2 + Math.floor(r() * 2.6);
     const used = [];
     for (let i = 0; i < n; i++) {
       const type = i === 0 && !pirate && r() < 0.6 ? pick(r, ['temperate', 'ocean']) : pick(r, pool);
@@ -123,6 +135,7 @@ export function systemDef(id) {
     }
     if (S.yard) def.stations.push({ id: 'shipyard', kind: 'shipyard', name: `${S.name} Fleet Yards`, pos: near(30000, 42000), dock: 'high', rot: r() * 6 });
   }
+  addSettlements(def, S);
   // jump points point along the 2D map edge toward the neighbour
   for (const to of S.links) {
     const T = SYSTEMS[to];
@@ -131,6 +144,84 @@ export function systemDef(id) {
     def.jumps.push({ to, pos: d.normalize().multiplyScalar(id === 'kaltos' && to === 'tessaly' ? 72000 : 78000 + (hash(to) % 12000)) });
   }
   return def;
+}
+
+const PORT_NAMES = {
+  city: ['Meridian', 'New Harbor', 'Port Calder', 'Highgate', 'Concord', 'Landfall', 'Sunward', 'Founders'],
+  colony: ['Dome', 'Ridge', 'Basin', 'Crater', 'Rift', 'Mesa'],
+  mining: ['Deepcore', 'Shaft Nine', 'Regolith', 'Pithead', 'Lodestone'],
+  aerostat: ['Cirrus', 'Stratos', 'Skyhaven', 'Bellwether', 'Zephyr'],
+  haven: ['Freeport', "Smugglers' Rest", 'Blackwater Haven', 'Scrap Town', 'Cutthroat Landing', 'Gallows Field', 'Redwater'],
+};
+const PORT_SUFFIX = { city: 'Spaceport', colony: 'Colony', mining: 'Mining Outpost', aerostat: 'Aerostat', haven: '' };
+
+// planetary spaceports and secondary orbital stations; separate seed keeps the base layout stable
+function addSettlements(def, S) {
+  const r = rng(hash(`${S.id}:ports`));
+  const pirate = S.gov === 'pirate';
+  let city = 0;
+  def.planets.forEach((P, i) => {
+    let style = null;
+    if (pirate) style = i === 0 || r() < 0.4 ? 'haven' : null;
+    else if (P.moon) style = r() < 0.55 ? 'mining' : null;
+    else if (P.type === 'temperate' || P.type === 'ocean') style = 'city';
+    else if (P.type === 'gas') style = r() < 0.6 ? 'aerostat' : null;
+    else if (P.type === 'lava') style = r() < 0.35 ? 'mining' : null;
+    else style = r() < 0.65 ? 'colony' : null;
+    if (!style) return;
+    const up = P.pos.clone().negate().normalize().add(new THREE.Vector3(r() - 0.5, (r() - 0.5) * 0.6, r() - 0.5).multiplyScalar(0.5)).normalize();
+    const lift = style === 'aerostat' ? 900 : 2;
+    const nm = pick(r, PORT_NAMES[style]);
+    def.stations.push({
+      id: `port-${i}`, kind: 'port', style, planet: i, up,
+      name: style === 'haven' ? `${nm}, ${P.name}` : `${P.name} ${nm} ${PORT_SUFFIX[style]}`,
+      pos: P.pos.clone().addScaledVector(up, P.radius + lift),
+      dock: pirate ? 'pirate' : 'basic',
+      yard: pirate ? 'pirate' : style === 'city' && city++ === 0 && r() < 0.7 ? 'light' : null,
+      rot: r() * 6,
+    });
+  });
+  const near = (d0, d1) => { const a = r() * Math.PI * 2; const d = d0 + r() * (d1 - d0); return new THREE.Vector3(Math.cos(a) * d, (r() - 0.5) * 12000, Math.sin(a) * d); };
+  if (!pirate && (S.id === 'kaltos' || r() < 0.5)) {
+    def.stations.push({ id: 'habitat', kind: 'habitat', name: `${S.name} ${pick(r, ['Halo', 'Wheel', 'Concourse', 'Arcology'])} Habitat`, pos: S.id === 'kaltos' ? v3([30000, -6000, 46000]) : near(24000, 36000), dock: 'basic', yard: null, rot: r() * 6 });
+  }
+  if (pirate && r() < 0.65) {
+    def.stations.push({ id: 'den', kind: 'den', name: `${S.name} ${pick(r, ['Black Market', 'Rustworks', 'Clan Moot', 'Freebooter Spire', 'Salvage Exchange'])}`, pos: near(16000, 26000), dock: 'pirate', yard: 'pirate', rot: r() * 6 });
+  }
+  for (const st of def.stations) if (st.kind === 'shipyard') st.yard = 'fed';
+}
+
+let portCache = null;
+// every dockable place in the galaxy
+export function allPorts() {
+  if (!portCache) portCache = RAW.flatMap((S) => systemDef(S.id).stations.map((st) => ({ sys: S.id, id: st.id, name: st.name, kind: st.kind, style: st.style || st.kind, pirate: st.dock === 'pirate' })));
+  return portCache;
+}
+
+// jump counts from a system over the full lane graph
+export function hops(from) {
+  const d = { [from]: 0 };
+  const q = [from];
+  while (q.length) {
+    const c = q.shift();
+    for (const n of SYSTEMS[c].links) if (!(n in d)) { d[n] = d[c] + 1; q.push(n); }
+  }
+  return d;
+}
+
+// shortest path over the full graph
+export function fullRoute(from, to) {
+  const prev = { [from]: null };
+  const q = [from];
+  while (q.length) {
+    const c = q.shift();
+    if (c === to) break;
+    for (const n of SYSTEMS[c].links) if (!(n in prev)) { prev[n] = c; q.push(n); }
+  }
+  if (!(to in prev)) return null;
+  const path = [];
+  for (let c = to; c; c = prev[c]) path.unshift(c);
+  return path;
 }
 
 // shortest route through explored systems (plus the final hop into the goal)

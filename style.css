@@ -134,13 +134,14 @@ body[data-state="docked"] #c:active { cursor: grabbing; }
 #docked { position: fixed; inset: 0; pointer-events: none; color: #dbdddf; }
 #docked > * { pointer-events: auto; }
 #docktop { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 24px; padding: 12px 22px; background: linear-gradient(rgba(9, 10, 11, 0.92), rgba(9, 10, 11, 0.6)); border-bottom: 1px solid rgba(164, 169, 176, 0.25); }
-#docktop h1 { margin: 0; font-weight: 300; letter-spacing: 5px; font-size: 22px; color: #fff; }
-#docksub { font-size: 11px; letter-spacing: 2px; color: #adb2b8; }
-.dtabs { display: flex; gap: 4px; margin-left: 20px; }
-.dtabs b { font-weight: normal; padding: 7px 16px; border: 1px solid rgba(164, 169, 176, 0.25); cursor: pointer; letter-spacing: 2px; font-size: 12px; text-transform: uppercase; color: #adb2b8; }
+#docktop > div:first-child { flex: 1 1 auto; min-width: 0; }
+#docktop h1 { margin: 0; font-weight: 300; letter-spacing: 4px; font-size: 20px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#docksub { font-size: 10px; letter-spacing: 1.5px; color: #adb2b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtabs { display: flex; gap: 4px; flex: none; }
+.dtabs b { font-weight: normal; white-space: nowrap; padding: 7px 14px; border: 1px solid rgba(164, 169, 176, 0.25); cursor: pointer; letter-spacing: 2px; font-size: 12px; text-transform: uppercase; color: #adb2b8; }
 .dtabs b.on { background: rgba(88, 94, 102, 0.55); color: #fff; border-color: #adb2b8; }
 .dtabs b.na { opacity: 0.45; }
-#dockwallet { margin-left: auto; font-size: 13px; color: #fd8; letter-spacing: 1px; }
+#dockwallet { flex: none; white-space: nowrap; font-size: 13px; color: #fd8; letter-spacing: 1px; }
 .dpanel { position: absolute; top: 74px; width: 330px; max-height: calc(100vh - 110px); overflow-y: auto; background: rgba(9, 10, 11, 0.82); border: 1px solid rgba(164, 169, 176, 0.25); padding: 14px 16px; font-size: 12px; }
 #dockleft { left: 16px; }
 #dockright { right: 16px; width: 300px; }
@@ -154,6 +155,13 @@ body[data-state="docked"] #c:active { cursor: grabbing; }
 .item:hover { border-color: rgba(169, 174, 181, 0.5); }
 .item.on { border-color: #adb2b8; background: rgba(88, 94, 102, 0.4); }
 .item.dis { opacity: 0.45; }
+.job { padding: 8px 9px; margin-bottom: 6px; border: 1px solid rgba(164, 169, 176, 0.18); border-left: 3px solid #6f7780; background: rgba(35, 37, 40, 0.35); }
+.job.r1 { border-left-color: #b8a050; } .job.r2 { border-left-color: #d07a30; } .job.r3 { border-left-color: #d03a30; }
+.job .jh { display: flex; justify-content: space-between; gap: 8px; } .job .nm { color: #f6f6f7; } .job .pr { color: #fd8; white-space: nowrap; }
+.job .ty { color: #959ba3; font-size: 11px; margin: 3px 0; line-height: 1.4; } .job .jr { font-size: 11px; color: #adb2b8; }
+.job.r2 .jr b, .job.r3 .jr b { color: #f07050; }
+.job button { margin-top: 5px; padding: 4px 8px; }
+.dpanel .warn { color: #f0a060; }
 .item .nm { color: #f6f6f7; } .item .ty { color: #808790; font-size: 11px; }
 .item .pr { color: #fd8; white-space: nowrap; font-size: 11px; text-align: right; }
 .item .pr.own { color: #7fe0a0; }
@@ -212,3 +220,4 @@ table.st .up { color: #7fe0a0; } table.st .dn { color: #ff7a66; }
 .opts .chk input { accent-color: #9aa0a6; margin: 0; }
 .opts .odesc { flex-basis: 100%; font-size: 11px; color: #80858b; }
 #fps { position: fixed; right: 8px; bottom: 6px; z-index: 60; pointer-events: none; font: 10px "Share Tech Mono", monospace; letter-spacing: 1px; color: rgba(200, 204, 209, 0.6); text-shadow: 0 0 3px #000; }
+#docktop button { flex: none; white-space: nowrap; }
