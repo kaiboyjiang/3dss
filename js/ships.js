@@ -1021,34 +1021,66 @@ export function buildHauler(env, seed = 1) {
   return addGreebles(ship);
 }
 
-// per-frame cosmetic animation
-// Bakes every opaque part that never moves relative to the hull into one mesh per material and shadow
-// setting, so a ship costs a handful of draw calls instead of dozens. Aiming turret heads stay separate.
+// Skinned meshes need their own program variant; a separate material keeps the renderer from switching per draw.
+const skinMats = new WeakMap();
+function skinMat(m) {
+  let s = skinMats.get(m);
+  if (!s) { s = m.clone(); skinMats.set(m, s); }
+  return s;
+}
+const _pv = new THREE.Vector3();
+
+// Bakes a ship's opaque parts into one mesh per material and shadow setting, so a ship costs a handful of
+// draw calls instead of dozens. Hull parts become plain meshes; turret and gun parts become skinned meshes
+// whose bones are the existing yaw/pitch/barrel groups, so aiming, recoil and spin animate exactly as before.
 export function mergeStatic(ship) {
   const g = ship.group;
-  const moving = new Set([...ship.turrets, ...ship.gunMounts, ...ship.turretMounts].map((t) => t.yaw));
+  const mounts = new Set([...ship.turrets, ...ship.gunMounts, ...ship.turretMounts]);
+  const pivotOf = new Map();
+  for (const t of mounts) for (const b of [t.yaw, t.pitch, ...t.barrels]) if (b) pivotOf.set(b, t.yaw);
   g.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
-  const bins = new Map();
+  const bins = new Map(), skinBins = new Map();
   g.traverse((o) => {
-    if (!o.isMesh || o.isInstancedMesh || o.renderOrder || !o.visible || Array.isArray(o.material)) return;
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.renderOrder || !o.visible || Array.isArray(o.material)) return;
     const m = o.material, a = o.geometry.attributes;
     if (m.transparent || !(m.isMeshStandardMaterial || m.isMeshBasicMaterial)) return;
     if (o.geometry.index || o.geometry.morphAttributes.position || Object.keys(a).sort().join() !== 'normal,position,uv') return;
-    for (let p = o.parent; p !== g; p = p.parent) if (!p || moving.has(p) || !p.visible) return;
+    let bone = null;
+    for (let p = o.parent; p !== g; p = p.parent) {
+      if (!p || !p.visible) return;
+      if (!bone && pivotOf.has(p)) bone = p;
+    }
     const xf = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
     if (xf.determinant() <= 0) return;
     const key = `${m.uuid}|${o.castShadow}|${o.receiveShadow}`;
-    if (!bins.has(key)) bins.set(key, []);
-    bins.get(key).push([o, xf]);
+    const into = bone ? skinBins : bins;
+    if (!into.has(key)) into.set(key, []);
+    into.get(key).push([o, xf, bone]);
   });
-  for (const list of bins.values()) {
-    if (list.length < 2) continue;
-    const geo = mergeGeometries(list.map(([o, xf]) => (o.geometry.userData.shared ? o.geometry.clone() : o.geometry).applyMatrix4(xf)), false);
-    if (!geo) continue;
+  // one skeleton per ship: a single bone texture and update for all of its moving parts
+  const bones = [...new Set([...skinBins.values()].flatMap((l) => (l.length > 1 ? l.map((x) => x[2]) : [])))];
+  const skeleton = bones.length ? new THREE.Skeleton(bones) : null;
+  const bake = (list, skinned) => {
+    let reach = 0;
+    const geos = list.map(([o, xf, bone]) => {
+      const geo = (o.geometry.userData.shared ? o.geometry.clone() : o.geometry).applyMatrix4(xf);
+      if (!skinned) return geo;
+      const n = geo.attributes.position.count, bi = bones.indexOf(bone);
+      const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+      for (let i = 0; i < n; i++) { si[i * 4] = bi; sw[i * 4] = 1; }
+      geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+      geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+      geo.computeBoundingSphere();
+      _pv.setFromMatrixPosition(pivotOf.get(bone).matrixWorld).applyMatrix4(inv);
+      reach = Math.max(reach, geo.boundingSphere.center.distanceTo(_pv) + geo.boundingSphere.radius);
+      return geo;
+    });
+    const geo = mergeGeometries(geos, false);
+    if (!geo) return;
     geo.computeBoundingSphere();
     const [o0] = list[0];
-    const mesh = new THREE.Mesh(geo, o0.material);
+    const mesh = skinned ? new THREE.SkinnedMesh(geo, skinMat(o0.material)) : new THREE.Mesh(geo, o0.material);
     mesh.name = o0.name;
     mesh.castShadow = o0.castShadow;
     mesh.receiveShadow = o0.receiveShadow;
@@ -1057,10 +1089,19 @@ export function mergeStatic(ship) {
       if (!o.geometry.userData.shared) o.geometry.dispose();
     }
     g.add(mesh);
-  }
+    if (skinned) {
+      mesh.bind(skeleton);
+      // parts swing about their mount, so they can reach past the bind-pose bounds
+      mesh.boundingSphere = geo.boundingSphere.clone();
+      mesh.boundingSphere.radius += reach * 2;
+    }
+  };
+  for (const list of bins.values()) if (list.length > 1) bake(list, false);
+  for (const list of skinBins.values()) if (list.length > 1) bake(list, true);
   return ship;
 }
 
+// per-frame cosmetic animation
 export function animateShip(ship, dt, time, throttle) {
   for (const e of ship.engines) {
     const p = 0.12 + throttle * 0.9;
