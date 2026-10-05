@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Kit, G, mat } from './geo.js';
 import { hullMaps } from './textures.js';
 import { animateShip } from './ships.js';
+import { UPSCALE, upscaleSharp } from './shaders.js';
 
 function hazardTexture() {
   const c = document.createElement('canvas');
@@ -89,7 +90,19 @@ export class Hangar {
     this.camera = new THREE.PerspectiveCamera(42, w / h, 0.5, 4000);
     this.composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples: 4 }));
     this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.composer.addPass(new OutputPass());
+    this.final = new ShaderPass({
+      uniforms: { tDiffuse: { value: null }, uTexel: { value: new THREE.Vector2() }, uSharp: { value: 0 }, uAA: { value: 0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      fragmentShader: /* glsl */`
+        uniform sampler2D tDiffuse; varying vec2 vUv;
+        ${UPSCALE}
+        void main(){
+          gl_FragColor = vec4(max(upscale(tDiffuse, vUv), 0.0), 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    });
+    this.composer.addPass(this.final);
     this.env = this.buildEnv();
     this.yaw = 2.4; this.pitch = 0.28; this.dist = 80; this.distWant = 80;
     this.target = new THREE.Vector3(0, 8, 0); this.targetWant = new THREE.Vector3(0, 8, 0);
@@ -434,11 +447,13 @@ export class Hangar {
     this.distWant = THREE.MathUtils.clamp(this.distWant * Math.pow(1.0015, dy), min, max);
   }
 
-  resize(w, h) {
+  resize(w, h, pr, out) {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-    this.composer.setPixelRatio(this.renderer.getPixelRatio());
+    this.composer.setPixelRatio(pr);
     this.composer.setSize(w, h);
+    this.final.uniforms.uTexel.value.set(1 / this.composer.renderTarget1.width, 1 / this.composer.renderTarget1.height);
+    this.final.uniforms.uSharp.value = upscaleSharp(pr / out);
   }
 
   update(dt) {
@@ -474,6 +489,7 @@ export class Hangar {
     k.shadow.mapSize.set(n, n);
     if (k.shadow.map) { k.shadow.map.dispose(); k.shadow.map = null; }
     for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) if (t.samples !== q.msaa) { t.samples = q.msaa; t.dispose(); }
+    this.final.uniforms.uAA.value = q.msaa ? 0 : 1;
   }
 
   render() { this.composer.render(); }

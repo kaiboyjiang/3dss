@@ -93,3 +93,44 @@ export const LOGDEPTH_FRAG_PARS = /* glsl */ `
 export const LOGDEPTH_FRAG = /* glsl */ `
 #include <logdepthbuf_fragment>
 `;
+
+// Upscale a lower-resolution render to the canvas: FXAA-style edge smoothing when the render has no MSAA,
+// then contrast-adaptive sharpening clamped to the local min/max so it cannot ring. uTexel is 1/source size.
+export const UPSCALE = /* glsl */ `
+uniform vec2 uTexel; uniform float uSharp, uAA;
+float aaLuma(vec3 c) { float l = dot(c, vec3(0.299, 0.587, 0.114)); return l / (1.0 + l); }
+vec3 upscale(sampler2D t, vec2 uv) {
+  vec3 m = texture2D(t, uv).rgb;
+  if (uSharp <= 0.0 && uAA <= 0.0) return m;
+  vec3 col = m;
+  if (uAA > 0.0) {
+    float lnw = aaLuma(texture2D(t, uv + vec2(-0.5, -0.5) * uTexel).rgb);
+    float lne = aaLuma(texture2D(t, uv + vec2(0.5, -0.5) * uTexel).rgb);
+    float lsw = aaLuma(texture2D(t, uv + vec2(-0.5, 0.5) * uTexel).rgb);
+    float lse = aaLuma(texture2D(t, uv + vec2(0.5, 0.5) * uTexel).rgb);
+    float lm = aaLuma(m);
+    float lmin = min(lm, min(min(lnw, lne), min(lsw, lse)));
+    float lmax = max(lm, max(max(lnw, lne), max(lsw, lse)));
+    if (lmax - lmin > max(0.03, lmax * 0.125)) {
+      vec2 dir = vec2(-((lnw + lne) - (lsw + lse)), (lnw + lsw) - (lne + lse));
+      float red = max((lnw + lne + lsw + lse) * 0.03125, 1.0 / 128.0);
+      dir = clamp(dir / (min(abs(dir.x), abs(dir.y)) + red), -2.0, 2.0) * uTexel;
+      vec3 a = 0.5 * (texture2D(t, uv - dir / 6.0).rgb + texture2D(t, uv + dir / 6.0).rgb);
+      vec3 b = a * 0.5 + 0.25 * (texture2D(t, uv - dir * 0.5).rgb + texture2D(t, uv + dir * 0.5).rgb);
+      float lb = aaLuma(b);
+      col = (lb < lmin || lb > lmax) ? a : b;
+    }
+  }
+  if (uSharp > 0.0) {
+    vec3 n = texture2D(t, uv + vec2(0.0, -1.0) * uTexel).rgb;
+    vec3 s = texture2D(t, uv + vec2(0.0, 1.0) * uTexel).rgb;
+    vec3 w = texture2D(t, uv + vec2(-1.0, 0.0) * uTexel).rgb;
+    vec3 e = texture2D(t, uv + vec2(1.0, 0.0) * uTexel).rgb;
+    vec3 mn = min(col, min(min(n, s), min(w, e))), mx = max(col, max(max(n, s), max(w, e)));
+    col = clamp(col + (col - 0.25 * (n + s + w + e)) * uSharp, mn, mx);
+  }
+  return col;
+}
+`;
+// sharpening strength for a render drawn at `scale` of the canvas resolution
+export const upscaleSharp = (scale) => Math.min(0.6, Math.max(0, (1 / scale - 1) * 0.8));

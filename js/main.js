@@ -12,6 +12,7 @@ import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } fr
 import { Audio } from './audio.js';
 import { HUD, fmtDist } from './hud.js';
 import { TargetHolo } from './holo.js';
+import { UPSCALE, upscaleSharp } from './shaders.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3();
@@ -25,7 +26,7 @@ const canvas = $('c');
 // MSAA happens in the composer's render target, so the canvas itself needs none
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
 const GFX = {
-  min: { label: 'Min', desc: 'For low-end hardware: lower resolution, no shadows or anti-aliasing, thinner asteroid belts and dust.', prMax: 0.75, prMin: 0.5, msaa: 0, shadow: 0, soft: false, sky: 256, detail: -2, clouds: false, belt: 0.45, rockLod: 0.35, dust: 0.35, stars: 0.6 },
+  min: { label: 'Min', desc: 'For low-end hardware: renders at reduced resolution and sharpens it up to full screen, no shadows, thinner asteroid belts and dust.', prMax: 0.75, prMin: 0.5, msaa: 0, shadow: 0, soft: false, sky: 512, detail: -2, clouds: false, belt: 0.45, rockLod: 0.35, dust: 0.35, stars: 0.6 },
   normal: { label: 'Normal', desc: 'A balance of looks and speed.', prMax: 1, prMin: 0.6, msaa: 4, shadow: 1024, soft: false, sky: 512, detail: 0, clouds: true, belt: 0.8, rockLod: 1, dust: 0.7, stars: 1 },
   max: { label: 'Max', desc: 'Maximum graphics: full display resolution, 8× MSAA, soft high-resolution shadows, full asteroid belts.', prMax: 2, prMin: 0.85, msaa: 8, shadow: 2048, soft: true, sky: 1024, detail: 1, clouds: true, belt: 1, rockLod: 2.5, dust: 1, stars: 1 },
 };
@@ -35,8 +36,10 @@ const settings = (() => { try { return { gfx: 'normal', fps: false, cap: 60, ...
 if (!GFX[settings.gfx]) settings.gfx = 'normal';
 if (!FPS_CAPS.includes(settings.cap)) settings.cap = 60;
 let prMax = Math.min(window.devicePixelRatio || 1, GFX[settings.gfx].prMax), prMin = Math.min(prMax, GFX[settings.gfx].prMin);
+// the canvas always matches the display; pixelRatio is the scene's render scale, upscaled by the final pass
+const outRatio = () => Math.min(window.devicePixelRatio || 1, 2);
 let pixelRatio = prMax;
-renderer.setPixelRatio(pixelRatio);
+renderer.setPixelRatio(outRatio());
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -52,18 +55,21 @@ const composer = new EffectComposer(renderer, rt);
 composer.addPass(new RenderPass(scene, camera));
 // final pass: lens effects plus the renderer's tone mapping and sRGB output, applied when drawing to the canvas
 const lensPass = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uWarp: { value: 0 }, uHit: { value: 0 }, uAspect: { value: 1 } },
+  uniforms: { tDiffuse: { value: null }, uWarp: { value: 0 }, uHit: { value: 0 }, uAspect: { value: 1 }, uTexel: { value: new THREE.Vector2() }, uSharp: { value: 0 }, uAA: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse; uniform float uWarp, uHit, uAspect; varying vec2 vUv;
+    ${UPSCALE}
     void main(){
       vec2 c = vUv - 0.5;
       float ca = uWarp * 0.004 + uHit * 0.004;
       vec2 uvW = vUv - c * uWarp * 0.03 * dot(c, c);
       vec3 col;
-      col.r = texture2D(tDiffuse, uvW + c * ca).r;
-      col.g = texture2D(tDiffuse, uvW).g;
-      col.b = texture2D(tDiffuse, uvW - c * ca).b;
+      if (ca > 0.0) {
+        col.r = texture2D(tDiffuse, uvW + c * ca).r;
+        col.g = texture2D(tDiffuse, uvW).g;
+        col.b = texture2D(tDiffuse, uvW - c * ca).b;
+      } else col = upscale(tDiffuse, uvW);
       // high-contrast grade: crush shadows, push highlights
       col = pow(max(col, 0.0), vec3(1.14)) * 1.12;
       vec2 cc = c * vec2(uAspect, 1.0);
@@ -78,13 +84,16 @@ composer.addPass(lensPass);
 
 function resize() {
   const w = window.innerWidth, h = window.innerHeight;
+  renderer.setPixelRatio(outRatio());
   renderer.setSize(w, h);
   composer.setPixelRatio(pixelRatio);
   composer.setSize(w, h);
+  lensPass.uniforms.uTexel.value.set(1 / composer.renderTarget1.width, 1 / composer.renderTarget1.height);
+  lensPass.uniforms.uSharp.value = upscaleSharp(pixelRatio / outRatio());
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   lensPass.uniforms.uAspect.value = w / h;
-  if (hangar) hangar.resize(w, h);
+  if (hangar) hangar.resize(w, h, pixelRatio, outRatio());
   staticDrawn = false;
 }
 window.addEventListener('resize', resize);
@@ -1904,6 +1913,8 @@ let staticDrawn = false, menuAcc = 0;
 let msaa = 0;
 function setMsaa(n) {
   msaa = n;
+  lensPass.uniforms.uAA.value = n ? 0 : 1;
+  if (hangar) hangar.final.uniforms.uAA.value = n ? 0 : 1;
   for (const c of [composer, hangar && hangar.composer]) {
     if (!c) continue;
     for (const t of [c.renderTarget1, c.renderTarget2]) if (t.samples !== n) { t.samples = n; t.dispose(); }
@@ -1922,7 +1933,6 @@ function adaptResolution(ms) {
   else if (fast && pr < prMax) pr = Math.min(prMax, pr + 0.05);
   if (pr === pixelRatio) return;
   pixelRatio = pr;
-  renderer.setPixelRatio(pr);
   resize();
 }
 
@@ -2312,7 +2322,6 @@ function applyGfx(name) {
   settings.gfx = GFX[name] ? name : 'normal';
   prMax = Math.min(window.devicePixelRatio || 1, q.prMax); prMin = Math.min(prMax, q.prMin);
   pixelRatio = prMax;
-  renderer.setPixelRatio(pixelRatio);
   const type = q.soft ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
   const recompile = renderer.shadowMap.enabled !== q.shadow > 0 || renderer.shadowMap.type !== type;
   renderer.shadowMap.enabled = q.shadow > 0;
