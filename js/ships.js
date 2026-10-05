@@ -1098,27 +1098,112 @@ export function mergeStatic(ship) {
   };
   for (const list of bins.values()) if (list.length > 1) bake(list, false);
   for (const list of skinBins.values()) if (list.length > 1) bake(list, true);
+  batchGlows(ship);
   return ship;
+}
+
+// Additive glow sprites (engine flares, nav lights) as one instanced billboard draw per ship. Additive blending is
+// order-independent, so this renders the same as the individual sprites it replaces.
+const glowMat = new THREE.ShaderMaterial({
+  uniforms: { map: { value: glow } },
+  vertexShader: `
+    attribute vec3 iPos;
+    attribute float iScale;
+    attribute vec4 iColor;
+    varying vec2 vUv;
+    varying vec4 vColor;
+    void main() {
+      vUv = uv;
+      vColor = iColor;
+      vec4 mvPosition = modelViewMatrix * vec4(iPos, 1.0);
+      float sx = length(modelMatrix[0].xyz), sy = length(modelMatrix[1].xyz);
+      mvPosition.xy += position.xy * vec2(sx, sy) * iScale;
+      gl_Position = projectionMatrix * mvPosition;
+    }`,
+  fragmentShader: `
+    uniform sampler2D map;
+    varying vec2 vUv;
+    varying vec4 vColor;
+    void main() {
+      vec4 t = texture2D(map, vUv);
+      gl_FragColor = vec4(vColor.rgb * t.rgb, vColor.a * t.a);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    }`,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  transparent: true,
+});
+glowMat.userData.shared = true;
+const glowQuad = new THREE.PlaneGeometry(1, 1);
+
+function batchGlows(ship) {
+  const g = ship.group, list = [];
+  const take = (sp, maxScale) => {
+    const m = sp.material;
+    if (!sp.isSprite || sp.parent !== g || !sp.visible || m.map !== glow || m.blending !== THREE.AdditiveBlending || m.rotation || sp.center.x !== 0.5 || sp.center.y !== 0.5 || sp.scale.x !== sp.scale.y) return -1;
+    list.push([sp, maxScale]);
+    return list.length - 1;
+  };
+  const engines = ship.engines.map((e) => take(e.sprite, e.radius * 3.2));
+  const lights = ship.navLights.map((l) => take(l.sp, l.size));
+  if (list.length < 2) return;
+  const n = list.length;
+  const geo = new THREE.InstancedBufferGeometry();
+  geo.index = glowQuad.index;
+  geo.setAttribute('position', glowQuad.attributes.position);
+  geo.setAttribute('uv', glowQuad.attributes.uv);
+  const pos = new Float32Array(n * 3), scale = new Float32Array(n), color = new Float32Array(n * 4);
+  geo.setAttribute('iPos', new THREE.InstancedBufferAttribute(pos, 3));
+  geo.setAttribute('iScale', new THREE.InstancedBufferAttribute(scale, 1).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('iColor', new THREE.InstancedBufferAttribute(color, 4).setUsage(THREE.DynamicDrawUsage));
+  geo.instanceCount = n;
+  const sphere = new THREE.Sphere();
+  const pts = list.map(([sp]) => sp.position);
+  sphere.setFromPoints(pts);
+  let r = 0;
+  list.forEach(([sp, maxScale], i) => {
+    sp.position.toArray(pos, i * 3);
+    scale[i] = sp.scale.x;
+    sp.material.color.toArray(color, i * 4);
+    color[i * 4 + 3] = sp.material.opacity;
+    r = Math.max(r, sp.position.distanceTo(sphere.center) + Math.max(maxScale, sp.scale.x));
+    sp.removeFromParent();
+    sp.material.dispose();
+  });
+  sphere.radius = r;
+  geo.boundingSphere = sphere;
+  const mesh = new THREE.Mesh(geo, glowMat);
+  mesh.name = 'glows';
+  g.add(mesh);
+  ship.glow = { scale: geo.attributes.iScale, color: geo.attributes.iColor, engines, lights };
 }
 
 // per-frame cosmetic animation
 export function animateShip(ship, dt, time, throttle) {
-  for (const e of ship.engines) {
+  const gl = ship.glow;
+  ship.engines.forEach((e, i) => {
     const p = 0.12 + throttle * 0.9;
     e.plume.material.uniforms.uPower.value = p * (0.95 + Math.random() * 0.1);
     e.plume.material.uniforms.uTime.value = time;
     e.plume.scale.z = e.length * (0.25 + throttle * 0.9);
-    e.sprite.scale.setScalar(e.radius * (1.4 + throttle * 1.8));
-    e.sprite.material.opacity = 0.25 + throttle * 0.45;
-  }
-  for (const l of ship.navLights) {
-    if (!l.blink) continue;
-    const on = ((time * l.blink + l.phase) % 1) < 0.12;
-    l.sp.material.opacity = on ? 1 : 0;
-  }
+    const sc = e.radius * (1.4 + throttle * 1.8), op = 0.25 + throttle * 0.45, j = gl ? gl.engines[i] : -1;
+    if (j < 0) { e.sprite.scale.setScalar(sc); e.sprite.material.opacity = op; return; }
+    gl.scale.array[j] = sc;
+    gl.color.array[j * 4 + 3] = op;
+  });
+  ship.navLights.forEach((l, i) => {
+    if (!l.blink) return;
+    const op = ((time * l.blink + l.phase) % 1) < 0.12 ? 1 : 0, j = gl ? gl.lights[i] : -1;
+    if (j < 0) l.sp.material.opacity = op;
+    else gl.color.array[j * 4 + 3] = op;
+  });
+  if (gl) { gl.scale.needsUpdate = true; gl.color.needsUpdate = true; }
   for (const t of ship.turrets) {
-    t.recoil = t.recoil.map((v) => Math.max(0, v - dt * 4));
-    t.barrels.forEach((b, i) => { b.position.z = t.baseZ[i] - t.recoil[i] * t.recoilDist; });
+    for (let i = 0; i < t.barrels.length; i++) {
+      t.recoil[i] = Math.max(0, t.recoil[i] - dt * 4);
+      t.barrels[i].position.z = t.baseZ[i] - t.recoil[i] * t.recoilDist;
+    }
     if (t.rotor) { t.rotor.rotation.z += dt * t.spin; t.spin = Math.max(0, t.spin - dt * 40); }
   }
 }

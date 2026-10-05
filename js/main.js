@@ -168,7 +168,7 @@ function disposeShip(obj) {
     if (o.isSprite) { o.material.dispose(); return; }
     if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
     if (o.isSkinnedMesh) o.skeleton.dispose();
-    if (o.material && o.material.isShaderMaterial) o.material.dispose();
+    if (o.material && o.material.isShaderMaterial && !o.material.userData.shared) o.material.dispose();
   });
 }
 
