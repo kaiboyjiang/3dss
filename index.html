@@ -153,6 +153,23 @@
 
 <div id="help" class="screen hidden"><div class="box" id="helpbox"></div></div>
 
+<script>
+(() => {
+  const fail = (text) => {
+    const start = document.getElementById('start');
+    if (!start.disabled) return;
+    start.textContent = 'Failed to load';
+    document.getElementById('loadmsg').textContent = text;
+  };
+  const report = (m) => fail(/webgl/i.test(m)
+    ? 'Your browser could not start WebGL. Turn on hardware acceleration in the browser settings, then reload the page.'
+    : `Error: ${String(m).replace(/^Uncaught (\w*Error: )?/, '').replace(/\.$/, '')}. Try reloading the page.`);
+  addEventListener('error', (e) => report(e.message || 'a game file failed to load'), true);
+  addEventListener('unhandledrejection', (e) => report((e.reason && e.reason.message) || e.reason));
+  document.getElementById('c').addEventListener('webglcontextlost', () => fail('The graphics driver stopped responding (WebGL context lost). Reload the page, or restart the browser if it keeps happening.'));
+  setTimeout(() => { if (!document.getElementById('loadmsg').textContent) fail('The game script did not start. Check that WebGL is enabled in your browser, then reload the page.'); }, 20000);
+})();
+</script>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

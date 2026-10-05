@@ -2246,7 +2246,7 @@ async function boot() {
     undockPose();
     await step('Compiling shaders…');
     const fonts = Promise.race([Promise.all(['600 120px "Chakra Petch"', '44px "Chakra Petch"', '30px "Share Tech Mono"', '10px "Mono Digits"'].map((f) => document.fonts.load(f, 'A0'))), new Promise((r) => setTimeout(r, 2000))]).catch(() => {});
-    await renderer.compileAsync(scene, camera);
+    renderer.compile(scene, camera);
     await step('Pressurising hangar bay…');
     await fonts;
     hangar = new Hangar(renderer);
