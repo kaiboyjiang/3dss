@@ -9,8 +9,8 @@ export function fmtDist(m) {
   return `${(m / 1.496e11).toFixed(2)} AU`;
 }
 
-const COLORS = { hostile: '255,90,72', neutral: '207,214,218', friendly: '127,224,160' };
-function factionCls(e) { return e.faction === 'pirate' ? 'hostile' : e.faction === 'navy' ? 'friendly' : 'neutral'; }
+const COLORS = { hostile: '255,90,72', neutral: '207,214,218', friendly: '127,224,160', corp: '216,176,64' };
+function factionCls(e) { return e.faction === 'pirate' ? 'hostile' : e.faction === 'navy' ? 'friendly' : e.faction === 'corp' ? 'corp' : 'neutral'; }
 
 export class HUD {
   constructor() {
@@ -298,7 +298,7 @@ export class HUD {
       if (d > 150000) continue;
       if (this.tab === 'nav') continue;
       if (this.tab === 'hostile' && e.faction !== 'pirate') continue;
-      rows.push({ ref: e, cls: factionCls(e), ico: e.faction === 'pirate' ? '▼' : e.faction === 'navy' ? '△' : '▽', name: e.name, type: e.className, d });
+      rows.push({ ref: e, cls: factionCls(e), ico: e.faction === 'pirate' ? '▼' : e.faction === 'navy' ? '△' : e.faction === 'corp' ? '◇' : '▽', name: e.name, type: e.className, d });
     }
     if (this.tab !== 'hostile') {
       G.locations.forEach((l, i) => rows.push({ ref: l, cls: 'loc', ico: ['◆', '◌', '☠', '◎', '●', '○', '✦'][i] || '◇', name: `${i + 1}. ${l.name}`, type: l.type, d: l.pos.distanceTo(pp) }));

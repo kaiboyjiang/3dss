@@ -1,7 +1,7 @@
 import {
   buildFrigate, buildKestrel, buildWarden, buildPaladin, buildMantis, buildCorvid, buildBastion,
   buildHornet, buildWisp, buildMule, buildAtlas, buildAurora, buildSabre, buildSovereign, buildLeviathan,
-  buildTurret, buildOutfitModel, buildRaider, buildCruiser, buildCutlass, buildReaver, buildRavager,
+  buildTurret, buildOutfitModel, buildRaider, buildCruiser, buildCutlass, buildReaver, buildRavager, buildCombine,
 } from './ships.js';
 import { Kit, G, mat } from './geo.js';
 
@@ -128,13 +128,47 @@ export const HULLS = {
   },
 };
 
+Object.assign(HULLS, {
+  unit: {
+    name: 'Unit-7', cls: 'Combine Unit-7 Drone Fighter', price: 70000, build: (env, liv) => buildCombine(env, 'unit', liv), corp: true,
+    desc: 'Stamped out by the thousand at Vanta Prime: two box sections, a pair of stub wings and two square engine pods. Cheap to buy, cheap to lose, and it handles like it.',
+    stats: { cargo: 2, bunks: 0, shield: 300, armor: 220, hull: 200, speed: 350, boost: 880, accel: 160, turn: [1.9, 1.5, 3.0], cap: 500, capRegen: 16, shieldRegen: 10, sig: 0.55 },
+    fit: { w: ['blaster', 'auto'], u: [null] },
+  },
+  enforcer: {
+    name: 'Enforcer', cls: 'Combine Enforcer Security Frigate', price: 180000, build: (env, liv) => buildCombine(env, 'enforcer', liv), corp: true,
+    desc: 'The Combine Security patrol frigate: four identical hull blocks, bolt-on sponsons and four square engine pods. Built to a budget, so the armour is thin and the reactor is small.',
+    stats: { cargo: 18, bunks: 4, shield: 800, armor: 700, hull: 600, speed: 230, boost: 560, accel: 68, turn: [0.95, 0.75, 1.7], cap: 1000, capRegen: 22, shieldRegen: 14, sig: 1.0 },
+    fit: { w: ['pulse', 'pulse', 'auto'], u: [null, null] },
+  },
+  crate: {
+    name: 'Crate', cls: 'Combine Crate-class Container Hauler', price: 380000, build: (env, liv) => buildCombine(env, 'crate', liv), corp: true,
+    desc: 'A cab, a spine and twenty standard containers. Huge hold for the price, but sluggish and lightly protected.',
+    stats: { cargo: 480, bunks: 4, shield: 700, armor: 900, hull: 900, speed: 120, boost: 290, accel: 18, turn: [0.32, 0.26, 0.55], cap: 900, capRegen: 18, shieldRegen: 12, sig: 2.6 },
+    fit: { w: ['pulse', null], u: [null, null, null] },
+  },
+  commuter: {
+    name: 'Commuter', cls: 'Combine Commuter Labour Transport', price: 520000, build: (env, liv) => buildCombine(env, 'commuter', liv), corp: true,
+    desc: 'A 110 m box of stacked bunks that ships contract workers between company towns. Two hundred berths and no comforts.',
+    stats: { cargo: 40, bunks: 200, shield: 900, armor: 800, hull: 900, speed: 130, boost: 300, accel: 20, turn: [0.3, 0.25, 0.5], cap: 1000, capRegen: 20, shieldRegen: 12, sig: 2.8 },
+    fit: { w: ['pulse', null], u: [null, null, null, null] },
+  },
+  compliance: {
+    name: 'Compliance', cls: 'Combine Compliance Cruiser', price: 620000, build: (env, liv) => buildCombine(env, 'compliance', liv), corp: true,
+    desc: 'The heaviest thing Combine Security flies: a cruiser-sized stack of standard blocks with a bridge tower and five hardpoints. Half the price of a Sabre, and it shows.',
+    stats: { cargo: 90, bunks: 30, shield: 1800, armor: 1700, hull: 1400, speed: 140, boost: 340, accel: 28, turn: [0.42, 0.34, 0.75], cap: 1800, capRegen: 34, shieldRegen: 22, sig: 2.2 },
+    fit: { w: ['pulse', 'pulse', 'pulse', 'flak', 'rail'], u: [null, null, null] },
+  },
+});
+
 // hull catalogues by shipyard type
 export const YARDS = {
   fed: { name: 'Helion Yards hull catalogue', hulls: ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'mule', 'mantis', 'warden', 'sabre', 'aurora', 'atlas', 'bastion', 'paladin', 'sovereign', 'leviathan'] },
   light: { name: 'Civilian dealership', hulls: ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'mule', 'aurora'] },
+  corp: { name: 'Vanta Combine asset catalogue', hulls: ['unit', 'enforcer', 'crate', 'commuter', 'compliance', 'hornet', 'mule'] },
   pirate: { name: 'Clan black-market hulls', hulls: ['raider', 'cutlass', 'reaver', 'marauder', 'ravager', 'hornet', 'mule'] },
 };
-export const HULL_ORDER = ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'mule', 'mantis', 'warden', 'sabre', 'aurora', 'atlas', 'bastion', 'paladin', 'sovereign', 'leviathan', 'raider', 'cutlass', 'reaver', 'marauder', 'ravager'];
+export const HULL_ORDER = ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'mule', 'mantis', 'warden', 'sabre', 'aurora', 'atlas', 'bastion', 'paladin', 'sovereign', 'leviathan', 'raider', 'cutlass', 'reaver', 'marauder', 'ravager', 'unit', 'enforcer', 'crate', 'commuter', 'compliance'];
 
 // mount: turret = auto-fires at hostiles, gun = fixed forward (group: primary = LMB, secondary = RMB). tech: basic (any station) / high (shipyard stations only)
 export const OUTFITS = {

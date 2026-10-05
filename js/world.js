@@ -422,6 +422,7 @@ export function stationMaterials(env) {
     red: new THREE.MeshBasicMaterial({ color: new THREE.Color(8, 0.6, 0.3) }),
     blue: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.6, 2.5, 8) }),
     hangar: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 1.5, 1.3) }),
+    gold: new THREE.MeshStandardMaterial({ color: 0xb8902c, metalness: 0.95, roughness: 0.32, envMap: env, envMapIntensity: 1.1 }),
   };
   m.light.userData.noShadow = m.red.userData.noShadow = m.blue.userData.noShadow = m.hangar.userData.noShadow = true;
   return m;
@@ -927,6 +928,26 @@ function buildSpaceport(M, style, seed) {
         k.add('hull', G.cyl(26, 26, 90 + sink, 16), mat([x, (90 - sink) / 2, z]));
         k.add('dark', G.cyl(28, 28, 6, 16), mat([x, 90, z]));
       } else k.add('rust', G.box(16, 10, 300), mat([x, 30, z], [0.12, a, 0]));
+    } else if (style === 'company') {
+      // identical factory halls, stacks, cooling towers and worker blocks
+      const t = i % 4;
+      if (t === 0) {
+        const w = 80 + r() * 60, l = 160 + r() * 120, h = 40 + r() * 20;
+        k.add('dark', G.box(w, h + sink, l), mat([x, (h - sink) / 2, z], [0, a, 0]));
+        k.add('window', G.box(w + 1, 6, l * 0.9), mat([x, h * 0.6, z], [0, a, 0]));
+        for (let j = 0; j < 4; j++) k.add('hull', G.box(w * 0.9, 10, 14), mat([x, h + 4, z], [0, a, 0]).multiply(mat([0, 0, -l * 0.35 + j * l * 0.23], [0.5, 0, 0])));
+        const sh = 140 + r() * 80;
+        k.add('hull', G.cyl(6, 10, sh + sink, 10), mat([x, (sh - sink) / 2, z]));
+        k.add('gold', G.cyl(10.5, 10.5, 8, 10), mat([x, sh - 12, z]));
+        addBeacon(new THREE.Vector3(x, sh + 6, z), 0xff3020, 20, r(), 0.6);
+      } else if (t === 1) {
+        k.add('hull', G.cyl(46, 70, 170 + sink, 24), mat([x, (170 - sink) / 2, z]));
+        k.add('dark', G.cyl(44, 44, 2, 24), mat([x, 171, z]));
+      } else {
+        const h = 70 + (i % 3) * 20;
+        k.add(t === 2 ? 'hull' : 'dark', G.box(36, h + sink, 36), mat([x, (h - sink) / 2, z], [0, a, 0]));
+        k.add('window', G.box(37, h * 0.7, 30), mat([x, h * 0.45, z], [0, a, 0]));
+      }
     } else if (style === 'haven') {
       const w = 30 + r() * 60, h = 20 + r() * 60;
       k.add(r() < 0.5 ? 'rust' : 'dark', G.box(w, h + sink, w * (0.5 + r())), mat([x, (h - sink) / 2, z], [r() * 0.2, a, r() * 0.2]));
@@ -940,7 +961,7 @@ function buildSpaceport(M, style, seed) {
     }
   }
   // approach light column above the main pad, chasing upwards
-  const col = pirate ? 0xff5020 : 0x9fd0ff;
+  const col = pirate ? 0xff5020 : style === 'company' ? 0xffc040 : 0x9fd0ff;
   for (let i = 0; i < 8; i++) addBeacon(new THREE.Vector3(0, 220 + i * 170, 0), col, 34 + i * 6, -i * 0.1, 0.9);
   for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; addBeacon(new THREE.Vector3(Math.cos(a) * 96, 12, Math.sin(a) * 96), pirate ? 0xff3010 : 0xffe0a0, 16, i / 8, 1.2); }
   root.add(k.build(M, { uvTile: { hull: 40, dark: 30, rust: 30, window: 60 } }));
@@ -992,6 +1013,48 @@ function buildHabitat(M, seed) {
   const colliders = [];
   for (let y = -450; y <= 450; y += 60) colliders.push({ p: new THREE.Vector3(0, y, 0), r: 60 });
   for (const y of [120, 300]) for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; colliders.push({ p: new THREE.Vector3(Math.cos(a) * 520, y, Math.sin(a) * 520), r: 40 }); }
+  return { root, colliders, bays: finishPods(pods, addBeacon, colliders) };
+}
+
+// ---------------------------------------------------------------- Combine tower: a tapering corporate spire on a docking podium
+function buildTower(M, seed) {
+  const root = new THREE.Group();
+  const k = new Kit();
+  const r = rng(seed);
+  k.add('dark', G.cyl(160, 190, 260, 8), mat([0, -60, 0]));
+  k.add('gold', G.cyl(166, 166, 10, 8), mat([0, 64, 0]));
+  const floors = 14;
+  for (let i = 0; i < floors; i++) {
+    const rad = 120 - i * 5, y = 70 + i * 90;
+    k.add(i % 4 === 3 ? 'dark' : 'hull', G.cyl(rad - 4, rad, 84, 8), mat([0, y + 42, 0]));
+    k.add('window', G.cyl(rad - 1.5, rad + 0.5, 30, 8, true), mat([0, y + 50, 0]));
+  }
+  const topY = 70 + floors * 90;
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * Math.PI * 2 + Math.PI / 8;
+    k.add('gold', G.box(14, 1000, 50), mat([Math.cos(a) * 125, 620, Math.sin(a) * 125], [0, Math.PI / 2 - a, 0]));
+  }
+  k.add('dark', G.cyl(40, 60, 140, 8), mat([0, topY + 70, 0]));
+  k.add('gold', G.cyl(4, 14, 260, 8), mat([0, topY + 270, 0]));
+  k.add('gold', G.torus(280, 9, 6, 64), mat([0, 900, 0], [Math.PI / 2, 0, 0]));
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * Math.PI * 2;
+    k.add('dark', G.box(170, 6, 6), mat([Math.cos(a) * 190, 900, Math.sin(a) * 190], [0, -a, 0]));
+  }
+  for (let i = 0; i < 40; i++) {
+    const a = r() * Math.PI * 2, y = 100 + r() * 1100;
+    k.add('dark', G.box(10 + r() * 16, 8 + r() * 20, 8), mat([Math.cos(a) * 118, y, Math.sin(a) * 118], [0, -a, 0]));
+  }
+  const pods = [0, 1, 2].map((i) => bayPod(k, i * Math.PI * 2 / 3 + 0.5, 190, -60, 200, 100, 300));
+  root.add(k.build(M, { uvTile: { hull: 40, dark: 30, window: 60 } }));
+  const beacons = [];
+  const addBeacon = beaconAdder(root, beacons);
+  addBeacon(new THREE.Vector3(0, topY + 410, 0), 0xffc040, 90, 0, 0.6);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; addBeacon(new THREE.Vector3(Math.cos(a) * 280, 900, Math.sin(a) * 280), 0xffb020, 40, i / 8, 1.0); }
+  root.userData = { beacons };
+  const colliders = [{ p: new THREE.Vector3(0, -60, 0), r: 190 }];
+  for (let y = 100; y <= topY + 300; y += 70) colliders.push({ p: new THREE.Vector3(0, y, 0), r: Math.max(60, 130 - (y / 90) * 5) });
+  for (let i = 0; i < 40; i++) { const a = i / 40 * Math.PI * 2; colliders.push({ p: new THREE.Vector3(Math.cos(a) * 280, 900, Math.sin(a) * 280), r: 24 }); }
   return { root, colliders, bays: finishPods(pods, addBeacon, colliders) };
 }
 
@@ -1313,10 +1376,10 @@ export function buildWorld(renderer, scene) {
     }
     bounce.position.copy(def.planets[0].pos).normalize().multiplyScalar(1000);
 
-    const LOC_TYPE = { station: 'Station', shipyard: 'Station (High-Tech)', habitat: 'Habitat Station', den: 'Pirate Station', port: 'Spaceport' };
-    const PORT_TYPE = { city: 'City Spaceport', colony: 'Colony Landing Field', mining: 'Mining Outpost', aerostat: 'Cloud-city Aerostat', haven: 'Pirate Haven' };
+    const LOC_TYPE = { station: 'Station', shipyard: 'Station (High-Tech)', habitat: 'Habitat Station', den: 'Pirate Station', port: 'Spaceport', tower: 'Combine Tower' };
+    const PORT_TYPE = { city: 'City Spaceport', colony: 'Colony Landing Field', mining: 'Mining Outpost', aerostat: 'Cloud-city Aerostat', haven: 'Pirate Haven', company: 'Company Town' };
     def.stations.forEach((S, si) => {
-      const b = S.kind === 'shipyard' ? buildShipyard(SM) : S.kind === 'habitat' ? buildHabitat(SM, 300 + si) : S.kind === 'den' ? buildDen(SM, 400 + si) : S.kind === 'port' ? buildSpaceport(SM, S.style, 500 + si * 7) : buildStation(SM);
+      const b = S.kind === 'shipyard' ? buildShipyard(SM) : S.kind === 'habitat' ? buildHabitat(SM, 300 + si) : S.kind === 'den' ? buildDen(SM, 400 + si) : S.kind === 'tower' ? buildTower(SM, 600 + si) : S.kind === 'port' ? buildSpaceport(SM, S.style, 500 + si * 7) : buildStation(SM);
       b.root.position.copy(S.pos);
       if (S.up) {
         b.root.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), S.up);

@@ -32,6 +32,7 @@ export function livery(name, env) {
     cutlass: { base: [88, 82, 74], accent: [214, 160, 30], second: [26, 24, 22], eng: [1.0, 0.5, 0.22], labels: ['CUTLASS', 'XX', 'SCRAP', '13', 'NO STEP'], seed: 191, wear: 1.0 },
     reaver: { base: [40, 40, 42], accent: [190, 24, 20], second: [16, 16, 18], eng: [1.0, 0.36, 0.16], labels: ['REAVER', 'BLOOD', 'R-66', 'RAM', 'HAZARD'], seed: 201, wear: 0.9 },
     ravager: { base: [70, 62, 56], accent: [150, 120, 96], second: [22, 20, 20], eng: [1.0, 0.32, 0.14], labels: ['RAVAGER', 'WARLORD', 'CLAN', 'KILL', 'HAZARD', '0666'], seed: 211, wear: 1.0 },
+    combine: { base: [62, 64, 68], accent: [206, 168, 38], second: [26, 26, 28], eng: [1.0, 0.82, 0.42], labels: ['VANTA', 'COMBINE', 'PROPERTY OF VANTA', 'ASSET 00417', 'COMPLY', 'UNIT'], seed: 221, wear: 0.12 },
     navy: { base: [72, 84, 98], accent: [230, 232, 236], second: [28, 32, 38], eng: [0.5, 0.8, 1.0], labels: ['HELION', 'NAVY', 'HN-12', 'RCS'], seed: 71, wear: 0.35 },
   }[name];
   const h = hullMaps({ seed: L.seed, base: L.base, accent: L.accent, accentChance: 0.05, darkChance: 0.08, wear: L.wear, labels: L.labels });
@@ -1771,5 +1772,130 @@ export function buildLeviathan(env, liv = 'leviathan') {
   ship.cockpit.set(0, 46, -56);
   ship.radius = 130;
   ship.hitSpheres = [[0, 0, 160, 6], [0, 0, 128, 10], [0, 0, 106, 16], [0, 0, 84, 20], [0, 0, 60, 22], [0, 0, 36, 24], [0, 0, 12, 24], [0, 0, -12, 24], [0, 0, -36, 24], [0, 0, -60, 24], [0, 0, -84, 24], [0, 0, -108, 22], [0, 0, -124, 20], [0, 36, -60, 10], [40, 0, -86, 12], [-40, 0, -86, 12]];
+  return addGreebles(ship);
+}
+
+// ---------------------------------------------------------------- Vanta Combine mass-production hulls
+// every Combine hull is assembled from the same few stamped parts: chamfered box sections, square engine pods and hazard bands
+const COMBINE = {
+  unit: {
+    name: 'Unit-7', radius: 8, cockpit: [0, 1.0, 4.2],
+    segs: [[2.0, 1.4, 4, 2.5], [2.4, 1.6, 4, -1.5]], nose: [1.4, 0.9, 2.4, 5.6], bridge: [1.2, 0.5, 1.6, 3.2, 0.7],
+    wings: { span: 8, t: 0.22, chord: 2.6, z: -1.5 }, engines: { R: 0.45, xs: [0.7, -0.7], ys: [0], z: -4.3 },
+    hp: [{ p: [0, 0.72, 2.2], flip: 0, s: 0.5 }, { p: [0, -0.82, -1.5], flip: 1, s: 0.5 }],
+    util: [{ p: [0, 0.82, -2.6], flip: 0, s: 0.32 }],
+  },
+  enforcer: {
+    name: 'Enforcer', radius: 18, cockpit: [0, 3.1, 9],
+    segs: [[5, 3.4, 7, 9], [6, 4, 7, 2], [6, 4, 7, -5], [5, 3.6, 5, -11]], nose: [3.4, 2.2, 5, 14.5], bridge: [3, 1.2, 3, 9, 1.7],
+    sponsons: { x: 3.9, w: 1.8, h: 2.4, l: 12, z: -2 }, engines: { R: 0.9, xs: [1.4, -1.4], ys: [1.0, -1.0], z: -14.2 },
+    hp: [{ p: [0, 2.02, 4], flip: 0, s: 0.75 }, { p: [0, 2.02, -4], flip: 0, s: 0.75 }, { p: [0, -2.02, 0], flip: 1, s: 0.75 }],
+    util: [{ p: [3.9, 1.22, -5], flip: 0, s: 0.45 }, { p: [-3.9, 1.22, -5], flip: 0, s: 0.45 }],
+  },
+  compliance: {
+    name: 'Compliance', radius: 50, cockpit: [0, 15, -9],
+    segs: [[14, 10, 16, 30], [18, 12, 18, 13], [18, 12, 18, -6], [16, 11, 16, -24]], nose: [10, 6, 14, 44], bridge: [8, 8, 10, -10, 6], tower: true,
+    sponsons: { x: 12, w: 5, h: 8, l: 40, z: -4 }, engines: { R: 2.2, xs: [5, 0, -5], ys: [2.6, -2.6], z: -34.5 },
+    hp: [{ p: [0, 5.05, 30], flip: 0, s: 1.4 }, { p: [0, 6.05, 8], flip: 0, s: 1.6 }, { p: [12, 4.05, 6], flip: 0, s: 1.2 }, { p: [-12, 4.05, 6], flip: 0, s: 1.2 }, { p: [0, -6.05, 0], flip: 1, s: 1.4 }],
+    util: [{ p: [12, 4.05, -14], flip: 0, s: 0.9 }, { p: [-12, 4.05, -14], flip: 0, s: 0.9 }, { p: [0, -6.05, -16], flip: 1, s: 0.9 }],
+  },
+  crate: {
+    name: 'Crate', radius: 46, cockpit: [0, 5, 38],
+    segs: [[10, 8, 10, 38], [12, 10, 8, -34]], spine: [3, 3, 66, 2], nose: [7, 5, 4, 44.5], bridge: [8, 0.8, 0.3, 42.6, 2.2],
+    containers: { zs: [24, 12, 0, -12, -24], size: [6.4, 6.4, 11] }, engines: { R: 2.4, xs: [3, -3], ys: [0], z: -38.5 },
+    hp: [{ p: [0, 4.05, 37], flip: 0, s: 1.1 }, { p: [0, 5.05, -34], flip: 0, s: 1.1 }],
+    util: [{ p: [3.4, 6.65, 12], flip: 0, s: 0.8 }, { p: [-3.4, 6.65, -12], flip: 0, s: 0.8 }, { p: [3.4, 6.65, -24], flip: 0, s: 0.8 }],
+  },
+  commuter: {
+    name: 'Commuter', radius: 58, cockpit: [0, 4.5, 50],
+    segs: [[12, 10, 90, 0], [13, 11, 8, -49]], nose: [9, 7, 10, 50], bridge: [7, 1.4, 0.3, 54.6, 1.8], decks: true,
+    engines: { R: 2.4, xs: [4, 0, -4], ys: [0], z: -53.5 },
+    hp: [{ p: [0, 5.05, 32], flip: 0, s: 1.1 }, { p: [0, 5.05, -32], flip: 0, s: 1.1 }],
+    util: [{ p: [0, 5.05, 12], flip: 0, s: 0.8 }, { p: [0, 5.05, -12], flip: 0, s: 0.8 }, { p: [0, -5.05, 4], flip: 1, s: 0.8 }, { p: [0, -5.05, -20], flip: 1, s: 0.8 }],
+  },
+};
+
+export function buildCombine(env, variant, liv = 'combine') {
+  const C = COMBINE[variant];
+  const M = livery(liv, env);
+  const ship = shipBase(C.name, M);
+  const k = new Kit();
+  const r = rng(241 + C.radius);
+  const alongZ = [Math.PI / 2, 0, 0];
+  const seg = (w, h, l, z, y = 0, key = 'hull') => {
+    k.add(key, G.rbox(w, h, l, Math.min(w, h) * 0.08), mat([0, y, z]));
+    for (const e of [-1, 1]) k.add('dark', G.box(w * 1.04, h * 1.04, Math.max(0.12, l * 0.05)), mat([0, y, z + e * l * 0.47]));
+    k.add('accent', G.box(w * 1.01, h * 0.1, l * 0.36), mat([0, y + h * 0.3, z]));
+    for (let i = 0; i < Math.round(l / (C.radius * 0.12)); i++) k.add('dark', G.box(w * 1.02, h * 0.04, l * 0.02), mat([0, y - h * 0.1, z - l * 0.4 + i * C.radius * 0.12]));
+    ship.hitSpheres.push([0, y, z, Math.max(w, h) * 0.55]);
+  };
+  for (const [w, h, l, z] of C.segs) seg(w, h, l, z);
+  if (C.spine) { const [w, h, l, z] = C.spine; k.add('dark', G.rbox(w, h, l, 0.3), mat([0, 0, z])); }
+  const [nw, nh, nl, nz] = C.nose;
+  k.add('hull', G.rbox(nw, nh, nl, Math.min(nw, nh) * 0.2), mat([0, -nh * 0.1, nz]));
+  k.add('accent', G.box(nw * 0.3, nh * 0.2, nl * 0.9), mat([0, nh * 0.35, nz]));
+  ship.hitSpheres.push([0, 0, nz, Math.max(nw, nh) * 0.55]);
+  const [bw, bh, bl, bz, by] = C.bridge;
+  if (C.tower) {
+    k.add('dark', G.rbox(bw, bh, bl, 0.6), mat([0, by + bh / 2, bz]));
+    k.add('glass', G.box(bw * 1.02, bh * 0.16, bl * 0.8), mat([0, by + bh * 0.8, bz]));
+    k.add('metal', G.cyl(0.3, 0.5, 8, 6), mat([0, by + bh + 4, bz - 2]));
+    ship.hitSpheres.push([0, by + bh / 2, bz, bh * 0.7]);
+  } else if (bl < 1) k.add('glass', G.box(bw, bh, bl), mat([0, by, bz], [-0.5, 0, 0]));
+  else { k.add('dark', G.rbox(bw * 1.2, bh, bl * 1.1, 0.1), mat([0, by - bh * 0.3, bz])); k.add('glass', G.rbox(bw, bh, bl, 0.1), mat([0, by, bz])); }
+  if (C.wings) {
+    const W = C.wings;
+    k.addMirrored('hull', G.box(W.span / 2, W.t, W.chord), mat([W.span / 4 + 0.6, 0, W.z]));
+    k.addMirrored('accent', G.box(0.5, W.t * 1.2, W.chord * 0.95), mat([W.span / 2 + 0.3, 0, W.z]));
+    k.addMirrored('dark', G.box(0.6, 0.7, W.chord * 1.1), mat([W.span / 2 + 0.6, 0, W.z]));
+    k.addMirrored('gun', G.cyl(0.08, 0.1, 2.6, 8), mat([W.span / 2 + 0.6, 0, W.z + 2.4], alongZ));
+    ship.hitSpheres.push([W.span / 2, 0, W.z, 1.2], [-W.span / 2, 0, W.z, 1.2]);
+  }
+  if (C.sponsons) {
+    const P = C.sponsons;
+    k.addMirrored('hull', G.rbox(P.w, P.h, P.l, P.w * 0.15), mat([P.x, 0, P.z]));
+    k.addMirrored('accent', G.box(P.w * 1.02, P.h * 0.12, P.l * 0.7), mat([P.x, P.h * 0.25, P.z]));
+    k.addMirrored('dark', G.box(P.x - 2, P.h * 0.5, P.l * 0.4), mat([P.x / 2 + 1, 0, P.z]));
+    for (let i = 0; i < 4; i++) k.addMirrored('dark', G.box(P.w * 1.06, P.h * 1.04, P.l * 0.03), mat([P.x, 0, P.z - P.l * 0.4 + i * P.l * 0.27]));
+    ship.hitSpheres.push([P.x, 0, P.z, P.h * 0.7], [-P.x, 0, P.z, P.h * 0.7]);
+  }
+  if (C.containers) {
+    const [cw, ch, cl] = C.containers.size;
+    let i = 0;
+    for (const z of C.containers.zs) for (const x of [cw / 2 + 0.2, -cw / 2 - 0.2]) for (const y of [ch / 2 + 0.2, -ch / 2 - 0.2]) {
+      k.add(i++ % 3 === 0 ? 'accent' : 'hull', G.rbox(cw, ch, cl, 0.15), mat([x, y, z]));
+      for (const e of [-1, 1]) k.add('dark', G.box(cw * 1.03, ch * 1.03, 0.25), mat([x, y, z + e * cl * 0.48]));
+      for (let j = 0; j < 5; j++) k.add('gun', G.box(cw * 1.01, 0.1, 0.14), mat([x, y + Math.sign(y) * ch * 0.25, z - cl * 0.4 + j * cl * 0.2]));
+    }
+    for (const z of C.containers.zs) ship.hitSpheres.push([0, 0, z, ch * 1.2]);
+  }
+  if (C.decks) {
+    const [w, h, l] = C.segs[0];
+    for (const y of [2.6, 0.6, -1.4, -3.2]) k.addMirrored('window', G.box(0.12, 0.45, l * 0.86), mat([w / 2 + 0.02, y, 0]));
+    for (let z = -l * 0.42; z < l * 0.45; z += 6) k.add('dark', G.box(w * 1.04, h * 1.04, 0.4), mat([0, 0, z]));
+  }
+  // identical square engine pods
+  const E = C.engines;
+  for (const x of E.xs) for (const y of E.ys) {
+    k.add('dark', G.rbox(E.R * 2.5, E.R * 2.5, E.R * 3, E.R * 0.2), mat([x, y, E.z + E.R * 1.6]));
+    k.add('accent', G.box(E.R * 2.56, E.R * 0.4, E.R * 1.2), mat([x, y, E.z + E.R * 1.9]));
+    k.add('nozzle', G.lathe([[E.R, E.R * 0.35], [E.R * 1.06, 0], [E.R * 1.2, -E.R * 0.8], [E.R * 1.28, -E.R * 1.2]], 20), mat([x, y, E.z], alongZ));
+    k.add('engine', G.cyl(E.R, E.R, 0.05, 16), mat([x, y, E.z - 0.05], alongZ));
+  }
+  const top = Math.max(...C.segs.map((s) => s[1])) / 2;
+  k.add('metal', G.cyl(C.radius * 0.004, C.radius * 0.007, C.radius * 0.12, 6), mat([C.radius * 0.03, top + C.radius * 0.06, C.segs[0][3]]));
+  ship.group.add(k.build(M, { uvTile: { hull: Math.max(4, C.radius / 7), accent: 4, dark: Math.max(4, C.radius / 9) } }));
+  for (const x of E.xs) for (const y of E.ys) addEngine(ship, M, new THREE.Vector3(x, y, E.z - 0.1), E.R, E.R * 12);
+  const half = C.sponsons ? C.sponsons.x + C.sponsons.w / 2 : Math.max(...C.segs.map((s) => s[0])) / 2;
+  const ls = Math.max(0.9, C.radius * 0.1);
+  addLight(ship, new THREE.Vector3(C.wings ? C.wings.span / 2 + 0.6 : half, 0, C.wings ? C.wings.z : 0), 0xff2015, ls, 0);
+  addLight(ship, new THREE.Vector3(-(C.wings ? C.wings.span / 2 + 0.6 : half), 0, C.wings ? C.wings.z : 0), 0x15ff40, ls, 0);
+  addLight(ship, new THREE.Vector3(0, top + 0.3, C.segs[C.segs.length - 1][3]), 0xffb020, ls * 1.1, 1.1, 0);
+  if (C.radius > 20) for (let i = 0; i < 3; i++) launcherAt(ship, (i - 1) * C.radius * 0.08, -top - 0.5, C.segs[0][3] - i * 2);
+  else launcherAt(ship, 0, -top - 0.3, C.segs[0][3]);
+  ship.hardpoints = C.hp;
+  ship.utilMounts = C.util;
+  ship.cockpit.set(...C.cockpit);
+  ship.radius = C.radius;
   return addGreebles(ship);
 }

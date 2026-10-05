@@ -4,6 +4,7 @@ import { rng } from './textures.js';
 export const GOVS = {
   gov: { name: 'Helion Federation', short: 'FEDERATION', color: '#6cf' },
   pirate: { name: 'Corsair Clans', short: 'PIRATE', color: '#ff5a48' },
+  corp: { name: 'Vanta Combine', short: 'CORPORATE', color: '#d8b040' },
 };
 
 export const STAR_CLASSES = {
@@ -25,18 +26,28 @@ const RAW = [
   { id: 'aster', name: 'Aster', gov: 'gov', sec: 0.9, danger: 0, map: [345, -215], star: 'B', links: ['mirel', 'ruin', 'lyra'], yard: true },
   { id: 'corsa', name: 'Corsa', gov: 'gov', sec: 0.6, danger: 1, map: [-15, -185], star: 'F', links: ['orin', 'mirel'] },
   { id: 'pellam', name: 'Pellam', gov: 'gov', sec: 0.7, danger: 1, map: [140, 85], star: 'K', links: ['kaltos', 'tessaly', 'sarn'] },
-  { id: 'lyra', name: 'Lyra', gov: 'gov', sec: 0.8, danger: 0, map: [500, -165], star: 'A', links: ['aster', 'quell'], yard: true },
+  { id: 'lyra', name: 'Lyra', gov: 'gov', sec: 0.8, danger: 0, map: [500, -165], star: 'A', links: ['aster', 'quell', 'cindra', 'ledger'], yard: true },
   { id: 'bastide', name: 'Bastide', gov: 'gov', sec: 0.4, danger: 1, map: [200, 250], star: 'G', links: ['tessaly', 'vane'] },
-  { id: 'oskar', name: 'Oskar', gov: 'gov', sec: 0.5, danger: 1, map: [-300, -215], star: 'G', links: ['orin', 'grav'] },
+  { id: 'oskar', name: 'Oskar', gov: 'gov', sec: 0.5, danger: 1, map: [-300, -215], star: 'G', links: ['orin', 'grav', 'halden'] },
   { id: 'sarn', name: 'Sarn', gov: 'pirate', sec: 0.1, danger: 2, map: [285, -10], star: 'M', links: ['vexal', 'ruin', 'pellam'] },
   { id: 'ruin', name: 'Ruin', gov: 'pirate', sec: 0.0, danger: 3, map: [400, 70], star: 'K', links: ['sarn', 'aster', 'quell', 'vane'] },
   { id: 'drak', name: 'Drak', gov: 'pirate', sec: 0.2, danger: 2, map: [-265, -40], star: 'M', links: ['orin', 'nyx', 'grav'] },
   { id: 'nyx', name: 'Nyx', gov: 'pirate', sec: 0.0, danger: 3, map: [-195, 170], star: 'B', links: ['tessaly', 'drak', 'morrow'] },
   { id: 'khar', name: 'Khar', gov: 'pirate', sec: 0.1, danger: 2, map: [-40, 290], star: 'F', links: ['tessaly', 'morrow'] },
-  { id: 'quell', name: 'Quell', gov: 'pirate', sec: 0.1, danger: 2, map: [555, -25], star: 'K', links: ['lyra', 'ruin'] },
-  { id: 'vane', name: 'Vane', gov: 'pirate', sec: 0.0, danger: 3, map: [360, 215], star: 'M', links: ['bastide', 'ruin'] },
+  { id: 'quell', name: 'Quell', gov: 'pirate', sec: 0.1, danger: 2, map: [555, -25], star: 'K', links: ['lyra', 'ruin', 'dividend'] },
+  { id: 'vane', name: 'Vane', gov: 'pirate', sec: 0.0, danger: 3, map: [360, 215], star: 'M', links: ['bastide', 'ruin', 'scour'] },
   { id: 'grav', name: 'Grav', gov: 'pirate', sec: 0.1, danger: 2, map: [-445, -115], star: 'K', links: ['oskar', 'drak'] },
   { id: 'morrow', name: 'Morrow', gov: 'pirate', sec: 0.0, danger: 3, map: [-170, 375], star: 'M', links: ['khar', 'nyx'] },
+  { id: 'halden', name: 'Halden', gov: 'gov', sec: 0.6, danger: 1, map: [-470, -300], star: 'K', links: ['oskar'] },
+  { id: 'cindra', name: 'Cindra', gov: 'gov', sec: 0.7, danger: 0, map: [560, -310], star: 'F', links: ['lyra', 'ledger'] },
+  { id: 'scour', name: 'Scour', gov: 'pirate', sec: 0.0, danger: 3, map: [600, 220], star: 'K', links: ['vane', 'tithe'] },
+  { id: 'ledger', name: 'Ledger', gov: 'corp', sec: 1.0, danger: 0, map: [690, -230], star: 'G', links: ['lyra', 'cindra', 'vanta'] },
+  { id: 'vanta', name: 'Vanta Prime', gov: 'corp', sec: 1.0, danger: 0, map: [800, -120], star: 'F', links: ['ledger', 'quota', 'equity'], hq: true },
+  { id: 'quota', name: 'Quota', gov: 'corp', sec: 1.0, danger: 0, map: [870, -260], star: 'M', links: ['vanta', 'margin'] },
+  { id: 'margin', name: 'Margin', gov: 'corp', sec: 1.0, danger: 0, map: [1000, -160], star: 'K', links: ['quota', 'equity'] },
+  { id: 'equity', name: 'Equity', gov: 'corp', sec: 1.0, danger: 0, map: [930, 10], star: 'A', links: ['vanta', 'margin', 'dividend'] },
+  { id: 'dividend', name: 'Dividend', gov: 'corp', sec: 1.0, danger: 0, map: [760, 70], star: 'G', links: ['equity', 'quell', 'tithe'] },
+  { id: 'tithe', name: 'Tithe', gov: 'corp', sec: 1.0, danger: 0, map: [840, 200], star: 'K', links: ['dividend', 'scour'] },
 ];
 export const SYSTEMS = Object.fromEntries(RAW.map((s) => [s.id, s]));
 
@@ -95,8 +106,8 @@ export function systemDef(id) {
     const hue = r();
     const col = (h, s, l) => new THREE.Color().setHSL(h % 1, s, l).toArray();
     def.sky = { dir: nd.toArray(), c1: col(hue, 0.75, 0.45), c2: col(hue + 0.35 + r() * 0.3, 0.7, 0.5), c3: col(hue + 0.1, 0.8, 0.55), amt: 0.25 + r() * 0.6 };
-    const pirate = S.gov === 'pirate';
-    const pool = pirate ? ['desert', 'lava', 'barren', 'gas', 'ice'] : ['temperate', 'ocean', 'gas', 'desert', 'ice', 'barren'];
+    const pirate = S.gov === 'pirate', corp = S.gov === 'corp';
+    const pool = pirate ? ['desert', 'lava', 'barren', 'gas', 'ice'] : corp ? ['barren', 'desert', 'gas', 'lava', 'ice', 'temperate'] : ['temperate', 'ocean', 'gas', 'desert', 'ice', 'barren'];
     const n = 2 + Math.floor(r() * 2.6);
     const used = [];
     for (let i = 0; i < n; i++) {
@@ -123,11 +134,13 @@ export function systemDef(id) {
     }
     const near = (d0, d1) => { const a = r() * Math.PI * 2; const d = d0 + r() * (d1 - d0); return new THREE.Vector3(Math.cos(a) * d, (r() - 0.5) * 16000, Math.sin(a) * d); };
     const mainPlanet = def.planets[0].name;
-    if (!pirate) {
+    if (corp) {
+      def.stations.push({ id: 'station', kind: 'tower', name: S.hq ? 'Vanta Combine Headquarters' : `${S.name} ${pick(r, ['Combine Exchange', 'Asset Control Tower', 'Compliance Spire', 'Revenue Tower'])}`, pos: v3([0, 0, 0]), dock: 'basic', yard: S.hq ? 'corp' : null, rot: r() * 6 });
+    } else if (!pirate) {
       const nm = pick(r, ['Relay Station', 'Trade Hub', 'Customs Station', 'Orbital Station', 'Logistics Hub']);
       def.stations.push({ id: 'station', kind: 'station', name: `${S.name} ${nm}`, pos: v3([0, 0, 0]), dock: 'basic', rot: r() * 6 });
     }
-    const nb = pirate ? 1 + Math.floor(r() * 2) : 1;
+    const nb = pirate || corp ? 1 + Math.floor(r() * 2) : 1;
     for (let i = 0; i < nb; i++) def.belts.push({ name: `${mainPlanet} - Asteroid Belt ${i + 1}`, pos: near(40000, 65000), count: 280 + Math.floor(r() * 260), spread: [12000, 3200, 12000], seed: 300 + Math.floor(r() * 9000), tint: pick(r, [[118, 108, 98], [128, 96, 76], [96, 100, 108], [110, 92, 86]]) });
     if (pirate) {
       const no = 1 + Math.floor(r() * 2);
@@ -151,18 +164,20 @@ const PORT_NAMES = {
   colony: ['Dome', 'Ridge', 'Basin', 'Crater', 'Rift', 'Mesa'],
   mining: ['Deepcore', 'Shaft Nine', 'Regolith', 'Pithead', 'Lodestone'],
   aerostat: ['Cirrus', 'Stratos', 'Skyhaven', 'Bellwether', 'Zephyr'],
+  company: ['Works No. 4', 'Plant 9', 'Productivity', 'Throughput', 'Quota Yard', 'Asset Field', 'Shift Six', 'Compliance'],
   haven: ['Freeport', "Smugglers' Rest", 'Blackwater Haven', 'Scrap Town', 'Cutthroat Landing', 'Gallows Field', 'Redwater'],
 };
-const PORT_SUFFIX = { city: 'Spaceport', colony: 'Colony', mining: 'Mining Outpost', aerostat: 'Aerostat', haven: '' };
+const PORT_SUFFIX = { city: 'Spaceport', colony: 'Colony', mining: 'Mining Outpost', aerostat: 'Aerostat', haven: '', company: 'Company Town' };
 
 // planetary spaceports and secondary orbital stations; separate seed keeps the base layout stable
 function addSettlements(def, S) {
   const r = rng(hash(`${S.id}:ports`));
-  const pirate = S.gov === 'pirate';
+  const pirate = S.gov === 'pirate', corp = S.gov === 'corp';
   let city = 0;
   def.planets.forEach((P, i) => {
     let style = null;
     if (pirate) style = i === 0 || r() < 0.4 ? 'haven' : null;
+    else if (corp) style = P.moon || P.type === 'lava' ? (r() < 0.6 ? 'mining' : null) : P.type === 'gas' ? (r() < 0.5 ? 'aerostat' : null) : 'company';
     else if (P.moon) style = r() < 0.55 ? 'mining' : null;
     else if (P.type === 'temperate' || P.type === 'ocean') style = 'city';
     else if (P.type === 'gas') style = r() < 0.6 ? 'aerostat' : null;
@@ -177,12 +192,12 @@ function addSettlements(def, S) {
       name: style === 'haven' ? `${nm}, ${P.name}` : `${P.name} ${nm} ${PORT_SUFFIX[style]}`,
       pos: P.pos.clone().addScaledVector(up, P.radius + lift),
       dock: pirate ? 'pirate' : 'basic',
-      yard: pirate ? 'pirate' : style === 'city' && city++ === 0 && r() < 0.7 ? 'light' : null,
+      yard: pirate ? 'pirate' : corp ? (style === 'company' && city++ === 0 && r() < 0.5 ? 'corp' : null) : style === 'city' && city++ === 0 && r() < 0.7 ? 'light' : null,
       rot: r() * 6,
     });
   });
   const near = (d0, d1) => { const a = r() * Math.PI * 2; const d = d0 + r() * (d1 - d0); return new THREE.Vector3(Math.cos(a) * d, (r() - 0.5) * 12000, Math.sin(a) * d); };
-  if (!pirate && (S.id === 'kaltos' || r() < 0.5)) {
+  if (!pirate && !corp && (S.id === 'kaltos' || r() < 0.5)) {
     def.stations.push({ id: 'habitat', kind: 'habitat', name: `${S.name} ${pick(r, ['Halo', 'Wheel', 'Concourse', 'Arcology'])} Habitat`, pos: S.id === 'kaltos' ? v3([30000, -6000, 46000]) : near(24000, 36000), dock: 'basic', yard: null, rot: r() * 6 });
   }
   if (pirate && r() < 0.65) {

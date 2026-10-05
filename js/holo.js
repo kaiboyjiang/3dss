@@ -32,6 +32,7 @@ const FRAG = /* glsl */`
 const COLORS = {
   pirate: new THREE.Color(1.0, 0.36, 0.22),
   navy: new THREE.Color(0.35, 1.0, 0.55),
+  corp: new THREE.Color(1.0, 0.78, 0.28),
   player: new THREE.Color(0.45, 0.85, 1.0),
   civil: new THREE.Color(0.55, 0.85, 1.0),
 };

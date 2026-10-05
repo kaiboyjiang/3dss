@@ -25,7 +25,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
   -webkit-mask: linear-gradient(#000 0 0) top left / 30% 30% no-repeat, linear-gradient(#000 0 0) top right / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom left / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom right / 30% 30% no-repeat;
           mask: linear-gradient(#000 0 0) top left / 30% 30% no-repeat, linear-gradient(#000 0 0) top right / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom left / 30% 30% no-repeat, linear-gradient(#000 0 0) bottom right / 30% 30% no-repeat; }
 .br .lbl { position: absolute; left: 50%; top: 50%; margin-left: 4px; }
-.br.hostile { color: #ff5a48; } .br.neutral { color: #d2d4d7; } .br.friendly { color: #7fe0a0; } .br.loc { color: #c3c6cb; }
+.br.hostile { color: #ff5a48; } .br.neutral { color: #d2d4d7; } .br.friendly { color: #7fe0a0; } .br.corp { color: #d8b040; } .br.loc { color: #c3c6cb; }
 .br.loc .box { border-radius: 0; transform: translate(-50%, -50%) rotate(45deg); -webkit-mask: none; mask: none; }
 .br.sel .box { border-width: 2px; opacity: 1; }
 .br .lockring { position: absolute; left: 50%; top: 50%; border: 2px dashed #ffb040; border-radius: 0; transform: translate(-50%, -50%); animation: spin 2s linear infinite; }
@@ -129,6 +129,7 @@ body[data-state="flying"] #c { cursor: none; }
 body[data-state="docked"] #c { cursor: grab; }
 body[data-state="docked"] #c:active { cursor: grabbing; }
 #overview tr.friendly td { color: #7fe0a0; }
+#overview tr.corp td { color: #e0c070; }
 
 /* ---- docked: hangar, shipyard and outfitter */
 #docked { position: fixed; inset: 0; pointer-events: none; color: #dbdddf; }
@@ -205,7 +206,7 @@ table.st .up { color: #7fe0a0; } table.st .dn { color: #ff7a66; }
 #mapinfo .hint { color: #808790; font-size: 11px; }
 #maplegend { left: 18px; bottom: 18px; padding: 6px 12px; color: #a4a9b0; font-size: 11px; }
 #maplegend .lg { display: inline-block; width: 10px; height: 10px; border-radius: 0; border: 2px solid; margin: 0 4px 0 10px; vertical-align: middle; }
-#maplegend .lg.gov { border-color: #6cf; } #maplegend .lg.pir { border-color: #ff5a48; } #maplegend .lg.unk { border: 1px dashed #9bc; border-radius: 0; height: 0; width: 14px; }
+#maplegend .lg.gov { border-color: #6cf; } #maplegend .lg.pir { border-color: #ff5a48; } #maplegend .lg.corp { border-color: #d8b040; } #maplegend .lg.unk { border: 1px dashed #9bc; border-radius: 0; height: 0; width: 14px; }
 #jumphint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); color: #bfc3c8; letter-spacing: 3px; font-size: 13px; text-shadow: 0 0 6px #000; }
 
 /* settings + fps */
