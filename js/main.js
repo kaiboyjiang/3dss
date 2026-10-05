@@ -7,7 +7,7 @@ import { buildWorld, LOCATIONS } from './world.js';
 import { SYSTEMS, GOVS, systemDef, route, allPorts, hops, fullRoute } from './systems.js';
 import { StarMap } from './map.js';
 import { buildRaider, buildCruiser, buildHauler, animateShip } from './ships.js';
-import { HULLS, OUTFITS, YARDS, emptyFit, buildFitted, outfitPreview, fittedStats } from './catalog.js';
+import { HULLS, OUTFITS, YARDS, emptyFit, bareFit, normFit, cloneFit, fitItems, roleOf, slotAccepts, SLOT_KEYS, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
 import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } from './combat.js';
 import { Audio } from './audio.js';
@@ -143,7 +143,7 @@ function makeEntity(kind, faction, pos, name, civHull) {
     ship = buildFitted(G.hull, fit, env);
     s = fittedStats(G.hull, fit);
   } else if (NAVY_HULL[kind]) ship = buildFitted(NAVY_HULL[kind], emptyFit(NAVY_HULL[kind]), env, 'navy');
-  else if (civHull) ship = buildFitted(civHull, { w: [], u: [] }, env);
+  else if (civHull) ship = buildFitted(civHull, bareFit(civHull), env);
   else if (s.hullId) ship = buildFitted(s.hullId, emptyFit(s.hullId), env);
   else ship = kind === 'raider' ? buildRaider(env) : kind === 'cruiser' ? buildCruiser(env) : buildHauler(env, 1 + Math.floor(Math.random() * 50));
   setShadows(ship.group);
@@ -290,57 +290,65 @@ function muzzleWorld(t, i, outPos, outDir) {
 const GUN_ASSIST = 0.1, AIM_SENS = 0.0022, AIM_EDGE = 0.9;
 const _fw = new THREE.Vector3(), _gp = new THREE.Vector3(), _tp = new THREE.Vector3(), _pd = new THREE.Vector3();
 
-function turretTarget() {
+const GUN_ARC = 0.1, TUR_PMAX = 0.35;
+const isHostile = (e) => e.alive && e.faction === 'pirate';
+const power = (e) => e.maxShield + e.maxArmor + e.maxHull;
+const _lp = new THREE.Vector3();
+
+// live hostiles, most powerful first
+function hostileList() {
   const pp = G.player.obj.position;
-  const L = G.lock && G.lock.progress >= 1 ? G.lock.ent : null;
-  if (L && L.alive && L.faction === 'pirate') return L;
-  let best = null, bd = 7000;
-  for (const e of G.entities) {
-    if (!e.alive || e.faction !== 'pirate') continue;
-    const d = e.obj.position.distanceTo(pp);
-    if (d < bd) { bd = d; best = e; }
-  }
-  return best;
+  return G.entities.filter((e) => isHostile(e) && e.obj.position.distanceTo(pp) < 12000).sort((a, b) => power(b) - power(a));
+}
+
+// lead point if this mount can put shots on the target from where it sits, otherwise null
+function reach(t, O, e, mp, fwd) {
+  const lead = intercept(mp, G.player.vel, e.obj.position, e.vel, O.hitscan ? 1e9 : O.speed);
+  if (!lead || mp.distanceTo(lead) > O.range * 0.95) return null;
+  if (t.mount === 'gun') return _v.subVectors(lead, mp).angleTo(fwd) < GUN_ARC ? lead : null;
+  const lp = t.root.worldToLocal(_lp.copy(lead));
+  return -Math.atan2(lp.y - t.pitch.position.y, Math.hypot(lp.x, lp.z)) <= TUR_PMAX ? lead : null;
 }
 
 function playerWeapons(dt) {
   const p = G.player;
+  const live = G.state === 'flying' && !G.warp && p.alive;
   const lockEnt = G.lock && G.lock.progress >= 1 && G.lock.ent.alive ? G.lock.ent : null;
-  const tt = G.turretsAuto && G.state === 'flying' && !G.warp ? turretTarget() : null;
+  const hostiles = live ? hostileList() : [];
+  const priGun = lockEnt && isHostile(lockEnt) ? [lockEnt, ...hostiles] : hostiles;
+  const secT = lockEnt ? [lockEnt] : hostiles;
+  const trig = G.input.fire1 || !!G.input.keys.KeyU || !!G.input.keys.KeyO;
   const fwd = _fw.set(0, 0, 1).applyQuaternion(p.obj.quaternion);
-  let pri = 0, sec = 0, tur = 0, priOff = true, secOff = true, turFiring = false;
+  let pri = 0, sec = 0, tur = 0, priOff = true, secOff = true, priF = false, secF = false, turF = false;
   G.gunAssist = false;
-  for (const t of p.ship.turrets) {
-    const O = t.weapon;
-    if (!O) continue;
+  for (const t of [...p.ship.gunMounts, ...p.ship.turretMounts]) {
+    const O = t.weapon, turret = t.mount === 'turret', primary = t.role === 'primary';
     t.next = Math.max(0, t.next - dt);
     t.root.updateWorldMatrix(true, false);
     const mp = _gp.setFromMatrixPosition(t.root.matrixWorld);
     const blocked = p.cap < O.cap || (O.ammo && G.ammo.rail <= 0);
-    let target, fire, assisted = false;
-    if (O.mount === 'turret') {
-      tur = Math.max(tur, t.next / O.rof);
-      target = tt ? intercept(mp, p.vel, tt.obj.position, tt.vel, O.hitscan ? 1e9 : O.speed) || tt.obj.position : _tp.copy(mp).addScaledVector(fwd, 2000);
-      const aligned = aimTurret(t, target, dt, O.track, -1.4, 0.35);
-      fire = !!tt && aligned && mp.distanceTo(tt.obj.position) < O.range * 0.95;
-      if (fire && !blocked) turFiring = true;
-    } else {
-      // fixed forward gun with a small auto-aim gimbal
-      target = _tp.copy(mp).addScaledVector(fwd, 1e5);
-      if (lockEnt) {
-        const lead = intercept(mp, p.vel, lockEnt.obj.position, lockEnt.vel, O.hitscan ? 1e9 : O.speed);
-        if (lead && _v.subVectors(lead, mp).angleTo(fwd) < GUN_ASSIST && mp.distanceTo(lead) < O.range) { target = lead; assisted = true; G.gunAssist = true; }
-      }
-      aimTurret(t, target, dt, 4, -GUN_ASSIST * 1.2, GUN_ASSIST * 1.2);
-      if (O.group === 'primary') { pri = Math.max(pri, t.next / O.rof); priOff = priOff && blocked; } else { sec = Math.max(sec, t.next / O.rof); secOff = secOff && blocked; }
-      fire = O.group === 'primary' ? G.input.fire1 || !!G.input.keys.KeyU : G.input.fire2 || !!G.input.keys.KeyO;
+    let aim = null;
+    for (const e of primary ? (turret ? hostiles : priGun) : secT) {
+      const l = reach(t, O, e, mp, fwd);
+      if (l) { aim = (t.aim ||= new THREE.Vector3()).copy(l); break; }
     }
-    if (G.warp || G.state !== 'flying' || !fire || t.next > 0 || blocked) continue;
+    let aligned;
+    if (turret) aligned = aimTurret(t, aim || _tp.copy(mp).addScaledVector(fwd, 2000), dt, O.track, -1.4, TUR_PMAX);
+    else {
+      aligned = aimTurret(t, aim || _tp.copy(mp).addScaledVector(fwd, 1e5), dt, 4, -GUN_ARC * 1.2, GUN_ARC * 1.2);
+      if (aim) G.gunAssist = true;
+    }
+    if (primary && turret) tur = Math.max(tur, t.next / O.rof);
+    else if (primary) { pri = Math.max(pri, t.next / O.rof); priOff = priOff && blocked; }
+    else { sec = Math.max(sec, t.next / O.rof); secOff = secOff && blocked; }
+    const want = primary ? !turret || G.turretsAuto : trig;
+    if (!live || !want || !aim || !aligned || t.next > 0 || blocked) continue;
+    if (!primary) secF = true; else if (turret) turF = true; else priF = true;
     t.next = O.rof * (0.94 + Math.random() * 0.12);
     p.cap -= O.cap;
     t.side = ((t.side || 0) + 1) % t.muzzles.length;
     muzzleWorld(t, t.side, _v2, _v3);
-    const dir = O.mount === 'gun' && !assisted ? _v3.copy(fwd) : _v3.subVectors(target, _v2).normalize();
+    const dir = _v3.subVectors(aim, _v2).normalize();
     if (O.spread) { dir.x += (Math.random() - 0.5) * O.spread; dir.y += (Math.random() - 0.5) * O.spread; dir.z += (Math.random() - 0.5) * O.spread; dir.normalize(); }
     t.recoil[Math.min(t.side, t.recoil.length - 1)] = 1;
     if (t.rotor) t.spin = 30;
@@ -364,20 +372,27 @@ function playerWeapons(dt) {
     }
     audio[O.sound]();
   }
-  G.cool.pri = pri; G.cool.sec = sec; G.cool.tur = tur; G.priOff = priOff; G.secOff = secOff; G.turFiring = turFiring;
-  G.cool.missile = Math.max(0, G.cool.missile - dt);
+  let mis = 0;
+  for (const b of p.ship.missileBays) { b.next = Math.max(0, b.next - dt); mis = Math.max(mis, b.next / b.weapon.rof); }
+  G.misFiring = false;
+  if (live && (trig || G.input.fire2) && fireBays(false)) G.misFiring = true;
+  G.cool.pri = pri; G.cool.sec = sec; G.cool.tur = tur; G.cool.missile = mis;
+  G.priOff = priOff; G.secOff = secOff; G.turFiring = turF; G.priFiring = priF; G.secFiring = secF;
 }
 
 function weaponInfo() {
-  const ws = G.owned[G.hull].w.filter(Boolean).map((id) => OUTFITS[id]);
-  const names = (f) => [...new Set(ws.filter(f).map((o) => o.name))].join(' + ') || 'None fitted';
-  $('priname').textContent = names((o) => o.mount === 'gun' && o.group === 'primary');
-  $('secname').textContent = names((o) => o.mount === 'gun' && o.group === 'secondary');
-  $('turname').textContent = names((o) => o.mount === 'turret');
-  G.hasTurrets = ws.some((o) => o.mount === 'turret');
-  G.usesAmmo = ws.some((o) => o.ammo);
-  const lead = ws.find((o) => o.mount === 'gun' && o.group === 'primary' && !o.hitscan) || ws.find((o) => o.mount === 'gun' && !o.hitscan);
-  G.leadSpeed = lead ? lead.speed : 3200;
+  const sh = G.player.ship;
+  const ms = [...sh.gunMounts, ...sh.turretMounts];
+  const names = (list) => [...new Set(list.map((t) => t.weapon.name))].join(' + ') || 'None fitted';
+  $('priname').textContent = names(sh.gunMounts.filter((t) => t.role === 'primary'));
+  $('secname').textContent = names(ms.filter((t) => t.role === 'secondary'));
+  $('turname').textContent = names(sh.turretMounts.filter((t) => t.role === 'primary'));
+  $('misname').textContent = names(sh.missileBays);
+  G.hasTurrets = sh.turretMounts.some((t) => t.role === 'primary');
+  G.hasBays = sh.missileBays.length > 0;
+  G.usesAmmo = ms.some((t) => t.weapon.ammo);
+  const lead = sh.gunMounts.find((t) => !t.weapon.hitscan);
+  G.leadSpeed = lead ? lead.weapon.speed : 3200;
 }
 
 function dragAim(dx, dy) {
@@ -411,24 +426,41 @@ document.addEventListener('pointerlockchange', () => {
   if (!G.mouseLocked) G.followToggle = false;
 });
 
-function fireMissiles() {
+// Launches from every fitted bay that is reloaded, has ammunition and has the locked target inside its range.
+// Returns the number of bays that fired; nothing is spent when no bay can engage.
+function fireBays(explicit) {
   const p = G.player;
-  if (G.state !== 'flying' || G.warp) return;
-  if (!(G.lock && G.lock.progress >= 1)) { hud.notice('MISSILES REQUIRE TARGET LOCK', 1.5); audio.beep(220, 0.15); return; }
-  if (G.cool.missile > 0 || G.ammo.missile <= 0 || !p.ship.launchers.length) return;
-  G.cool.missile = 4;
-  for (let i = 0; i < 2 && G.ammo.missile > 0; i++) {
-    G.ammo.missile--;
-    const L = p.ship.launchers[(G.ammo.missile) % p.ship.launchers.length];
-    setTimeout(() => {
-      if (!G.lock || !p.alive) return;
-      L.updateWorldMatrix(true, false);
-      const pos = new THREE.Vector3().setFromMatrixPosition(L.matrixWorld);
-      const dir = fwdOf(p).add(new THREE.Vector3(0, -0.15, 0).applyQuaternion(p.obj.quaternion)).normalize();
-      missiles.launch(pos, dir, p.vel, G.lock.ent, p, 150);
-      audio.missile();
-    }, i * 180);
+  if (G.state !== 'flying' || G.warp || !p.alive) return 0;
+  const bays = p.ship.missileBays;
+  if (!bays.length) { if (explicit) hud.notice('NO MISSILE BAYS FITTED', 1.2); return 0; }
+  const T = G.lock && G.lock.progress >= 1 && G.lock.ent.alive ? G.lock.ent : null;
+  if (!T) { if (explicit) { hud.notice('MISSILES REQUIRE TARGET LOCK', 1.5); audio.beep(220, 0.15); } return 0; }
+  let n = 0, range = false, ready = false;
+  for (const b of bays) {
+    const O = b.weapon;
+    if (b.next > 0) continue;
+    ready = true;
+    if (G.ammo.missile < O.ammoPer) continue;
+    b.root.updateWorldMatrix(true, false);
+    if (_gp.setFromMatrixPosition(b.root.matrixWorld).distanceTo(T.obj.position) > O.range) { range = true; continue; }
+    b.next = O.rof;
+    n++;
+    for (let i = 0; i < O.salvo && G.ammo.missile >= O.ammoPer; i++) {
+      G.ammo.missile -= O.ammoPer;
+      b.side = (b.side + 1) % b.tubes.length;
+      const tube = b.tubes[b.side];
+      setTimeout(() => {
+        if (!p.alive || !T.alive || G.player !== p || G.state !== 'flying') { G.ammo.missile += O.ammoPer; return; }
+        tube.updateWorldMatrix(true, false);
+        const pos = new THREE.Vector3().setFromMatrixPosition(tube.matrixWorld);
+        const up = new THREE.Vector3(0, 1, 0).transformDirection(b.root.matrixWorld);
+        missiles.launch(pos, fwdOf(p).addScaledVector(up, 0.6).normalize(), p.vel, T, p, O.dmg, O.mspeed);
+        audio.missile();
+      }, i * 160);
+    }
   }
+  if (!n && explicit && ready) { hud.notice(range ? 'TARGET OUT OF MISSILE RANGE' : 'OUT OF MISSILES', 1.3); audio.beep(220, 0.15); }
+  return n;
 }
 
 function impactWorld(point, normal, size) {
@@ -483,6 +515,27 @@ function avoid(e, dir) {
     if (d < 500 && to.dot(dir) > 0) dir.addScaledVector(to.normalize(), -2.5 * (1 - Math.max(d, 0) / 500));
   }
   return dir.normalize();
+}
+
+function npcTurrets(e, dt, dist) {
+  const p = G.player, A = e.ai, S = e.stats;
+  if (!A.turretCd.length) A.turretCd = e.ship.turrets.map(() => Math.random());
+  e.ship.turrets.forEach((t, i) => {
+    const lead = intercept(e.obj.position, e.vel, p.obj.position, p.vel, 2400) || p.obj.position;
+    const ok = aimTurret(t, lead, dt, 0.7, -1.45, 0.25);
+    A.turretCd[i] -= dt;
+    if (ok && dist < 8500 && A.turretCd[i] <= 0) {
+      A.turretCd[i] = 1.2 + Math.random() * 0.5;
+      t.side = ((t.side || 0) + 1) % t.muzzles.length;
+      muzzleWorld(t, t.side, _v, _v2);
+      const d = _v2.subVectors(lead, _v).normalize();
+      d.x += (Math.random() - 0.5) * 0.012; d.y += (Math.random() - 0.5) * 0.012; d.normalize();
+      bolts.fire('heavy', _v, d, 2400, e.vel, 9000, S.gunDmg || 42, e, 'thermal');
+      fx.muzzle(_v, d, 0xff8020, 6);
+      t.recoil[t.side] = 1;
+      audio.laser(_v.distanceTo(camera.position), true);
+    }
+  });
 }
 
 function updateAI(e, dt) {
@@ -541,17 +594,23 @@ function updateAI(e, dt) {
     steer(e, dir, dt, S.turn);
     const speed = A.state === 'break' ? S.speed : THREE.MathUtils.clamp(dist / 4, S.speed * 0.45, S.speed);
     moveAI(e, dt, speed, S.accel);
+    if (e.ship.turrets.length) npcTurrets(e, dt, dist);
     // guns
     A.fire -= dt;
     const fwd = fwdOf(e, _v2);
     const toLead = _v.subVectors(lead, e.obj.position).normalize();
     if (A.state === 'attack' && dist < 3200 && fwd.dot(toLead) > 0.993 && A.fire <= 0) {
       A.fire = 0.2 + Math.random() * 0.08;
-      A.gun = ((A.gun || 0) + 1) % e.ship.guns.length;
-      const g = e.ship.guns[A.gun];
-      g.updateWorldMatrix(true, false);
-      const from = _v3.setFromMatrixPosition(g.matrixWorld);
       const d = toLead.clone();
+      const gm = e.ship.gunMounts, gs = gm.length ? gm : e.ship.guns;
+      let from;
+      if (!gs.length) from = _v3.copy(e.obj.position).addScaledVector(fwd, e.ship.radius);
+      else {
+        A.gun = ((A.gun || 0) + 1) % gs.length;
+        const g = gs[A.gun];
+        if (gm.length) { g.side = ((g.side || 0) + 1) % g.muzzles.length; muzzleWorld(g, g.side, _v3, _pd); g.recoil[g.side] = 1; from = _v3; }
+        else { g.updateWorldMatrix(true, false); from = _v3.setFromMatrixPosition(g.matrixWorld); }
+      }
       d.x += (Math.random() - 0.5) * 0.02; d.y += (Math.random() - 0.5) * 0.02; d.z += (Math.random() - 0.5) * 0.02; d.normalize();
       bolts.fire('pirate', from, d, 2600, e.vel, 3400, S.gunDmg || 10, e, 'thermal');
       fx.muzzle(from, d, 0xff5030, 1.6);
@@ -564,27 +623,11 @@ function updateAI(e, dt) {
     const dir = tangent.clone().addScaledVector(radial, (dist - (S.orbit || 4500)) / 2000).normalize();
     steer(e, avoid(e, dir), dt, S.turn, 0.4);
     moveAI(e, dt, S.speed, S.accel);
-    if (!A.turretCd.length) A.turretCd = e.ship.turrets.map(() => Math.random());
-    e.ship.turrets.forEach((t, i) => {
-      const lead = intercept(e.obj.position, e.vel, p.obj.position, p.vel, 2400) || p.obj.position;
-      const ok = aimTurret(t, lead, dt, 0.7, -1.45, 0.25);
-      A.turretCd[i] -= dt;
-      if (ok && dist < 8500 && A.turretCd[i] <= 0) {
-        A.turretCd[i] = 1.2 + Math.random() * 0.5;
-        t.side = ((t.side || 0) + 1) % t.muzzles.length;
-        muzzleWorld(t, t.side, _v, _v2);
-        const d = _v2.subVectors(lead, _v).normalize();
-        d.x += (Math.random() - 0.5) * 0.012; d.y += (Math.random() - 0.5) * 0.012; d.normalize();
-        bolts.fire('heavy', _v, d, 2400, e.vel, 9000, S.gunDmg || 42, e, 'thermal');
-        fx.muzzle(_v, d, 0xff8020, 6);
-        t.recoil[t.side] = 1;
-        audio.laser(_v.distanceTo(camera.position), true);
-      }
-    });
+    npcTurrets(e, dt, dist);
     A.missile -= dt;
     if (A.missile <= 0 && dist < 15000) {
       A.missile = 8 + Math.random() * 4;
-      for (const L of e.ship.launchers) {
+      for (const L of e.ship.missileBays.length ? e.ship.missileBays.map((m) => m.tubes[0]) : e.ship.launchers) {
         L.updateWorldMatrix(true, false);
         const pos = new THREE.Vector3().setFromMatrixPosition(L.matrixWorld);
         missiles.launch(pos, new THREE.Vector3(0, 1, 0).applyQuaternion(e.obj.quaternion).add(fwdOf(e)).normalize(), e.vel, p, e, 95, 700);
@@ -1074,7 +1117,7 @@ function cineCamera() {
   camera.updateMatrixWorld();
 }
 
-const D = { tab: 'services', browse: 'valkyrie', slot: { k: 'w', i: 0 }, preview: null, shown: null, board: [], boardAt: null };
+const D = { tab: 'services', browse: 'valkyrie', slot: { k: 'g', i: 0 }, preview: null, shown: null, board: [], boardAt: null };
 const fmtIsk = (n) => `${Math.round(n).toLocaleString()} ISK`;
 function repairCost() { const p = G.player; return Math.round((p.maxArmor - p.armor) * 40 + (p.maxHull - p.hull) * 80); }
 function rearmCost() { return G.usesAmmo ? (40 - G.ammo.rail) * 300 + (24 - G.ammo.missile) * 1200 : (24 - G.ammo.missile) * 1200; }
@@ -1099,10 +1142,15 @@ function statRows(s, cmp) {
   }).join('')}</table>`;
 }
 
+const SLOT_HEAD = { g: 'Gun mounts', t: 'Turret mounts', m: 'Missile bays', u: 'Utility slots' };
+const SLOT_EMPTY = { g: 'Empty gun mount', t: 'Empty turret mount', m: 'Empty missile bay', u: 'Empty utility slot' };
 function weaponLine(O) {
   if (O.type !== 'weapon') return '';
-  return `${O.mount === 'turret' ? 'Turret — auto-engages hostiles' : O.group === 'primary' ? 'Fixed gun (LMB / U)' : 'Fixed gun (RMB / O)'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
+  if (O.mount === 'bay') return `Missile bay — always secondary, needs a target lock · ${O.salvo} × ${O.dmg} dmg per salvo · ${(O.range / 1000).toFixed(1)} km · ${O.rof} s reload · ${O.ammoPer} missile${O.ammoPer > 1 ? 's' : ''} per shot`;
+  return `${O.mount === 'turret' ? 'Turret — tracks targets on its own' : 'Fixed gun — aims up to 6° off the nose'} · ${Math.round(O.dmg / O.rof)} DPS · ${(O.range / 1000).toFixed(1)} km · ${O.cap} GJ/shot${O.ammo ? ' · uses slugs' : ''}`;
 }
+const mountType = (O) => (O.type !== 'weapon' ? 'Utility' : O.mount === 'bay' ? 'Missile bay · secondary' : `${O.mount === 'gun' ? 'Fixed gun' : 'Turret'} · ${O.group === 'primary' ? 'primary' : 'secondary'} by default`);
+const roleName = (fit, k, j) => (roleOf(fit, k, j) === 'primary' ? 'PRIMARY' : 'SECONDARY');
 
 function renderDock() {
   const L = $('dockleft'), R = $('dockright');
@@ -1119,8 +1167,7 @@ function renderDock() {
       <button data-a="repair" ${repairCost() === 0 || G.credits < repairCost() ? 'disabled' : ''}>Repair (${fmtIsk(repairCost())})</button>
       <button data-a="rearm" ${rearmCost() === 0 || G.credits < rearmCost() ? 'disabled' : ''}>Rearm (${fmtIsk(rearmCost())})</button>
       <p style="margin-top:14px">${servicesText()}</p>`;
-    R.innerHTML = `<h3>Fitting</h3>${fit.w.map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">W${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : 'Empty hardpoint'}</span></span></div>`).join('')}
-      ${fit.u.map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">U${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : 'Empty utility slot'}</span></span></div>`).join('')}
+    R.innerHTML = `<h3>Fitting</h3>${SLOT_KEYS.map((k) => fit[k].map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">${k.toUpperCase()}${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[k]}</span></span>${id && k !== 'u' ? `<span class="pr">${roleName(fit, k, i)}</span>` : ''}</div>`).join('')).join('')}
       <h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}`;
   } else if (D.tab === 'shipyard') {
     const Y0 = yardOf(), forSale = new Set(Y0.hulls);
@@ -1133,9 +1180,9 @@ function renderDock() {
     const s = fittedStats(D.browse, G.owned[D.browse] || emptyFit(D.browse));
     const f = G.owned[D.browse] || h.fit;
     R.innerHTML = `<h2>${h.name}</h2><div class="sub">${h.cls}</div><p>${h.desc}</p>
-      <table class="st"><tr><td>Weapon hardpoints</td><td>${h.fit.w.length}</td></tr><tr><td>Utility slots</td><td>${h.fit.u.length}</td></tr>
+      <table class="st">${SLOT_KEYS.map((k) => `<tr><td>${SLOT_HEAD[k]}</td><td>${h.fit[k].length}</td></tr>`).join('')}
       <tr><td>Cargo hold</td><td>${s.cargo} t</td></tr><tr><td>Passenger bunks</td><td>${s.bunks}</td></tr>
-      <tr><td>${own ? 'Fitted' : 'Stock'} weapons</td><td>${f.w.filter(Boolean).map((id) => OUTFITS[id].name).join(', ') || '—'}</td></tr></table>
+      <tr><td>${own ? 'Fitted' : 'Stock'} weapons</td><td>${fitItems(f).filter((id) => OUTFITS[id].type === 'weapon').map((id) => OUTFITS[id].name).join(', ') || '—'}</td></tr></table>
       ${statRows(s, D.browse === G.hull ? null : p.stats)}
       ${D.browse === G.hull ? '<button disabled>Active ship</button>' : own ? `<button data-a="board" class="primary">Board this ship</button><button data-a="sellship">Sell hull (${fmtIsk(h.price * 0.5)}, fittings to cargo)</button>`
     : forSale.has(D.browse) ? `<button data-a="buy" class="primary" ${G.credits < h.price ? 'disabled' : ''}>Buy &amp; board (${fmtIsk(h.price)})</button>` : '<button disabled>Not sold here</button>'}
@@ -1143,29 +1190,30 @@ function renderDock() {
   } else if (D.tab === 'jobs') {
     renderJobs(L, R);
   } else {
+    if (!fit[D.slot.k] || D.slot.i >= fit[D.slot.k].length) D.slot = { k: SLOT_KEYS.find((kk) => fit[kk].length) || 'u', i: 0 };
     const k = D.slot.k, i = D.slot.i;
-    const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${kk.toUpperCase()}${j + 1}</span><span class="nm">${id ? OUTFITS[id].name : kk === 'w' ? 'Empty hardpoint' : 'Empty utility slot'}</span></span></div>`;
+    const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${kk.toUpperCase()}${j + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[kk]}</span></span>${kk === 'g' || kk === 't' ? `<span class="pr role" data-a="role" data-slot="${kk}${j}" title="Switch firing role">${roleName(fit, kk, j)}</span>` : kk === 'm' ? '<span class="pr">SECONDARY</span>' : ''}</div>`;
     const inv = Object.entries(G.inventory).filter(([, n]) => n > 0);
-    L.innerHTML = `<h3>${H.name} — weapon hardpoints</h3>${fit.w.map((id, j) => slotRow('w', id, j)).join('')}
-      <h3 style="margin-top:12px">Utility slots</h3>${fit.u.map((id, j) => slotRow('u', id, j)).join('')}
+    L.innerHTML = `<h3>${H.name} — mounts</h3><p>Primary weapons fire on their own at hostiles in reach; secondary weapons fire on LMB / U. Click a role to switch it.</p>
+      ${SLOT_KEYS.filter((kk) => fit[kk].length).map((kk) => `<h3 style="margin-top:12px">${SLOT_HEAD[kk]}</h3>${fit[kk].map((id, j) => slotRow(kk, id, j)).join('')}`).join('')}
       ${fit[k][i] ? '<button data-a="unfit">Unfit selected slot</button>' : ''}
       <h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}
       ${inv.length ? `<h3>Cargo hold</h3>${inv.map(([id, n]) => `<div class="item" data-out="${id}"><span class="nm">${OUTFITS[id].name}</span><span class="pr own">×${n}</span></div>`).join('')}` : ''}`;
-    const type = k === 'w' ? 'weapon' : 'utility';
-    const list = Object.entries(OUTFITS).filter(([, O]) => O.type === type);
+    const list = Object.entries(OUTFITS).filter(([id]) => slotAccepts(k, id));
     let det = '';
     if (D.preview && OUTFITS[D.preview]) {
-      const O = OUTFITS[D.preview], have = G.inventory[D.preview] > 0, avail = O.tech === 'basic' || isHigh();
-      const tf = { w: [...fit.w], u: [...fit.u] }; tf[k][i] = D.preview;
-      det = `<h2 style="margin-top:12px">${O.name}</h2><div class="sub">${O.tech === 'high' ? 'HIGH-TECH · ' : ''}${O.type.toUpperCase()}</div><p>${O.desc}</p><p>${weaponLine(O)}</p>
+      const O = OUTFITS[D.preview], have = G.inventory[D.preview] > 0, avail = O.tech === 'basic' || isHigh(), fits = slotAccepts(k, D.preview);
+      const tf = cloneFit(fit); if (fits) tf[k][i] = D.preview;
+      det = `<h2 style="margin-top:12px">${O.name}</h2><div class="sub">${O.tech === 'high' ? 'HIGH-TECH · ' : ''}${mountType(O).toUpperCase()}</div><p>${O.desc}</p><p>${weaponLine(O)}</p>
         ${O.type === 'utility' ? statRows(fittedStats(G.hull, tf), p.stats) : ''}
-        <button data-a="fit" class="primary" ${!avail || (!have && G.credits < O.price) || fit[k][i] === D.preview ? 'disabled' : ''}>${fit[k][i] === D.preview ? 'Fitted' : `${have ? 'Fit from cargo' : `Buy &amp; fit (${fmtIsk(O.price)})`} → ${k.toUpperCase()}${i + 1}`}</button>
+        <button data-a="fit" class="primary" ${!fits || !avail || (!have && G.credits < O.price) || fit[k][i] === D.preview ? 'disabled' : ''}>${!fits ? 'No matching slot on this hull' : fit[k][i] === D.preview ? 'Fitted' : `${have ? 'Fit from cargo' : `Buy &amp; fit (${fmtIsk(O.price)})`} → ${k.toUpperCase()}${i + 1}`}</button>
         ${!avail ? '<p>Only sold at high-tech stations.</p>' : ''}
         ${have ? `<button data-a="sell">Sell one from cargo (${fmtIsk(O.price * 0.5)})</button>` : ''}`;
     }
-    R.innerHTML = `<h3>${isHigh() ? 'Helion outfitter' : 'Basic outfitter'} — ${type}s</h3>${list.map(([id, O]) => {
+    const type = SLOT_HEAD[k].toLowerCase();
+    R.innerHTML = `<h3>${isHigh() ? 'Helion outfitter' : 'Basic outfitter'} — ${type}</h3>${list.map(([id, O]) => {
       const avail = O.tech === 'basic' || isHigh();
-      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${O.type === 'weapon' ? (O.mount === 'turret' ? 'Auto turret' : O.group === 'primary' ? 'Fixed gun · LMB / U' : 'Fixed gun · RMB / O') : 'Utility'}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
+      return `<div class="item${D.preview === id ? ' on' : ''}${avail ? '' : ' dis'}" data-out="${id}"><span><div class="nm">${O.name}</div><div class="ty">${mountType(O)}${O.tech === 'high' ? ' · High-tech' : ''}</div></span>
         <span class="pr${G.inventory[id] ? ' own' : ''}">${G.inventory[id] ? `×${G.inventory[id]} in cargo` : fmtIsk(O.price)}</span></div>`;
     }).join('')}${det}`;
   }
@@ -1176,7 +1224,7 @@ function slotMarkers() {
   const s = hangar.ship;
   if (D.tab === 'services' || D.tab === 'jobs' || !s) { hangar.setSlots(null); return; }
   const fit = D.tab === 'shipyard' ? (G.owned[D.browse] || HULLS[D.browse].fit) : G.owned[G.hull];
-  const list = [...s.hardpoints.slice(0, fit.w.length).map((h, i) => ({ k: 'w', i, ...h })), ...s.utilMounts.slice(0, fit.u.length).map((h, i) => ({ k: 'u', i, ...h }))];
+  const list = SLOT_KEYS.flatMap((k) => (s.slots ? s.slots[k] : []).slice(0, fit[k].length).map((h, i) => ({ k, i, ...h })));
   hangar.setSlots(list, D.tab === 'outfitter' ? D.slot : null, D.focusSlot);
   D.focusSlot = false;
 }
@@ -1456,18 +1504,16 @@ function readSave() {
     return s && s.v === 1 && HULLS[s.hull] && SYSTEMS[s.dockSys] ? s : null;
   } catch { return null; }
 }
-function cleanFit(id, f) {
-  const d = emptyFit(id);
-  for (const k of ['w', 'u']) if (Array.isArray(f?.[k]) && f[k].length === d[k].length && f[k].every((x) => x === null || OUTFITS[x])) d[k] = [...f[k]];
-  return d;
-}
 function applySave(s) {
-  G.owned = {};
-  for (const [id, f] of Object.entries(s.owned || {})) if (HULLS[id]) G.owned[id] = cleanFit(id, f);
-  if (!G.owned[s.hull]) G.owned[s.hull] = emptyFit(s.hull);
-  G.hull = s.hull;
   G.inventory = {};
   for (const [k, n] of Object.entries(s.inventory || {})) if (OUTFITS[k] && n > 0) G.inventory[k] = Math.floor(n);
+  // fittings that no longer have a matching slot go back to the cargo hold
+  G.owned = {};
+  const spare = [];
+  for (const [id, f] of Object.entries(s.owned || {})) if (HULLS[id]) G.owned[id] = normFit(id, f, spare);
+  for (const x of spare) G.inventory[x] = (G.inventory[x] || 0) + 1;
+  if (!G.owned[s.hull]) G.owned[s.hull] = emptyFit(s.hull);
+  G.hull = s.hull;
   G.credits = Math.max(0, Number(s.credits) || 0);
   G.kills = Math.max(0, Number(s.kills) || 0);
   G.ammo = { rail: s.ammo?.rail ?? 40, missile: s.ammo?.missile ?? 24 };
@@ -1506,12 +1552,20 @@ for (const id of ['dockleft', 'dockright']) {
     if (!t) return;
     const fit = G.owned[G.hull];
     if (t.dataset.j) { jobAction(t.dataset.a, t.dataset.j); audio.ui(); renderDock(); return; }
+    if (t.dataset.a === 'role') {
+      const k = t.dataset.slot[0], i = +t.dataset.slot.slice(1);
+      fit.r[k][i] = roleOf(fit, k, i) === 'primary' ? 'secondary' : 'primary';
+      D.slot = { k, i }; D.preview = fit[k][i];
+      rebuildPlayer(); hangarShow(G.hull, true); audio.ui(); renderDock(); return;
+    }
     if (t.dataset.hull) { D.browse = t.dataset.hull; hangarShow(D.browse); audio.ui(); }
     else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.focusSlot = true; hangar.setOutfit(null); audio.ui(); }
     else if (t.dataset.out) {
       const O = OUTFITS[t.dataset.out];
-      if (O.type === 'weapon' && D.slot.k !== 'w') D.slot = { k: 'w', i: 0 };
-      if (O.type === 'utility' && D.slot.k !== 'u') D.slot = { k: 'u', i: 0 };
+      if (!slotAccepts(D.slot.k, t.dataset.out)) {
+        const kk = SLOT_KEYS.find((x) => fit[x].length && slotAccepts(x, t.dataset.out));
+        if (kk) D.slot = { k: kk, i: Math.max(0, fit[kk].indexOf(null)) };
+      }
       D.preview = t.dataset.out; hangar.setOutfit(outfitPreview(D.preview, G.player.ship.M)); audio.ui();
     } else {
       const a = t.dataset.a, k = D.slot.k, i = D.slot.i;
@@ -1522,23 +1576,25 @@ for (const id of ['dockleft', 'dockright']) {
       if (a === 'board') { G.hull = D.browse; rebuildPlayer(); hangarShow(G.hull, true); }
       if (a === 'sellship' && G.owned[D.browse] && D.browse !== G.hull) {
         const h = HULLS[D.browse], f = G.owned[D.browse];
-        for (const id of [...f.w, ...f.u]) if (id) G.inventory[id] = (G.inventory[id] || 0) + 1;
+        for (const id of fitItems(f)) G.inventory[id] = (G.inventory[id] || 0) + 1;
         delete G.owned[D.browse];
         G.credits += h.price * 0.5;
         hud.log(`Sold ${h.cls} ${h.name} for ${fmtIsk(h.price * 0.5)}`, 'g');
       }
       if (a === 'fit' && D.preview) {
         const id = D.preview, O = OUTFITS[id];
+        if (!slotAccepts(k, id)) return;
         const have = G.inventory[id] > 0;
         if (have) G.inventory[id]--; else if (G.credits >= O.price) G.credits -= O.price; else return;
         const old = fit[k][i];
-        const tf = { w: [...fit.w], u: [...fit.u] }; tf[k][i] = id;
+        const tf = cloneFit(fit); tf[k][i] = id;
         if (!capOk(G.hull, tf)) { if (have) G.inventory[id]++; else G.credits += O.price; flashDockMsg('Removing that module would leave active cargo or passengers without space'); renderDock(); return; }
         if (old) G.inventory[old] = (G.inventory[old] || 0) + 1;
         fit[k][i] = id;
+        if (fit.r[k]) fit.r[k][i] = O.group;
         rebuildPlayer(); hangarShow(G.hull, true); hangar.setOutfit(null);
       }
-      if (a === 'unfit') { const old = fit[k][i]; const tf = { w: [...fit.w], u: [...fit.u] }; tf[k][i] = null; if (old && !capOk(G.hull, tf)) { flashDockMsg('Active cargo or passengers need that module'); renderDock(); return; } if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; fit[k][i] = null; rebuildPlayer(); hangarShow(G.hull, true); } }
+      if (a === 'unfit') { const old = fit[k][i]; const tf = cloneFit(fit); tf[k][i] = null; if (old && !capOk(G.hull, tf)) { flashDockMsg('Active cargo or passengers need that module'); renderDock(); return; } if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; fit[k][i] = null; rebuildPlayer(); hangarShow(G.hull, true); } }
       if (a === 'sell' && D.preview && G.inventory[D.preview] > 0) { G.inventory[D.preview]--; G.credits += OUTFITS[D.preview].price * 0.5; }
       audio.ui();
     }
@@ -1656,7 +1712,7 @@ canvas.addEventListener('mousedown', (ev) => {
   if (G.state !== 'flying') return;
   if (ev.button === 0) { if (!G.lock && !G.ctrlTargeting) lockNearestToReticle(true); G.input.fire1 = true; }
   if (ev.button === 1) { G.input.mmb = true; lockMouse(); }
-  if (ev.button === 2) G.input.fire2 = true;
+  if (ev.button === 2) { G.input.fire2 = true; fireBays(true); }
 });
 window.addEventListener('mouseup', (ev) => {
   if (ev.button === 0) G.input.fire1 = false;
@@ -1704,7 +1760,7 @@ window.addEventListener('keydown', (ev) => {
     case 'KeyT': lockNearestToReticle(); break;
     case 'Tab': cycleHostile(); break;
     case 'KeyU': if (!G.lock && !G.ctrlTargeting) lockNearestToReticle(true); break;
-    case 'KeyF': case 'Semicolon': fireMissiles(); break;
+    case 'KeyF': case 'Semicolon': fireBays(true); break;
     case 'KeyH': jumpKey(); break;
     case 'Space': warpKey(); break;
     case 'KeyG': tryDock(); break;
@@ -1730,7 +1786,7 @@ document.querySelectorAll('#selinfo button').forEach((b) => b.addEventListener('
 function toggleHelp() {
   const h = $('help');
   if (h.classList.contains('hidden')) {
-    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (N toggles mouse flight). Fixed guns fire straight ahead (LMB/RMB or U/O) and auto-aim when the locked target’s lead pip is close to the reticle; turrets engage hostiles automatically (Y toggles hold fire). Hold right Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; H jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press F1 to close. Press Esc to pause.</p>';
+    $('helpbox').innerHTML = document.querySelector('#menu .cols').outerHTML + '<p style="margin-top:14px">Hold the middle mouse button and drag to set a heading: the ship turns to it and stops there (N toggles mouse flight). Each weapon is primary or secondary (switch it in the outfitter). Primary guns fire on their own when a hostile is within about 6° of the nose, and primary turrets fire at the most powerful hostile they can reach (Y toggles turret hold fire). Secondary guns, turrets and missile bays fire only while you hold LMB or U, and only the ones that can hit the locked target. RMB, ; or F fire just the missile bays. Hold right Ctrl and sweep the pointer over a ship to lock it. Shields regenerate after 4 s without damage. Lasers and plasma drain capacitor; railguns use slugs; missiles need a full lock. Dock (G) at Federation stations to repair and buy outfits; high-tech stations sell new hulls and high-tech modules. Space warps to the selected destination; H jumps at a gate (or warps to the gate on your route, then jumps). M opens the star map. The game saves while you are docked; if you die, everything reverts to that save. Press F1 to close. Press Esc to pause.</p>';
     h.classList.remove('hidden');
   } else h.classList.add('hidden');
 }

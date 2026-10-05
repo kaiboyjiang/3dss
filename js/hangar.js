@@ -69,7 +69,7 @@ function slotLabel(text, on, kind) {
   c.width = 128; c.height = 64;
   const g = c.getContext('2d');
   g.fillStyle = on ? 'rgba(60,36,4,0.85)' : 'rgba(14,15,17,0.78)';
-  g.strokeStyle = on ? '#ffc060' : kind === 'w' ? '#d4d7db' : '#80f0a8';
+  g.strokeStyle = on ? '#ffc060' : { g: '#d4d7db', t: '#7ab8ff', m: '#ff8a70', u: '#80f0a8' }[kind];
   g.lineWidth = 4;
   g.beginPath(); g.rect(6, 8, 116, 48); g.fill(); g.stroke();
   g.fillStyle = on ? '#ffe0a0' : '#f2f3f4';
@@ -306,12 +306,12 @@ export class Hangar {
     let selPos = null;
     for (const s of list) {
       const on = !!sel && s.k === sel.k && s.i === sel.i;
-      const col = on ? new THREE.Color(5, 3, 0.6) : s.k === 'w' ? new THREE.Color(0.5, 1.6, 3.2) : new THREE.Color(0.5, 2.6, 1.1);
+      const col = on ? new THREE.Color(5, 3, 0.6) : { g: new THREE.Color(1.8, 1.9, 2.1), t: new THREE.Color(0.5, 1.6, 3.2), m: new THREE.Color(3.2, 0.9, 0.6), u: new THREE.Color(0.5, 2.6, 1.1) }[s.k];
       const up = s.flip ? -1 : 1;
       const m = new THREE.Group();
       m.position.fromArray(s.p);
       const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: on ? 1 : 0.6, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
-      const base = s.s * (s.k === 'u' ? 1.5 : 1.3);
+      const base = s.s * { g: 1.0, t: 1.4, m: 1.7, u: 1.5 }[s.k];
       ring.rotation.x = -Math.PI / 2; ring.position.y = up * 0.3 * s.s; ring.scale.setScalar(base * (on ? 1.5 : 1)); ring.renderOrder = 30;
       m.add(ring);
       const h = 2.6 * s.s + ls * 1.4;

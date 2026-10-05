@@ -108,6 +108,43 @@ export const G = {
     g.translate(0, 0, -depth / 2);
     return g;
   },
+  // closed superellipse loft along +Z; sections are [z, width, heightUp, heightDown, yOffset = 0, exponent = 2.4]
+  // (exponent 2 = ellipse, ~4 = rounded box, 1 = diamond). Sections must be ordered by increasing z.
+  loft: (sections, seg = 24, flat = false) => {
+    const S = sections.map(([z, w, ht, hb, y = 0, n = 2.4]) => ({ z, w, ht, hb, y, n }));
+    const pos = [], idx = [];
+    for (const s of S) {
+      for (let j = 0; j < seg; j++) {
+        const a = (j / seg) * Math.PI * 2, c = Math.cos(a), sn = Math.sin(a), e = 2 / s.n;
+        pos.push(Math.sign(c) * Math.abs(c) ** e * s.w / 2, s.y + Math.sign(sn) * Math.abs(sn) ** e * (sn >= 0 ? s.ht : s.hb), s.z);
+      }
+    }
+    for (let i = 0; i < S.length - 1; i++) {
+      for (let j = 0; j < seg; j++) {
+        const a = i * seg + j, b = i * seg + (j + 1) % seg, c = b + seg, d = a + seg;
+        idx.push(a, b, d, b, c, d);
+      }
+    }
+    const cap = (i, front) => {
+      const s = S[i];
+      if (s.w < 1e-4 && s.ht + s.hb < 1e-4) return;
+      const ci = pos.length / 3;
+      pos.push(0, s.y + (s.ht - s.hb) * 0.25, s.z);
+      for (let j = 0; j < seg; j++) pos.push(pos[(i * seg + j) * 3], pos[(i * seg + j) * 3 + 1], s.z);
+      for (let j = 0; j < seg; j++) {
+        const a = ci + 1 + j, b = ci + 1 + (j + 1) % seg;
+        if (front) idx.push(ci, a, b); else idx.push(ci, b, a);
+      }
+    };
+    cap(0, false);
+    cap(S.length - 1, true);
+    let g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setIndex(idx);
+    if (flat) g = g.toNonIndexed();
+    g.computeVertexNormals();
+    return g;
+  },
   // profiles may be listed in either direction; LatheGeometry faces outward only when y increases
   lathe: (pts, seg = 32) => {
     const v = pts.map(([x, y]) => new THREE.Vector2(x, y));

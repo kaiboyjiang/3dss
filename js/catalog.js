@@ -1,22 +1,22 @@
 import {
   buildFrigate, buildKestrel, buildWarden, buildPaladin, buildMantis, buildCorvid, buildBastion,
   buildHornet, buildWisp, buildMule, buildAtlas, buildAurora, buildSabre, buildSovereign, buildLeviathan,
-  buildTurret, buildOutfitModel, buildRaider, buildCruiser, buildCutlass, buildReaver, buildRavager, buildCombine,
+  buildTurret, buildGun, buildMissileBay, buildOutfitModel, buildRaider, buildCruiser, buildCutlass, buildReaver, buildRavager, buildCombine,
 } from './ships.js';
 import { Kit, G, mat } from './geo.js';
 
 export const HULLS = {
   hornet: {
     name: 'Hornet', cls: 'Hornet Light Fighter', price: 160000, build: buildHornet,
-    desc: 'Cheap split-wing space-superiority fighter. The smallest warship in the catalogue: two hardpoints, wingtip cannons and the fastest turn rate of any hull.',
+    desc: 'Cheap split-wing space-superiority fighter. The smallest warship in the catalogue: two fixed wing guns, a missile bay and the fastest turn rate of any hull.',
     stats: { cargo: 2, bunks: 0, shield: 420, armor: 300, hull: 280, speed: 400, boost: 1080, accel: 200, turn: [2.4, 1.85, 3.8], cap: 650, capRegen: 22, shieldRegen: 16, sig: 0.5 },
-    fit: { w: ['blaster', 'auto'], u: [null] },
+    fit: { g: ['blaster', 'auto'], t: [], m: ['swarm'], u: [null] },
   },
   wisp: {
     name: 'Wisp', cls: 'Wisp Pathfinder Scout', price: 150000, build: buildWisp,
     desc: 'Long-range survey scout with outrigger sensor booms and a dorsal dish. Lightly armed, but the fastest hull in the catalogue with a 45 km lock range.',
     stats: { cargo: 4, bunks: 1, shield: 380, armor: 220, hull: 240, speed: 430, boost: 1200, accel: 190, turn: [2.2, 1.75, 3.6], cap: 900, capRegen: 30, shieldRegen: 18, sig: 0.35, lockRange: 45000 },
-    fit: { w: ['pulse', null], u: [null, null] },
+    fit: { g: [null], t: ['pulse'], m: [null], u: [null, null] },
   },
   mule: {
     name: 'Mule', cls: 'Mule Light Freighter', price: 260000, build: buildMule,
@@ -28,43 +28,43 @@ export const HULLS = {
     name: 'Kestrel', cls: 'Kestrel Interceptor', price: 220000, build: buildKestrel,
     desc: 'Twin-nacelle interceptor built around raw speed and agility. Light on armour, quick to lock and almost impossible to track.',
     stats: { cargo: 4, bunks: 1, shield: 520, armor: 380, hull: 340, speed: 360, boost: 980, accel: 170, turn: [2.1, 1.65, 3.4], cap: 750, capRegen: 24, shieldRegen: 18, sig: 0.6 },
-    fit: { w: ['auto', 'pulse'], u: [null, null] },
+    fit: { g: ['auto', 'auto'], t: ['pulse'], m: ['srm'], u: [null, null] },
   },
   corvid: {
     name: 'Corvid', cls: 'Corvid Stealth Corvette', price: 380000, build: buildCorvid,
     desc: 'Faceted low-observable corvette. The smallest sensor signature in the catalogue — hostiles struggle to lock it, and it slips through fights at speed.',
     stats: { cargo: 8, bunks: 2, shield: 650, armor: 520, hull: 420, speed: 320, boost: 870, accel: 140, turn: [1.8, 1.45, 3.0], cap: 900, capRegen: 28, shieldRegen: 20, sig: 0.45 },
-    fit: { w: ['scatter', 'pulse'], u: [null, null, null] },
+    fit: { g: ['scatter', null], t: ['pulse'], m: ['srm'], u: [null, null, null] },
   },
   valkyrie: {
     name: 'Valkyrie', cls: 'Caldera Assault Frigate', price: 320000, build: buildFrigate,
-    desc: 'The UNS workhorse. Balanced shields and armour with a ventral spinal hardpoint for heavy weapons.',
+    desc: 'The UNS workhorse. Balanced shields and armour with a ventral spinal gun mount for heavy weapons.',
     stats: { cargo: 20, bunks: 4, shield: 950, armor: 800, hull: 650, speed: 250, boost: 640, accel: 90, turn: [1.25, 0.95, 2.2], cap: 1000, capRegen: 26, shieldRegen: 22, sig: 1 },
-    fit: { w: ['blaster', 'pulse', 'rail'], u: [null, null, null] },
+    bays: ['srm', 'srm'], fit: { w: ['blaster', 'pulse', 'rail'], u: [null, null, null] },
   },
   mantis: {
     name: 'Mantis', cls: 'Mantis Heavy Gunship', price: 540000, build: buildMantis,
     desc: 'Forward-swept twin-boom gunship. Heavy forward firepower on the spine, flak mounts on the booms and thick frontal armour.',
     stats: { cargo: 25, bunks: 6, shield: 1150, armor: 1150, hull: 850, speed: 215, boost: 560, accel: 72, turn: [1.0, 0.78, 1.8], cap: 1250, capRegen: 30, shieldRegen: 24, sig: 1.2 },
-    fit: { w: ['scatter', 'gauss', 'flak', 'flak'], u: [null, null, null] },
+    fit: { g: ['scatter', 'gauss'], t: ['flak', 'flak'], m: ['srm', 'srm'], u: [null, null, null] },
   },
   warden: {
     name: 'Warden', cls: 'Warden-class Destroyer', price: 780000, build: buildWarden,
-    desc: 'Helion Yards line destroyer. Five turret hardpoints on dorsal and ventral spines, heavy sponson armour and a deep capacitor.',
+    desc: 'Helion Yards line destroyer. Two spinal guns, three turrets and twin missile bays on an armoured slab hull, heavy sponson armour and a deep capacitor.',
     stats: { cargo: 40, bunks: 12, shield: 1800, armor: 1700, hull: 1300, speed: 165, boost: 410, accel: 42, turn: [0.62, 0.5, 1.1], cap: 1800, capRegen: 40, shieldRegen: 32, sig: 1.8 },
-    fit: { w: ['pulse', 'pulse', 'rail', 'auto', 'auto'], u: [null, null, null, null] },
+    fit: { g: ['auto', 'rail'], t: ['pulse', 'pulse', 'flak'], m: ['srm', 'srm'], u: [null, null, null, null] },
   },
   sabre: {
     name: 'Sabre', cls: 'Sabre-class Light Cruiser', price: 1050000, build: buildSabre,
-    desc: 'Wedge-hulled light cruiser bridging destroyers and heavy cruisers. Five hardpoints including twin flank sponsons, quick for its size.',
+    desc: 'Wedge-hulled light cruiser bridging destroyers and heavy cruisers. Two nose guns, three turrets and two missile bays, quick for its size.',
     stats: { cargo: 50, bunks: 18, shield: 2200, armor: 2100, hull: 1600, speed: 150, boost: 380, accel: 36, turn: [0.54, 0.43, 0.95], cap: 2100, capRegen: 44, shieldRegen: 36, sig: 2.0 },
-    fit: { w: ['heavypulse', 'pulse', 'pulse', 'gauss', 'auto'], u: [null, null, null, null] },
+    fit: { g: ['gauss', 'auto'], t: ['heavypulse', 'pulse', 'pulse'], m: ['srm', 'srm'], u: [null, null, null, null] },
   },
   aurora: {
     name: 'Aurora', cls: 'Aurora Starlines Passenger Liner', price: 1100000, build: buildAurora,
     desc: 'Luxury passenger liner with three lit decks and an observation dome. Huge shields for its class, two point-defence turrets and no missile launchers.',
     stats: { cargo: 60, bunks: 160, shield: 2600, armor: 1300, hull: 1600, speed: 140, boost: 360, accel: 28, turn: [0.42, 0.34, 0.75], cap: 2000, capRegen: 45, shieldRegen: 50, sig: 2.4 },
-    fit: { w: ['pulse', 'pulse'], u: [null, null, null, null, null] },
+    fit: { g: [], t: ['pulse', 'pulse', 'flak'], m: [], u: [null, null, null, null, null] },
   },
   atlas: {
     name: 'Atlas', cls: 'Atlas Bulk Freighter', price: 950000, build: buildAtlas,
@@ -74,31 +74,31 @@ export const HULLS = {
   },
   bastion: {
     name: 'Bastion', cls: 'Bastion-class Heavy Cruiser', price: 1450000, build: buildBastion,
-    desc: 'Armour-ringed heavy cruiser with twin hangar pods. Six hardpoints and five utility slots — a flying fortress that still turns faster than a battlecruiser.',
+    desc: 'Armour-ringed heavy cruiser with twin hangar pods. Two guns, four turrets, two missile bays and five utility slots on a broad armoured deck — a flying fortress that still turns faster than a battlecruiser.',
     stats: { cargo: 80, bunks: 30, shield: 2700, armor: 2900, hull: 2100, speed: 130, boost: 330, accel: 30, turn: [0.45, 0.37, 0.8], cap: 2600, capRegen: 52, shieldRegen: 44, sig: 2.4 },
-    fit: { w: ['auto', 'gauss', 'flak', 'flak', 'pulse', 'pulse'], u: [null, null, null, null, null] },
+    fit: { g: ['auto', 'gauss'], t: ['flak', 'flak', 'pulse', 'pulse'], m: ['srm', 'srm'], u: [null, null, null, null, null] },
   },
   paladin: {
     name: 'Paladin', cls: 'Paladin-class Battlecruiser', price: 2400000, build: buildPaladin,
-    desc: 'Flagship-grade battlecruiser. Seven large hardpoints, layered armour decks and a command superstructure — slow, but it hits like a station.',
+    desc: 'Flagship-grade battlecruiser. Four spinal guns, four turrets, layered armour decks and a command superstructure — slow, but it hits like a station.',
     stats: { cargo: 100, bunks: 40, shield: 3600, armor: 3800, hull: 2800, speed: 110, boost: 270, accel: 22, turn: [0.34, 0.28, 0.6], cap: 3200, capRegen: 65, shieldRegen: 55, sig: 3 },
-    fit: { w: ['heavypulse', 'heavypulse', 'rail', 'rail', 'blaster', 'blaster', 'auto'], u: [null, null, null, null, null] },
+    fit: { g: ['rail', 'rail', 'blaster', 'blaster'], t: ['heavypulse', 'heavypulse', 'flak', 'flak'], m: ['srm', 'srm'], u: [null, null, null, null, null] },
   },
   sovereign: {
     name: 'Sovereign', cls: 'Sovereign-class Battleship', price: 4200000, build: buildSovereign,
-    desc: 'Ship-of-the-line battleship with a dorsal gun deck, armoured belts and a towering command bridge. Nine hardpoints, six utility slots.',
+    desc: 'Ship-of-the-line battleship with a dorsal gun deck, armoured belts and a towering command bridge. Two spinal guns, seven turrets, three missile bays, six utility slots.',
     stats: { cargo: 140, bunks: 60, shield: 5200, armor: 5600, hull: 4200, speed: 90, boost: 220, accel: 15, turn: [0.24, 0.2, 0.42], cap: 4600, capRegen: 85, shieldRegen: 75, sig: 4 },
-    fit: { w: ['heavypulse', 'heavypulse', 'heavypulse', 'rail', 'rail', 'beam', 'beam', 'flak', 'flak'], u: [null, null, null, null, null, null] },
+    fit: { g: ['rail', 'rail'], t: ['heavypulse', 'heavypulse', 'heavypulse', 'beam', 'beam', 'flak', 'flak'], m: ['torp', 'srm', 'srm'], u: [null, null, null, null, null, null] },
   },
   leviathan: {
     name: 'Leviathan', cls: 'Leviathan-class Superheavy Dreadnought', price: 9500000, build: buildLeviathan,
-    desc: 'The largest hull Helion Yards will sell: a 270 m dreadnought built around a spinal siege lance. Twelve hardpoints, seven utility slots and armour measured in metres. It turns like a moon.',
+    desc: 'The largest hull Helion Yards will sell: a 270 m dreadnought built around a spinal siege lance. Four spinal guns, eight turrets, four missile bays, seven utility slots and armour measured in metres. It turns like a moon.',
     stats: { cargo: 220, bunks: 90, shield: 9000, armor: 10000, hull: 7500, speed: 70, boost: 175, accel: 10, turn: [0.17, 0.14, 0.3], cap: 8000, capRegen: 130, shieldRegen: 120, sig: 6 },
-    fit: { w: ['plasma', 'plasma', 'heavypulse', 'heavypulse', 'heavypulse', 'heavypulse', 'beam', 'beam', 'rail', 'rail', 'flak', 'flak'], u: [null, null, null, null, null, null, null] },
+    fit: { g: ['plasma', 'plasma', 'rail', 'rail'], t: ['heavypulse', 'heavypulse', 'heavypulse', 'heavypulse', 'beam', 'beam', 'flak', 'flak'], m: ['torp', 'torp', 'srm', 'srm'], u: [null, null, null, null, null, null, null] },
   },
   raider: {
     name: 'Raider', cls: 'Corsair Raider', price: 140000, build: (env) => buildRaider(env), pirate: true,
-    desc: 'The Clans\' standard swept-blade fighter. Cheap, fast and fragile, with wing cannons and two hardpoints. Sold only at pirate ports.',
+    desc: 'The Clans\' standard swept-blade fighter. Cheap, fast and fragile, with two wing guns. Sold only at pirate ports.',
     stats: { cargo: 6, bunks: 1, shield: 380, armor: 300, hull: 300, speed: 385, boost: 1050, accel: 185, turn: [2.3, 1.75, 3.6], cap: 700, capRegen: 22, shieldRegen: 15, sig: 0.6 },
     fit: { w: ['blaster', 'auto'], u: [null] },
   },
@@ -110,21 +110,21 @@ export const HULLS = {
   },
   reaver: {
     name: 'Reaver', cls: 'Reaver Boarding Frigate', price: 620000, build: buildReaver, pirate: true,
-    desc: 'Spiked assault frigate with a reinforced ram prow and a boarding crew hold. Four hardpoints and missile racks; the Clans use it to run down freighters.',
+    desc: 'Spiked assault frigate with a reinforced ram prow and a boarding crew hold. Two guns, two turrets and two missile bays; the Clans use it to run down freighters.',
     stats: { cargo: 60, bunks: 14, shield: 1300, armor: 1750, hull: 1150, speed: 225, boost: 610, accel: 76, turn: [1.0, 0.8, 1.8], cap: 1400, capRegen: 32, shieldRegen: 22, sig: 1.4 },
-    fit: { w: ['gauss', 'pulse', 'flak', 'auto'], u: [null, null, null] },
+    bays: ['srm', 'srm'], fit: { w: ['gauss', 'pulse', 'flak', 'auto'], u: [null, null, null] },
   },
   marauder: {
     name: 'Marauder', cls: 'Corsair Marauder Cruiser', price: 1600000, build: (env) => buildCruiser(env, true), pirate: true,
     desc: 'A converted ore carrier with armour belts, side hangars and a tall bridge tower. Slow, but its holds swallow whole cargo convoys.',
     stats: { cargo: 260, bunks: 40, shield: 2400, armor: 3200, hull: 2600, speed: 120, boost: 300, accel: 24, turn: [0.38, 0.31, 0.66], cap: 2600, capRegen: 50, shieldRegen: 34, sig: 3 },
-    fit: { w: ['heavypulse', 'heavypulse', 'flak', 'pulse', 'pulse'], u: [null, null, null, null, null] },
+    bays: ['torp', 'srm'], fit: { w: ['heavypulse', 'heavypulse', 'flak', 'pulse', 'pulse'], u: [null, null, null, null, null] },
   },
   ravager: {
     name: 'Ravager', cls: 'Ravager Clan Warlord Battleship', price: 5200000, build: buildRavager, pirate: true,
-    desc: 'A warlord\'s flagship: a forked siege prow, a salvaged command tower and slabs of stolen armour welded over everything. Eight hardpoints. Feared across the frontier.',
+    desc: 'A warlord\'s flagship: a forked siege prow, a salvaged command tower and slabs of stolen armour welded over everything. Seven turrets, a spinal gun and two missile bays. Feared across the frontier.',
     stats: { cargo: 300, bunks: 80, shield: 6000, armor: 8000, hull: 6200, speed: 85, boost: 210, accel: 13, turn: [0.22, 0.18, 0.38], cap: 5200, capRegen: 95, shieldRegen: 70, sig: 5 },
-    fit: { w: ['heavypulse', 'heavypulse', 'beam', 'heavypulse', 'flak', 'beam', 'flak', 'plasma'], u: [null, null, null, null, null, null] },
+    bays: ['torp', 'torp'], fit: { w: ['heavypulse', 'heavypulse', 'beam', 'heavypulse', 'flak', 'beam', 'flak', 'plasma'], u: [null, null, null, null, null, null] },
   },
 };
 
@@ -133,13 +133,13 @@ Object.assign(HULLS, {
     name: 'Unit-7', cls: 'Combine Unit-7 Drone Fighter', price: 70000, build: (env, liv) => buildCombine(env, 'unit', liv), corp: true,
     desc: 'Stamped out by the thousand at Vanta Prime: two box sections, a pair of stub wings and two square engine pods. Cheap to buy, cheap to lose, and it handles like it.',
     stats: { cargo: 2, bunks: 0, shield: 300, armor: 220, hull: 200, speed: 350, boost: 880, accel: 160, turn: [1.9, 1.5, 3.0], cap: 500, capRegen: 16, shieldRegen: 10, sig: 0.55 },
-    fit: { w: ['blaster', 'auto'], u: [null] },
+    bays: [null], fit: { w: ['blaster', 'auto'], u: [null] },
   },
   enforcer: {
     name: 'Enforcer', cls: 'Combine Enforcer Security Frigate', price: 180000, build: (env, liv) => buildCombine(env, 'enforcer', liv), corp: true,
     desc: 'The Combine Security patrol frigate: four identical hull blocks, bolt-on sponsons and four square engine pods. Built to a budget, so the armour is thin and the reactor is small.',
     stats: { cargo: 18, bunks: 4, shield: 800, armor: 700, hull: 600, speed: 230, boost: 560, accel: 68, turn: [0.95, 0.75, 1.7], cap: 1000, capRegen: 22, shieldRegen: 14, sig: 1.0 },
-    fit: { w: ['pulse', 'pulse', 'auto'], u: [null, null] },
+    bays: ['srm'], fit: { w: ['pulse', 'pulse', 'auto'], u: [null, null] },
   },
   crate: {
     name: 'Crate', cls: 'Combine Crate-class Container Hauler', price: 380000, build: (env, liv) => buildCombine(env, 'crate', liv), corp: true,
@@ -155,9 +155,9 @@ Object.assign(HULLS, {
   },
   compliance: {
     name: 'Compliance', cls: 'Combine Compliance Cruiser', price: 620000, build: (env, liv) => buildCombine(env, 'compliance', liv), corp: true,
-    desc: 'The heaviest thing Combine Security flies: a cruiser-sized stack of standard blocks with a bridge tower and five hardpoints. Half the price of a Sabre, and it shows.',
+    desc: 'The heaviest thing Combine Security flies: a cruiser-sized stack of standard blocks with a bridge tower, four turrets, a gun and two missile bays. Half the price of a Sabre, and it shows.',
     stats: { cargo: 90, bunks: 30, shield: 1800, armor: 1700, hull: 1400, speed: 140, boost: 340, accel: 28, turn: [0.42, 0.34, 0.75], cap: 1800, capRegen: 34, shieldRegen: 22, sig: 2.2 },
-    fit: { w: ['pulse', 'pulse', 'pulse', 'flak', 'rail'], u: [null, null, null] },
+    bays: ['srm', 'srm'], fit: { w: ['pulse', 'pulse', 'pulse', 'flak', 'rail'], u: [null, null, null] },
   },
 });
 
@@ -170,7 +170,8 @@ export const YARDS = {
 };
 export const HULL_ORDER = ['wisp', 'hornet', 'kestrel', 'corvid', 'valkyrie', 'mule', 'mantis', 'warden', 'sabre', 'aurora', 'atlas', 'bastion', 'paladin', 'sovereign', 'leviathan', 'raider', 'cutlass', 'reaver', 'marauder', 'ravager', 'unit', 'enforcer', 'crate', 'commuter', 'compliance'];
 
-// mount: turret = auto-fires at hostiles, gun = fixed forward (group: primary = LMB, secondary = RMB). tech: basic (any station) / high (shipyard stations only)
+// mount: gun = forward-fixed with a small gimbal, turret = free-tracking, bay = missile bay (always secondary).
+// group is the default firing role: primary = fires automatically at hostiles, secondary = fires on LMB / U. tech: basic (any station) / high (shipyard stations only)
 export const OUTFITS = {
   pulse: { name: 'Pulse Laser Turret', type: 'weapon', mount: 'turret', group: 'primary', turret: 'laser', price: 45000, tech: 'basic', bolt: 'laser', dmg: 22, rof: 0.16, cap: 6, speed: 3200, range: 5200, track: 2.6, spread: 0.002, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Twin-barrel pulsed laser turret. Tracks and engages hostiles automatically; cheap on capacitor.' },
   blaster: { name: 'Pulse Blaster', type: 'weapon', mount: 'gun', group: 'primary', turret: 'laser', scale: 1.1, price: 60000, tech: 'basic', bolt: 'laser', dmg: 30, rof: 0.18, cap: 7, speed: 3600, range: 5500, track: 3, spread: 0.0015, profile: 'em', flash: 0x60a0ff, sound: 'laser', desc: 'Fixed forward pulse cannon. Fires along the bow and auto-aims when the target is near the reticle.' },
@@ -182,6 +183,9 @@ export const OUTFITS = {
   beam: { name: 'Beam Laser Turret', type: 'weapon', mount: 'turret', group: 'primary', turret: 'beam', scale: 1.1, price: 260000, tech: 'high', bolt: 'laser', dmg: 60, rof: 0.45, cap: 16, speed: 5200, range: 8000, track: 1.6, spread: 0.0008, profile: 'em', flash: 0x80b0ff, sound: 'laser', desc: 'Long-focus emitter with a crystal lens. Hard-hitting, very long range turret that engages automatically.' },
   scatter: { name: 'Scatter Cannon', type: 'weapon', mount: 'gun', group: 'primary', turret: 'scatter', price: 75000, tech: 'basic', bolt: 'tracer', dmg: 11, pellets: 6, rof: 0.45, cap: 4, speed: 2600, range: 3200, track: 3, spread: 0.035, profile: 'kinetic', flash: 0xffb050, sound: 'cannon', desc: 'Quad-barrel fixed shotgun. A devastating cone of slugs at close range.' },
   gauss: { name: 'Gauss Cannon', type: 'weapon', mount: 'gun', group: 'secondary', turret: 'gauss', scale: 0.9, price: 150000, tech: 'basic', bolt: 'tracer', dmg: 140, rof: 1.1, cap: 30, speed: 4600, range: 7000, track: 1.4, spread: 0.0005, profile: 'kinetic', flash: 0xffc070, sound: 'rail', desc: 'Fixed coilgun firing heavy ferrous slugs. Long range, no ammunition required.' },
+  srm: { name: 'Missile Bay', type: 'weapon', mount: 'bay', group: 'secondary', bay: 'srm', price: 90000, tech: 'basic', tubes: 2, salvo: 2, dmg: 150, rof: 4, mspeed: 850, range: 10000, ammoPer: 1, desc: 'Armoured twin-cell bay of guided anti-ship missiles. Needs a full target lock; fires a pair per salvo.' },
+  swarm: { name: 'Swarm Rocket Pod', type: 'weapon', mount: 'bay', group: 'secondary', bay: 'swarm', price: 110000, tech: 'basic', tubes: 6, salvo: 4, dmg: 70, rof: 5, mspeed: 1000, range: 8000, ammoPer: 1, desc: 'Six-cell pod of fast, light seekers. Four at a time saturate point defence on small craft.' },
+  torp: { name: 'Torpedo Bay', type: 'weapon', mount: 'bay', group: 'secondary', bay: 'torp', price: 320000, tech: 'high', tubes: 1, salvo: 1, dmg: 620, rof: 9, mspeed: 620, range: 8000, ammoPer: 3, desc: 'Single heavy anti-capital torpedo. Slow and expensive (3 missiles of ammunition per shot), but it guts cruisers.' },
   shieldext: { name: 'Shield Extender', type: 'utility', price: 60000, tech: 'basic', mods: { shield: 350 }, desc: '+350 shield HP.' },
   armorplate: { name: 'Reinforced Armor Plates', type: 'utility', price: 55000, tech: 'basic', mods: { armor: 450, speedMul: 0.94 }, desc: '+450 armor HP, −6% max velocity.' },
   capbattery: { name: 'Capacitor Battery', type: 'utility', price: 50000, tech: 'basic', mods: { cap: 400 }, desc: '+400 capacitor.' },
@@ -193,16 +197,105 @@ export const OUTFITS = {
   overdrive: { name: 'Overdrive Injector', type: 'utility', price: 150000, tech: 'high', mods: { speedMul: 1.15, boostMul: 1.1 }, desc: '+15% max velocity, +10% afterburner.' },
 };
 
-export function emptyFit(hullId) {
-  const f = HULLS[hullId].fit;
-  return { w: [...f.w], u: [...f.u] };
+export const SLOT_KEYS = ['g', 't', 'm', 'u'];
+export const SLOT_MOUNT = { g: 'gun', t: 'turret', m: 'bay' };
+const KEY_OF = { gun: 'g', turret: 't', bay: 'm' };
+export const SLOT_NAME = { g: 'Gun', t: 'Turret', m: 'Missile bay', u: 'Utility' };
+export const slotAccepts = (k, id) => !!OUTFITS[id] && (k === 'u' ? OUTFITS[id].type === 'utility' : OUTFITS[id].mount === SLOT_MOUNT[k]);
+
+// Hulls still described with a legacy generic weapon list get typed gun/turret slots from each stock weapon's mount,
+// plus missile bays placed on their old launcher points.
+for (const H of Object.values(HULLS)) {
+  if (!H.fit.w) continue;
+  H.hpKinds = H.fit.w.map((id) => (id && OUTFITS[id].mount === 'gun' ? 'g' : 't'));
+  H.fit = { g: H.fit.w.filter((_, i) => H.hpKinds[i] === 'g'), t: H.fit.w.filter((_, i) => H.hpKinds[i] === 't'), m: H.bays || [], u: H.fit.u };
 }
 
-function socket(M, m, util) {
+export function roleOf(fit, k, i) {
+  if (k === 'm') return 'secondary';
+  const r = fit.r?.[k]?.[i];
+  if (r === 'primary' || r === 'secondary') return r;
+  const id = fit[k][i];
+  return id ? OUTFITS[id].group : 'primary';
+}
+
+export function emptyFit(hullId) {
+  const f = HULLS[hullId].fit;
+  const d = { g: [...f.g], t: [...f.t], m: [...f.m], u: [...f.u] };
+  d.r = { g: d.g.map((id) => (id ? OUTFITS[id].group : 'primary')), t: d.t.map((id) => (id ? OUTFITS[id].group : 'primary')) };
+  return d;
+}
+
+export function bareFit(hullId) {
+  const d = emptyFit(hullId);
+  for (const k of SLOT_KEYS) d[k] = d[k].map(() => null);
+  return d;
+}
+
+export const cloneFit = (f) => ({ g: [...f.g], t: [...f.t], m: [...f.m], u: [...f.u], r: { g: [...f.r.g], t: [...f.r.t] } });
+
+// Validates a saved fit against the hull. Legacy { w, u } fits are redistributed by each weapon's mount;
+// anything that no longer has a slot is pushed to `spare` so the caller can return it to the cargo hold.
+export function normFit(hullId, f, spare = []) {
+  const d = emptyFit(hullId);
+  if (!f || typeof f !== 'object') return d;
+  const valid = (k, x) => x === null || slotAccepts(k, x);
+  if (Array.isArray(f.g) || Array.isArray(f.t) || Array.isArray(f.m)) {
+    for (const k of SLOT_KEYS) {
+      if (!Array.isArray(f[k])) continue;
+      d[k] = d[k].map((_, i) => null);
+      f[k].forEach((x, i) => {
+        if (x === null || x === undefined) return;
+        if (i < d[k].length && valid(k, x)) d[k][i] = x; else if (OUTFITS[x]) spare.push(x);
+      });
+    }
+    for (const k of ['g', 't']) {
+      d.r[k] = d[k].map((id, i) => {
+        const v = f.r?.[k]?.[i];
+        return v === 'primary' || v === 'secondary' ? v : id ? OUTFITS[id].group : 'primary';
+      });
+    }
+    return d;
+  }
+  if (Array.isArray(f.w)) {
+    d.g = d.g.map(() => null); d.t = d.t.map(() => null);
+    for (const x of f.w) {
+      if (!x || !OUTFITS[x] || OUTFITS[x].type !== 'weapon') continue;
+      const k = KEY_OF[OUTFITS[x].mount];
+      const i = d[k] ? d[k].indexOf(null) : -1;
+      if (i >= 0) d[k][i] = x; else spare.push(x);
+    }
+    d.r = { g: d.g.map((id) => (id ? OUTFITS[id].group : 'primary')), t: d.t.map((id) => (id ? OUTFITS[id].group : 'primary')) };
+  }
+  if (Array.isArray(f.u)) {
+    d.u = d.u.map(() => null);
+    f.u.forEach((x, i) => {
+      if (x === null || x === undefined) return;
+      if (i < d.u.length && slotAccepts('u', x)) d.u[i] = x; else if (OUTFITS[x]) spare.push(x);
+    });
+  }
+  return d;
+}
+
+export const fitItems = (f) => SLOT_KEYS.flatMap((k) => f[k]).filter(Boolean);
+
+function socket(M, m, kind) {
   const k = new Kit();
-  k.add('dark', G.cyl(util ? 1.2 : 0.95, util ? 1.3 : 1.1, 0.25, 20), mat([0, 0.12, 0]));
-  k.add('metal', G.torus(util ? 0.95 : 0.7, 0.06, 6, 24), mat([0, 0.27, 0], [Math.PI / 2, 0, 0]));
-  k.add('amber', G.box(0.3, 0.05, 0.12), mat([0, 0.26, util ? 1.05 : 0.85]));
+  if (kind === 'm') {
+    k.add('dark', G.rbox(2.2, 0.25, 2.2, 0.06), mat([0, 0.12, 0]));
+    k.add('metal', G.box(1.6, 0.06, 1.6), mat([0, 0.27, 0]));
+    k.add('amber', G.box(0.12, 0.05, 1.7), mat([0.95, 0.26, 0]));
+    k.add('amber', G.box(0.12, 0.05, 1.7), mat([-0.95, 0.26, 0]));
+  } else if (kind === 'g') {
+    k.add('dark', G.rbox(1.3, 0.25, 2.4, 0.08), mat([0, 0.12, -0.2]));
+    k.add('metal', G.box(0.9, 0.06, 1.8), mat([0, 0.27, -0.2]));
+    k.add('amber', G.box(0.3, 0.05, 0.12), mat([0, 0.26, 1.0]));
+  } else {
+    const util = kind === 'u';
+    k.add('dark', G.cyl(util ? 1.2 : 0.95, util ? 1.3 : 1.1, 0.25, 20), mat([0, 0.12, 0]));
+    k.add('metal', G.torus(util ? 0.95 : 0.7, 0.06, 6, 24), mat([0, 0.27, 0], [Math.PI / 2, 0, 0]));
+    k.add('amber', G.box(0.3, 0.05, 0.12), mat([0, 0.26, util ? 1.05 : 0.85]));
+  }
   const g = k.build(M);
   g.position.fromArray(m.p);
   if (m.flip) g.rotation.z = Math.PI;
@@ -210,24 +303,57 @@ function socket(M, m, util) {
   return g;
 }
 
-export function buildFitted(hullId, fit, env, liv) {
+// physical mount points for each slot type
+export function mountSlots(ship, hullId) {
+  if (ship.slots) return ship.slots;
+  const H = HULLS[hullId], kinds = H.hpKinds || [];
+  const g = [], t = [];
+  ship.hardpoints.forEach((hp, i) => (kinds[i] === 'g' ? g : t).push(hp));
+  const L = ship.launchers, n = H.fit.m.length;
+  const s = Math.min(2.4, Math.max(0.4, ship.radius * 0.028));
+  const m = L.length ? Array.from({ length: n }, (_, i) => {
+    const o = L[Math.floor((i * L.length) / n)];
+    return { p: o.position.toArray(), flip: o.position.y < 0 ? 1 : 0, s };
+  }) : [];
+  ship.slots = { g, t, m, u: ship.utilMounts };
+  return ship.slots;
+}
+
+export function buildFitted(hullId, fit0, env, liv) {
+  const fit = fit0 && Array.isArray(fit0.g) && fit0.r ? fit0 : normFit(hullId, fit0);
   const ship = HULLS[hullId].build(env, liv);
-  fit.w.forEach((id, i) => {
-    const hp = ship.hardpoints[i];
+  const S = mountSlots(ship, hullId);
+  for (const k of ['g', 't']) {
+    fit[k].forEach((id, i) => {
+      const hp = S[k][i];
+      if (!hp) return;
+      if (!id) { ship.group.add(socket(ship.M, hp, k)); return; }
+      const O = OUTFITS[id];
+      const t = k === 'g' ? buildGun(ship.M, O.turret, hp.s * (O.scale || 1)) : buildTurret(ship.M, O.turret, hp.s * (O.scale || 1));
+      t.root.position.fromArray(hp.p);
+      if (hp.flip) t.root.rotation.z = Math.PI;
+      t.weapon = O; t.mount = SLOT_MOUNT[k]; t.role = roleOf(fit, k, i); t.slot = i;
+      ship.group.add(t.root);
+      (k === 'g' ? ship.gunMounts : ship.turretMounts).push(t);
+      if (k === 't') ship.turrets.push(t);
+    });
+  }
+  fit.m.forEach((id, i) => {
+    const hp = S.m[i];
     if (!hp) return;
-    if (!id) { ship.group.add(socket(ship.M, hp, false)); return; }
+    if (!id) { ship.group.add(socket(ship.M, hp, 'm')); return; }
     const O = OUTFITS[id];
-    const t = buildTurret(ship.M, O.turret, hp.s * (O.scale || 1));
-    t.root.position.fromArray(hp.p);
-    if (hp.flip) t.root.rotation.z = Math.PI;
-    t.weapon = O;
-    ship.group.add(t.root);
-    ship.turrets.push(t);
+    const b = buildMissileBay(ship.M, O, hp.s);
+    b.root.position.fromArray(hp.p);
+    if (hp.flip) b.root.rotation.z = Math.PI;
+    b.weapon = O; b.mount = 'bay'; b.role = 'secondary'; b.slot = i;
+    ship.group.add(b.root);
+    ship.missileBays.push(b);
   });
   fit.u.forEach((id, i) => {
-    const m = ship.utilMounts[i];
+    const m = S.u[i];
     if (!m) return;
-    if (!id) { ship.group.add(socket(ship.M, m, true)); return; }
+    if (!id) { ship.group.add(socket(ship.M, m, 'u')); return; }
     const g = buildOutfitModel(id, ship.M);
     g.position.fromArray(m.p);
     if (m.flip) g.rotation.z = Math.PI;
@@ -239,7 +365,8 @@ export function buildFitted(hullId, fit, env, liv) {
 
 export function outfitPreview(id, M) {
   const O = OUTFITS[id];
-  return O.type === 'weapon' ? buildTurret(M, O.turret, 1).root : buildOutfitModel(id, M);
+  if (O.type !== 'weapon') return buildOutfitModel(id, M);
+  return O.mount === 'bay' ? buildMissileBay(M, O, 1).root : O.mount === 'gun' ? buildGun(M, O.turret, 1).root : buildTurret(M, O.turret, 1).root;
 }
 
 export function fittedStats(hullId, fit) {

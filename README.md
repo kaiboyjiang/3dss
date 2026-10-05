@@ -15,13 +15,13 @@ Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a de
 - A / D: strafe
 - R / B: vertical thrust up / down
 - Shift: afterburner
-- Left mouse or U: fixed forward guns (auto-aim when the locked target's lead pip is near the reticle)
-- Right mouse or O: heavy fixed guns (railgun / plasma lance)
-- Turrets: engage hostiles automatically; Y toggles hold fire
+- Primary weapons fire on their own: fixed guns when a hostile is within ~6° of the nose, turrets at the most powerful hostile they can reach
+- Left mouse or U (or O): fire secondary guns, turrets and missile bays — only the mounts that can hit the target fire
+- Y: primary turrets hold fire (they keep tracking)
 - Hold right Ctrl: lock the ship nearest the pointer
 - T: lock target near the pointer / reticle
 - Tab: cycle hostiles
-- ; or F: missile salvo after locking
+- Right mouse, ; or F: fire missile bays only (needs a lock)
 - 1–9: select navigation destination
 - Space: warp to the selected destination
 - H: jump through a gate within 3.5 km (plays a jump cutscene); otherwise warp to the selected or next route gate and jump on arrival

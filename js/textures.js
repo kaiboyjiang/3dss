@@ -200,6 +200,20 @@ export function hullMaps(opts = {}) {
     c.fillStyle = g; c.fillRect(x, y, 2 + r() * 4, len);
   }
   c.restore();
+  // corrosion: rust blooms that bleed down from seams and pit the surface
+  const rust = opts.rust || 0;
+  if (rust > 0) {
+    grime(c, size, r, Math.floor(70 * rust), 'rgba(122,58,22,A)', size / 9, 0.75 * rust);
+    grime(c, size, r, Math.floor(50 * rust), 'rgba(84,40,18,A)', size / 16, 0.9 * rust);
+    grime(ro, size, r, Math.floor(60 * rust), 'rgba(250,250,250,A)', size / 10, 0.8 * rust);
+    grime(h, size, r, Math.floor(40 * rust), 'rgba(40,40,40,A)', size / 18, 0.5 * rust);
+    for (let i = 0; i < 70 * rust; i++) {
+      const x = r() * size, y = r() * size, len = size / 24 + r() * size / 7;
+      const g = c.createLinearGradient(x, y, x, y + len);
+      g.addColorStop(0, `rgba(140,66,24,${0.25 + r() * 0.3})`); g.addColorStop(1, 'rgba(110,50,20,0)');
+      c.fillStyle = g; c.fillRect(x, y, 1.5 + r() * 3, len);
+    }
+  }
 
   const nrm = normalFromHeight(hgt, opts.normalStrength || 2.2);
   return {

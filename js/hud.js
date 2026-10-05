@@ -177,11 +177,11 @@ export class HUD {
       m.classList.toggle('active', !!active); m.classList.toggle('off', !!off);
     };
     this.el.railammo.style.display = G.usesAmmo ? '' : 'none';
-    cd('m-laser', G.cool.pri, G.input.fire1, G.priOff);
-    cd('m-rail', G.cool.sec, G.input.fire2, G.secOff);
+    cd('m-laser', G.cool.pri, G.priFiring, G.priOff);
+    cd('m-rail', G.cool.sec, G.secFiring, G.secOff);
     cd('m-turret', G.cool.tur, G.turFiring, !G.turretsAuto || !G.hasTurrets);
     document.getElementById('turstate').textContent = !G.hasTurrets ? '' : G.turretsAuto ? 'AUTO' : 'HOLD';
-    cd('m-missile', G.cool.missile / 4, false, G.ammo.missile <= 0 || !(G.lock && G.lock.progress >= 1));
+    cd('m-missile', G.cool.missile, G.misFiring, !G.hasBays || G.ammo.missile <= 0 || !(G.lock && G.lock.progress >= 1));
     cd('m-ab', 0, G.boosting, player.cap < 10);
     cd('m-warp', G.warp ? 1 : 0, !!G.warp, G.scrambled);
     // warnings
