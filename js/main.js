@@ -2245,9 +2245,10 @@ async function boot() {
     G.navTarget = LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS.find((l) => l.jump);
     undockPose();
     await step('Compiling shaders…');
-    renderer.compile(scene, camera);
+    const fonts = Promise.race([Promise.all(['600 120px "Chakra Petch"', '44px "Chakra Petch"', '30px "Share Tech Mono"', '10px "Mono Digits"'].map((f) => document.fonts.load(f, 'A0'))), new Promise((r) => setTimeout(r, 2000))]).catch(() => {});
+    await renderer.compileAsync(scene, camera);
     await step('Pressurising hangar bay…');
-    await Promise.all(['600 120px "Chakra Petch"', '44px "Chakra Petch"', '30px "Share Tech Mono"', '10px "Mono Digits"'].map((f) => document.fonts.load(f, 'A0'))).catch(() => {});
+    await fonts;
     hangar = new Hangar(renderer);
     applyGfx(settings.gfx);
     composer.render(0.016);

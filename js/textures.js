@@ -35,18 +35,18 @@ function normalFromHeight(hc, strength) {
   const octx = out.getContext('2d');
   const img = octx.createImageData(w, h);
   const d = img.data;
-  const H = (x, y) => src[(((y + h) % h) * w + ((x + w) % w)) * 4] / 255;
+  const hm = new Float32Array(w * h);
+  for (let i = 0, j = 0; i < hm.length; i++, j += 4) hm[i] = src[j] * (strength / 255);
   for (let y = 0; y < h; y++) {
+    const row = y * w, up = ((y + h - 1) % h) * w, dn = ((y + 1) % h) * w;
     for (let x = 0; x < w; x++) {
-      const dx = (H(x + 1, y) - H(x - 1, y)) * strength;
-      const dy = (H(x, y + 1) - H(x, y - 1)) * strength;
-      let nx = -dx, ny = dy, nz = 1;
-      const l = Math.hypot(nx, ny, nz);
-      nx /= l; ny /= l; nz /= l;
-      const i = (y * w + x) * 4;
-      d[i] = (nx * 0.5 + 0.5) * 255;
-      d[i + 1] = (ny * 0.5 + 0.5) * 255;
-      d[i + 2] = (nz * 0.5 + 0.5) * 255;
+      const xl = x ? x - 1 : w - 1, xr = x + 1 < w ? x + 1 : 0;
+      const nx = hm[row + xl] - hm[row + xr], ny = hm[dn + x] - hm[up + x];
+      const k = 127.5 / Math.sqrt(nx * nx + ny * ny + 1);
+      const i = (row + x) * 4;
+      d[i] = nx * k + 127.5;
+      d[i + 1] = ny * k + 127.5;
+      d[i + 2] = k + 127.5;
       d[i + 3] = 255;
     }
   }
@@ -56,7 +56,6 @@ function normalFromHeight(hc, strength) {
 
 function grime(ctx, size, r, count, color, maxR, alpha) {
   ctx.save();
-  ctx.filter = `blur(${Math.round(size / 160)}px)`;
   for (let i = 0; i < count; i++) {
     const x = r() * size, y = r() * size, rad = (0.2 + r()) * maxR;
     const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
@@ -83,7 +82,7 @@ export function hullMaps(opts = {}) {
   const hazardChance = opts.hazardChance ?? 0.03;
 
   const col = canvas(size), hgt = canvas(size), rough = canvas(size);
-  const c = col.getContext('2d'), h = hgt.getContext('2d'), ro = rough.getContext('2d');
+  const c = col.getContext('2d'), h = hgt.getContext('2d', { willReadFrequently: true }), ro = rough.getContext('2d');
   c.fillStyle = `rgb(${base})`; c.fillRect(0, 0, size, size);
   h.fillStyle = '#808080'; h.fillRect(0, 0, size, size);
   ro.fillStyle = '#8c8c8c'; ro.fillRect(0, 0, size, size);
@@ -226,7 +225,7 @@ export function hullMaps(opts = {}) {
 export function rockMaps(seed = 7, size = 512, tint = [120, 110, 100]) {
   const r = rng(seed);
   const col = canvas(size), hgt = canvas(size);
-  const c = col.getContext('2d'), h = hgt.getContext('2d');
+  const c = col.getContext('2d', { willReadFrequently: true }), h = hgt.getContext('2d', { willReadFrequently: true });
   c.fillStyle = `rgb(${tint})`; c.fillRect(0, 0, size, size);
   h.fillStyle = '#808080'; h.fillRect(0, 0, size, size);
   // layered noise blobs (wrap-around so it tiles)
