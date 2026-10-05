@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Kit, G, mat } from './geo.js';
 import { hullMaps, rng, glowTexture } from './textures.js';
 import { LOGDEPTH_VERT_PARS, LOGDEPTH_VERT, LOGDEPTH_FRAG_PARS, LOGDEPTH_FRAG } from './shaders.js';
@@ -65,6 +66,7 @@ const plumeGeo = (() => {
   const g = new THREE.CylinderGeometry(1, 0.25, 1, 24, 8, true);
   g.translate(0, -0.5, 0);
   g.rotateX(Math.PI / 2); // tail now along -Z... (y=-1 -> z=-1)
+  g.userData.shared = true;
   return g;
 })();
 
@@ -1020,6 +1022,45 @@ export function buildHauler(env, seed = 1) {
 }
 
 // per-frame cosmetic animation
+// Bakes every opaque part that never moves relative to the hull into one mesh per material and shadow
+// setting, so a ship costs a handful of draw calls instead of dozens. Aiming turret heads stay separate.
+export function mergeStatic(ship) {
+  const g = ship.group;
+  const moving = new Set([...ship.turrets, ...ship.gunMounts, ...ship.turretMounts].map((t) => t.yaw));
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  const bins = new Map();
+  g.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || o.renderOrder || !o.visible || Array.isArray(o.material)) return;
+    const m = o.material, a = o.geometry.attributes;
+    if (m.transparent || !(m.isMeshStandardMaterial || m.isMeshBasicMaterial)) return;
+    if (o.geometry.index || o.geometry.morphAttributes.position || Object.keys(a).sort().join() !== 'normal,position,uv') return;
+    for (let p = o.parent; p !== g; p = p.parent) if (!p || moving.has(p) || !p.visible) return;
+    const xf = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    if (xf.determinant() <= 0) return;
+    const key = `${m.uuid}|${o.castShadow}|${o.receiveShadow}`;
+    if (!bins.has(key)) bins.set(key, []);
+    bins.get(key).push([o, xf]);
+  });
+  for (const list of bins.values()) {
+    if (list.length < 2) continue;
+    const geo = mergeGeometries(list.map(([o, xf]) => (o.geometry.userData.shared ? o.geometry.clone() : o.geometry).applyMatrix4(xf)), false);
+    if (!geo) continue;
+    geo.computeBoundingSphere();
+    const [o0] = list[0];
+    const mesh = new THREE.Mesh(geo, o0.material);
+    mesh.name = o0.name;
+    mesh.castShadow = o0.castShadow;
+    mesh.receiveShadow = o0.receiveShadow;
+    for (const [o] of list) {
+      o.removeFromParent();
+      if (!o.geometry.userData.shared) o.geometry.dispose();
+    }
+    g.add(mesh);
+  }
+  return ship;
+}
+
 export function animateShip(ship, dt, time, throttle) {
   for (const e of ship.engines) {
     const p = 0.12 + throttle * 0.9;

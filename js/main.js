@@ -6,7 +6,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { buildWorld, LOCATIONS } from './world.js';
 import { SYSTEMS, GOVS, systemDef, route, allPorts, hops, fullRoute } from './systems.js';
 import { StarMap } from './map.js';
-import { buildRaider, buildCruiser, buildHauler, animateShip } from './ships.js';
+import { buildRaider, buildCruiser, buildHauler, animateShip, mergeStatic } from './ships.js';
 import { HULLS, OUTFITS, YARDS, emptyFit, bareFit, normFit, cloneFit, fitItems, roleOf, slotAccepts, SLOT_KEYS, MOUNT_KEYS, OUTFIT_CATS, CAP_NAME, catOf, fitLoad, fitProblem, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
 import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } from './combat.js';
@@ -147,6 +147,7 @@ function makeEntity(kind, faction, pos, name, civHull) {
   else if (s.hullId) ship = buildFitted(s.hullId, emptyFit(s.hullId), env);
   else ship = kind === 'raider' ? buildRaider(env) : kind === 'cruiser' ? buildCruiser(env) : buildHauler(env, 1 + Math.floor(Math.random() * 50));
   setShadows(ship.group);
+  mergeStatic(ship);
   ship.group.position.copy(pos);
   scene.add(ship.group);
   const e = {
@@ -161,9 +162,18 @@ function makeEntity(kind, faction, pos, name, civHull) {
   return e;
 }
 
+function disposeShip(obj) {
+  scene.remove(obj);
+  obj.traverse((o) => {
+    if (o.isSprite) { o.material.dispose(); return; }
+    if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
+    if (o.material && o.material.isShaderMaterial) o.material.dispose();
+  });
+}
+
 function removeEntity(e) {
   e.alive = false;
-  scene.remove(e.obj);
+  disposeShip(e.obj);
   const i = G.entities.indexOf(e);
   if (i >= 0) G.entities.splice(i, 1);
   if (G.selected === e) G.selected = null;
@@ -1578,7 +1588,7 @@ function rebuildPlayer() {
   e.armor = e.maxArmor * (old.armor / old.maxArmor);
   e.hull = Math.max(1, e.maxHull * (old.hull / old.maxHull));
   e.obj.visible = old.obj.visible;
-  scene.remove(old.obj);
+  disposeShip(old.obj);
   G.entities.splice(G.entities.indexOf(old), 1);
   G.player = e;
   weaponInfo();
@@ -1887,12 +1897,22 @@ const perf = { acc: 0, n: 0 };
 const fpsMeter = { n: 0, t: 0 };
 // menu and pause screens only redraw when something changed
 let staticDrawn = false, menuAcc = 0;
+let msaa = 0;
+function setMsaa(n) {
+  msaa = n;
+  for (const c of [composer, hangar && hangar.composer]) {
+    if (!c) continue;
+    for (const t of [c.renderTarget1, c.renderTarget2]) if (t.samples !== n) { t.samples = n; t.dispose(); }
+  }
+}
 function adaptResolution(ms) {
   perf.acc += ms; perf.n++;
   if (perf.acc < 2000) return;
   const avg = perf.acc / perf.n;
   perf.acc = perf.n = 0;
   let pr = pixelRatio;
+  // once resolution is at its floor, shed anti-aliasing: multisampled targets dominate fill cost on weak GPUs
+  if (avg > 21 && pr <= prMin && msaa > 0) { setMsaa(msaa > 4 ? 4 : msaa > 2 ? 2 : 0); return; }
   if (avg > 21 && pr > prMin) pr = Math.max(prMin, pr - 0.1);
   else if (avg < 17.5 && pr < prMax) pr = Math.min(prMax, pr + 0.05);
   if (pr === pixelRatio) return;
@@ -2292,9 +2312,9 @@ function applyGfx(name) {
   const recompile = renderer.shadowMap.enabled !== q.shadow > 0 || renderer.shadowMap.type !== type;
   renderer.shadowMap.enabled = q.shadow > 0;
   renderer.shadowMap.type = type;
-  for (const t of [composer.renderTarget1, composer.renderTarget2]) if (t.samples !== q.msaa) { t.samples = q.msaa; t.dispose(); }
   if (world) world.setQuality(q);
   if (hangar) hangar.setQuality(q);
+  setMsaa(q.msaa);
   if (recompile) for (const s of [scene, hangar && hangar.scene]) s?.traverse((o) => { for (const m of [].concat(o.material || [])) m.needsUpdate = true; });
   perf.acc = perf.n = 0;
   resize();
