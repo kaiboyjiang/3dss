@@ -70,7 +70,7 @@ function slotLabel(text, on, kind) {
   c.width = 128; c.height = 64;
   const g = c.getContext('2d');
   g.fillStyle = on ? 'rgba(60,36,4,0.85)' : 'rgba(14,15,17,0.78)';
-  g.strokeStyle = on ? '#ffc060' : { g: '#d4d7db', t: '#7ab8ff', m: '#ff8a70', u: '#80f0a8' }[kind];
+  g.strokeStyle = on ? '#ffc060' : { g: '#d4d7db', t: '#7ab8ff', m: '#ff8a70' }[kind];
   g.lineWidth = 4;
   g.beginPath(); g.rect(6, 8, 116, 48); g.fill(); g.stroke();
   g.fillStyle = on ? '#ffe0a0' : '#f2f3f4';
@@ -80,6 +80,8 @@ function slotLabel(text, on, kind) {
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
+
+const _cc = new THREE.Color(), _sz = new THREE.Vector2();
 
 export class Hangar {
   constructor(renderer) {
@@ -111,6 +113,55 @@ export class Hangar {
     this.swapped = new Map();
     this.time = 0;
     this.buildRoom();
+    this.pv = this.buildPreview();
+  }
+
+  // Outfit viewer: its own small scene, rendered into the #outprev panel after the hangar frame.
+  buildPreview() {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, 1.25, 0.1, 200);
+    scene.add(new THREE.HemisphereLight(0xb4bfd0, 0x2a2d32, 1.8));
+    const key = new THREE.DirectionalLight(0xfff4e8, 4.2); key.position.set(6, 9, 7);
+    const rim = new THREE.DirectionalLight(0x86a8e0, 3.0); rim.position.set(-7, 3, -8);
+    const fill = new THREE.DirectionalLight(0xc8d0dc, 1.6); fill.position.set(-4, -3, 6);
+    scene.add(key, rim, fill);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.1, 3.2, 64), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 1.4, 1.8), side: THREE.DoubleSide }));
+    ring.rotation.x = -Math.PI / 2; ring.position.y = -2.4;
+    const grid = new THREE.PolarGridHelper(3.1, 12, 4, 48, 0x2a3038, 0x1c2026);
+    grid.position.y = -2.41;
+    scene.add(ring, grid);
+    const holder = new THREE.Group();
+    scene.add(holder);
+    const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: rt.texture } }, depthTest: false, depthWrite: false,
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+      fragmentShader: /* glsl */`
+        uniform sampler2D tDiffuse; varying vec2 vUv;
+        void main(){
+          vec2 d = vUv - 0.5;
+          gl_FragColor = vec4(max(texture2D(tDiffuse, vUv).rgb, 0.0) * (1.0 - dot(d, d) * 0.9), 1.0);
+          #include <tonemapping_fragment>
+          #include <colorspace_fragment>
+        }`,
+    }));
+    quad.frustumCulled = false;
+    const P = { scene, camera, holder, rt, quad, qcam: new THREE.OrthographicCamera(), el: null, yaw: 0.6, pitch: 0.32, dist: 13, distWant: 13, drag: false, idle: 0 };
+    return P;
+  }
+
+  bindPreview(el) {
+    const P = this.pv;
+    P.el = el;
+    el.addEventListener('mousedown', (ev) => { ev.stopPropagation(); P.drag = true; });
+    window.addEventListener('mouseup', () => { P.drag = false; });
+    window.addEventListener('mousemove', (ev) => {
+      if (!P.drag) return;
+      P.yaw -= ev.movementX * 0.01;
+      P.pitch = THREE.MathUtils.clamp(P.pitch + ev.movementY * 0.006, -0.6, 1.2);
+      P.idle = 2.5;
+    });
+    el.addEventListener('wheel', (ev) => { ev.preventDefault(); ev.stopPropagation(); P.distWant = THREE.MathUtils.clamp(P.distWant * Math.pow(1.0015, ev.deltaY), 6.5, 26); }, { passive: false });
   }
 
   buildEnv() {
@@ -259,26 +310,6 @@ export class Hangar {
     const rim = new THREE.DirectionalLight(0xb4bcc8, 0.6);
     rim.position.set(0, 40, -200);
     this.scene.add(rim);
-    // holo pedestal for outfits
-    const pk = new Kit();
-    pk.add('dark', G.cyl(3.4, 3.8, 1.0, 32), mat([0, 0.5, 0]));
-    pk.add('steel', G.cyl(2.6, 3.0, 1.4, 32), mat([0, 1.7, 0]));
-    pk.add('glow', G.torus(2.7, 0.08, 6, 48), mat([0, 2.45, 0], [Math.PI / 2, 0, 0]));
-    pk.add('glow', G.torus(3.6, 0.05, 6, 48), mat([0, 1.02, 0], [Math.PI / 2, 0, 0]));
-    const ped = pk.build(M);
-    ped.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.6, 7, 32, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0.8, 0.84, 0.9), transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
-    beam.position.y = 6;
-    this.pedestal = new THREE.Group();
-    this.pedestal.add(ped, beam);
-    const pl = new THREE.PointLight(0xe8ecf2, 30, 30, 2);
-    pl.position.set(0, 9, 3);
-    this.pedestal.add(pl);
-    this.pedestal.visible = false;
-    this.scene.add(this.pedestal);
-    this.holder = new THREE.Group();
-    this.holder.position.y = 5.5;
-    this.pedestal.add(this.holder);
   }
 
   swapEnv(obj) {
@@ -319,12 +350,12 @@ export class Hangar {
     let selPos = null;
     for (const s of list) {
       const on = !!sel && s.k === sel.k && s.i === sel.i;
-      const col = on ? new THREE.Color(5, 3, 0.6) : { g: new THREE.Color(1.8, 1.9, 2.1), t: new THREE.Color(0.5, 1.6, 3.2), m: new THREE.Color(3.2, 0.9, 0.6), u: new THREE.Color(0.5, 2.6, 1.1) }[s.k];
+      const col = on ? new THREE.Color(5, 3, 0.6) : { g: new THREE.Color(1.8, 1.9, 2.1), t: new THREE.Color(0.5, 1.6, 3.2), m: new THREE.Color(3.2, 0.9, 0.6) }[s.k];
       const up = s.flip ? -1 : 1;
       const m = new THREE.Group();
       m.position.fromArray(s.p);
       const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: on ? 1 : 0.6, depthTest: false, depthWrite: false, side: THREE.DoubleSide }));
-      const base = s.s * { g: 1.0, t: 1.4, m: 1.7, u: 1.5 }[s.k];
+      const base = s.s * { g: 1.0, t: 1.4, m: 1.7 }[s.k];
       ring.rotation.x = -Math.PI / 2; ring.position.y = up * 0.3 * s.s; ring.scale.setScalar(base * (on ? 1.5 : 1)); ring.renderOrder = 30;
       m.add(ring);
       const h = 2.6 * s.s + ls * 1.4;
@@ -398,7 +429,6 @@ export class Hangar {
     const cy = lift + (box.max.y - box.min.y) * 0.45;
     this.shipCenter = new THREE.Vector3(0, cy, 0);
     this.shipDist = Math.min(185, R * 2.7 + 8);
-    this.pedestal.position.set(-(R * 1.2 + 10), 0, R * 0.55 + 4);
     const sh = this.key.shadow.camera;
     const ext = R * 1.8 + 30;
     sh.left = -ext; sh.right = ext; sh.top = ext; sh.bottom = -ext; sh.near = 1; sh.far = 600;
@@ -407,25 +437,27 @@ export class Hangar {
     if (this.focus === 'ship') this.focusShip(keepView);
   }
 
-  setOutfit(obj) {
-    if (this.outfit) { this.holder.remove(this.outfit); this.dispose(this.outfit); this.outfit = null; }
-    if (!obj) { this.pedestal.visible = false; this.focusShip(); return; }
+  setOutfit(obj, label = '') {
+    const P = this.pv;
+    if (this.outfit) { P.holder.remove(this.outfit); this.dispose(this.outfit); this.outfit = null; }
+    if (P.el) {
+      P.el.classList.toggle('hidden', !obj);
+      P.el.querySelector('.nm').textContent = label;
+    }
+    if (!obj) return;
     this.swapEnv(obj);
     obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
-    const sc = 4.2 / Math.max(size.x, size.y, size.z);
+    const sc = 5.4 / Math.max(size.x, size.y, size.z);
     obj.scale.multiplyScalar(sc);
     const c = box.getCenter(new THREE.Vector3()).multiplyScalar(sc);
     const pivot = new THREE.Group();
     obj.position.sub(c);
     pivot.add(obj);
     this.outfit = pivot;
-    this.holder.add(pivot);
-    this.pedestal.visible = true;
-    this.focus = 'outfit';
-    this.targetWant.copy(this.pedestal.position).add(new THREE.Vector3(0, 5, 0));
-    this.distWant = 15;
+    P.holder.add(pivot);
+    P.yaw = 0.6; P.pitch = 0.32; P.dist = P.distWant = 11; P.idle = 0;
   }
 
   focusShip(keepView) {
@@ -442,8 +474,8 @@ export class Hangar {
   }
   zoom(dy) {
     const R = this.ship ? this.viewR : 20;
-    const min = this.focus === 'outfit' ? 7 : R * 1.2 + 4;
-    const max = this.focus === 'outfit' ? 40 : Math.min(185, R * 5 + 30);
+    const min = R * 1.2 + 4;
+    const max = Math.min(185, R * 5 + 30);
     this.distWant = THREE.MathUtils.clamp(this.distWant * Math.pow(1.0015, dy), min, max);
   }
 
@@ -477,8 +509,14 @@ export class Hangar {
         if (on) { ring.scale.setScalar(base * (1.45 + pulse * 0.35)); ring.material.opacity = 0.65 + pulse * 0.35; }
       }
     }
-    if (this.outfit) this.outfit.rotation.y += dt * 0.6;
-    this.holder.position.y = 5.5 + Math.sin(this.time * 1.5) * 0.15;
+    const P = this.pv;
+    if (this.outfit) {
+      if (!P.drag && (P.idle -= dt) <= 0) P.yaw += dt * 0.45;
+      P.dist += (P.distWant - P.dist) * k;
+      const c = Math.cos(P.pitch);
+      P.camera.position.set(Math.sin(P.yaw) * c, Math.sin(P.pitch), Math.cos(P.yaw) * c).multiplyScalar(P.dist);
+      P.camera.lookAt(0, -0.5, 0);
+    }
     this.field.material.opacity = 0.15 + Math.sin(this.time * 2) * 0.03;
   }
 
@@ -489,8 +527,34 @@ export class Hangar {
     k.shadow.mapSize.set(n, n);
     if (k.shadow.map) { k.shadow.map.dispose(); k.shadow.map = null; }
     for (const t of [this.composer.renderTarget1, this.composer.renderTarget2]) if (t.samples !== q.msaa) { t.samples = q.msaa; t.dispose(); }
+    const ps = Math.max(2, q.msaa);
+    if (this.pv.rt.samples !== ps) { this.pv.rt.samples = ps; this.pv.rt.dispose(); }
     this.final.uniforms.uAA.value = q.msaa ? 0 : 1;
   }
 
-  render() { this.composer.render(); }
+  render() {
+    this.composer.render();
+    const P = this.pv;
+    if (!this.outfit || !P.el) return;
+    const r = P.el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return;
+    const R = this.renderer, pr = R.getPixelRatio();
+    const w = Math.round(r.width * pr), h = Math.round(r.height * pr);
+    if (P.rt.width !== w || P.rt.height !== h) P.rt.setSize(w, h);
+    if (Math.abs(P.camera.aspect - r.width / r.height) > 1e-3) { P.camera.aspect = r.width / r.height; P.camera.updateProjectionMatrix(); }
+    const cc = R.getClearColor(_cc), ca = R.getClearAlpha();
+    R.setRenderTarget(P.rt);
+    R.setClearColor(0x07090c, 1);
+    R.clear();
+    R.render(P.scene, P.camera);
+    R.setRenderTarget(null);
+    R.getSize(_sz);
+    R.setScissorTest(true);
+    R.setScissor(r.left, _sz.y - r.bottom, r.width, r.height);
+    R.setViewport(r.left, _sz.y - r.bottom, r.width, r.height);
+    R.render(P.quad, P.qcam);
+    R.setScissorTest(false);
+    R.setViewport(0, 0, _sz.x, _sz.y);
+    R.setClearColor(cc, ca);
+  }
 }

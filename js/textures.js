@@ -387,3 +387,23 @@ export function solarPanelMaps(size = 256) {
   }
   return toTexture(col, true);
 }
+
+// Radial engine-throat gradient: white-hot centre, injector rings and vanes, cooler lip.
+export function engineCoreTexture(size = 128) {
+  const c = canvas(size);
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const dx = (x + 0.5) / size * 2 - 1, dy = (y + 0.5) / size * 2 - 1;
+    const d = Math.min(1, Math.hypot(dx, dy)), a = Math.atan2(dy, dx);
+    let v = 0.22 + 0.78 * Math.pow(1 - d, 1.6);
+    v *= 1 - 0.28 * Math.exp(-(((d - 0.42) / 0.035) ** 2)) - 0.22 * Math.exp(-(((d - 0.7) / 0.03) ** 2));
+    if (d > 0.5 && d < 0.88) v *= 0.86 + 0.14 * Math.abs(Math.cos(a * 6));
+    v *= 1 - 0.5 * Math.max(0, (d - 0.9) / 0.1);
+    const i = (y * size + x) * 4;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = Math.round(Math.min(1, v) * 255);
+    img.data[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return toTexture(c, false, false);
+}

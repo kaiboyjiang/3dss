@@ -70,7 +70,7 @@ export class StarMap {
     const path = id === G.system ? [id] : route(G.system, id, G.explored);
     const name = (x) => (G.explored.has(x) ? SYSTEMS[x].name : 'Uncharted');
     const routeTxt = id === G.system ? '<p class="here">You are here</p>'
-      : path ? `<p class="route">Route: ${path.map(name).join(' → ')} <b>(${path.length - 1} jump${path.length > 2 ? 's' : ''})</b></p><p class="hint">Press H to warp to the highlighted jump gate and jump.</p>`
+      : path ? `<p class="route">Route: ${path.map(name).join(' → ')} <b>(${path.length - 1} jump${path.length > 2 ? 's' : ''})</b></p><p class="hint">Press H in flight to autopilot the whole route: it warps to each gate and jumps until you arrive. H again stops it.</p>`
         : '<p class="hint">No charted route.</p>';
     if (!G.explored.has(id)) {
       this.info.innerHTML = `<h2>Uncharted System</h2><p class="dim">No survey data. Jump in to chart it.</p>${routeTxt}`;

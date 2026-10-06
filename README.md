@@ -24,12 +24,12 @@ Open the [GitHub Pages deployment](https://kaiboyjiang.github.io/GVCSG/) in a de
 - Right mouse, ; or F: fire missile bays only (needs a lock)
 - 1–9: select navigation destination
 - Space: warp to the selected destination
-- H: jump through a gate within 3.5 km (plays a jump cutscene); otherwise warp to the selected or next route gate and jump on arrival
+- H: jump through a gate within 3.5 km (plays a jump cutscene); otherwise warp to the selected gate and jump on arrival. With a route plotted on the map, H autopilots the whole route (warp, jump, repeat) until you arrive; H again stops it
 - M: star map (only charted systems are shown; click a system to plot a route)
 - P: collapse / expand overview
 - F1: help
 - G: dock or land at the nearest port (at a pirate port the first G shows the bribe, the second pays it; plays a docking cutscene; Space or Esc skips docking, undocking and jump cutscenes)
-- V: cycle cameras
+- V: cycle cameras: chase, bridge (cockpit view from inside your ship, with the canopy frame and consoles) and tactical
 - Esc: pause and show controls
 - H: help
 

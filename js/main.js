@@ -8,6 +8,7 @@ import { StarMap } from './map.js';
 import { buildRaider, buildCruiser, buildHauler, animateShip, mergeStatic } from './ships.js';
 import { HULLS, OUTFITS, YARDS, emptyFit, bareFit, normFit, cloneFit, fitItems, roleOf, slotAccepts, SLOT_KEYS, MOUNT_KEYS, OUTFIT_CATS, CAP_NAME, catOf, fitLoad, fitProblem, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
+import { buildBridge } from './bridge.js';
 import { Effects, Projectiles, Missiles, attachShield, intercept, raySphere } from './combat.js';
 import { Audio } from './audio.js';
 import { HUD, fmtDist } from './hud.js';
@@ -115,7 +116,7 @@ const G = {
   priOff: false, secOff: false, usesAmmo: true, leadSpeed: 3200, turretsAuto: true, hasTurrets: true, turFiring: false, gunAssist: false,
   aimDir: new THREE.Vector3(0, 0, 1), aimPoint: new THREE.Vector3(), aimActive: false, mouseLocked: false,
   hull: 'valkyrie', owned: { valkyrie: emptyFit('valkyrie') }, inventory: {}, dockedAt: null,
-  system: 'kaltos', explored: new Set(['kaltos']), routeTo: null, autoJump: null, dockSys: 'kaltos', dockId: 'station',
+  system: 'kaltos', explored: new Set(['kaltos']), routeTo: null, autoJump: null, autoRoute: null, autoT: 0, dockSys: 'kaltos', dockId: 'station',
   jobs: [], access: {}, jumps: 0, ambush: null, boardT: 0, bribe: null, bribeT: 0,
   nearestName: '', time: 0, shake: 0, hitFlash: 0,
 };
@@ -1167,6 +1168,7 @@ function statRows(s, cmp) {
 }
 
 const SLOT_HEAD = { g: 'Gun mounts', t: 'Turret mounts', m: 'Missile bays', e: 'Engines', u: 'Systems' };
+const slotTag = (k, i) => (k === 'u' ? 'SYS' : `${k.toUpperCase()}${i + 1}`);
 const SLOT_EMPTY = { g: 'Empty gun mount', t: 'Empty turret mount', m: 'Empty missile bay' };
 const CAT_NAME = Object.fromEntries(OUTFIT_CATS);
 const MOUNT_OF_CAT = { gun: 'g', turret: 't', bay: 'm' };
@@ -1225,7 +1227,7 @@ function renderDock() {
       <button data-a="repair" ${repairCost() === 0 || G.credits < repairCost() ? 'disabled' : ''}>Repair (${fmtIsk(repairCost())})</button>
       <button data-a="rearm" ${rearmCost() === 0 || G.credits < rearmCost() ? 'disabled' : ''}>Rearm (${fmtIsk(rearmCost())})</button>
       <p style="margin-top:14px">${servicesText()}</p>`;
-    R.innerHTML = `<h3>Fitting</h3>${SLOT_KEYS.map((k) => fit[k].map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">${k.toUpperCase()}${i + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[k]}</span></span>${id && MOUNT_KEYS.includes(k) ? `<span class="pr">${roleName(fit, k, i)}</span>` : ''}</div>`).join('')).join('')}
+    R.innerHTML = `<h3>Fitting</h3>${SLOT_KEYS.map((k) => fit[k].map((id, i) => `<div class="item slot${id ? '' : ' empty'}"><span><span class="k">${slotTag(k, i)}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[k]}</span></span>${id && MOUNT_KEYS.includes(k) ? `<span class="pr">${roleName(fit, k, i)}</span>` : ''}</div>`).join('')).join('')}
       ${capBars(G.hull, fit)}<h3 style="margin-top:12px">Ship attributes</h3>${statRows(p.stats)}`;
   } else if (D.tab === 'shipyard') {
     const Y0 = yardOf(), forSale = new Set(Y0.hulls);
@@ -1253,9 +1255,9 @@ function renderDock() {
     if (!fit[D.slot.k] || D.slot.i >= fit[D.slot.k].length) D.slot = { k: MOUNT_KEYS.find((kk) => fit[kk].length) || 'e', i: 0 };
     if (!D.cat) D.cat = { g: 'gun', t: 'turret', m: 'bay', e: 'engine' }[D.slot.k] || 'reactor';
     const k = D.slot.k, i = D.slot.i;
-    const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${kk.toUpperCase()}${j + 1}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[kk]}</span></span>${kk === 'g' || kk === 't' ? `<span class="pr role" data-a="role" data-slot="${kk}${j}" title="Switch firing role">${roleName(fit, kk, j)}</span>` : kk === 'm' ? '<span class="pr">SECONDARY</span>' : `<span class="pr">${OUTFITS[id].space}</span>`}</div>`;
+    const slotRow = (kk, id, j) => `<div class="item slot${id ? '' : ' empty'}${k === kk && i === j ? ' on' : ''}" data-slot="${kk}${j}"><span><span class="k">${slotTag(kk, j)}</span><span class="nm">${id ? OUTFITS[id].name : SLOT_EMPTY[kk]}</span></span>${kk === 'g' || kk === 't' ? `<span class="pr role" data-a="role" data-slot="${kk}${j}" title="Switch firing role">${roleName(fit, kk, j)}</span>` : kk === 'm' ? '<span class="pr">SECONDARY</span>' : `<span class="pr">${OUTFITS[id].space}</span>`}</div>`;
     const inv = Object.entries(G.inventory).filter(([, n]) => n > 0);
-    L.innerHTML = `<h3>${H.name} — fitting</h3>${capBars(G.hull, fit)}<p>Weapons and engines count against outfit space as well as their own capacity. Primary weapons fire on their own at hostiles in reach; secondary weapons fire on LMB / U. Click a role to switch it.</p>
+    L.innerHTML = `<h3>${H.name} — fitting</h3>${capBars(G.hull, fit)}<p>Weapons and engines count against outfit space as well as their own capacity. Systems need no mount: fit as many as outfit space allows. Primary weapons fire on their own at hostiles in reach; secondary weapons fire on LMB / U. Click a role to switch it.</p>
       ${MOUNT_KEYS.filter((kk) => fit[kk].length).map((kk) => `<h3 style="margin-top:12px">${SLOT_HEAD[kk]}</h3>${fit[kk].map((id, j) => slotRow(kk, id, j)).join('')}`).join('')}
       ${['e', 'u'].map((kk) => `<h3 style="margin-top:12px">${SLOT_HEAD[kk]}</h3>${fit[kk].map((id, j) => slotRow(kk, id, j)).join('') || `<p class="${kk === 'e' ? 'warn' : ''}">${kk === 'e' ? 'No engines: the ship cannot leave the dock.' : 'No systems fitted.'}</p>`}`).join('')}
       ${fit[k]?.[i] ? `<button data-a="unfit">Unfit ${OUTFITS[fit[k][i]].name}</button>` : ''}
@@ -1280,6 +1282,10 @@ function renderDock() {
         <span class="pr${G.inventory[id] ? ' own' : ''}">${G.inventory[id] ? `×${G.inventory[id]} in cargo` : fmtIsk(O.price)}</span></div>`).join('')}${det}`;
   }
   slotMarkers();
+}
+
+function showOutfit(id) {
+  hangar.setOutfit(id ? outfitPreview(id, G.player.ship.M) : null, id ? OUTFITS[id].name : '');
 }
 
 function slotMarkers() {
@@ -1622,12 +1628,12 @@ for (const id of ['dockleft', 'dockright']) {
     }
     if (t.dataset.cat) { D.cat = t.dataset.cat; D.preview = null; hangar.setOutfit(null); audio.ui(); renderDock(); return; }
     if (t.dataset.hull) { D.browse = t.dataset.hull; hangarShow(D.browse); audio.ui(); }
-    else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.cat = cur ? catOf(cur) : { g: 'gun', t: 'turret', m: 'bay' }[D.slot.k] || D.cat; D.focusSlot = MOUNT_KEYS.includes(D.slot.k); hangar.setOutfit(null); audio.ui(); }
+    else if (t.dataset.slot) { D.slot = { k: t.dataset.slot[0], i: +t.dataset.slot.slice(1) }; const cur = fit[D.slot.k][D.slot.i]; D.preview = cur; D.cat = cur ? catOf(cur) : { g: 'gun', t: 'turret', m: 'bay' }[D.slot.k] || D.cat; D.focusSlot = MOUNT_KEYS.includes(D.slot.k); showOutfit(cur); audio.ui(); }
     else if (t.dataset.out) {
       const kk = MOUNT_OF_CAT[catOf(t.dataset.out)];
       if (kk && D.slot.k !== kk && fit[kk].length) { D.slot = { k: kk, i: Math.max(0, fit[kk].indexOf(null)) }; D.focusSlot = true; }
       D.cat = catOf(t.dataset.out);
-      D.preview = t.dataset.out; hangar.setOutfit(outfitPreview(D.preview, G.player.ship.M)); audio.ui();
+      D.preview = t.dataset.out; showOutfit(D.preview); audio.ui();
     } else {
       const a = t.dataset.a, k = D.slot.k, i = D.slot.i;
       if (a === 'repair') { const c = repairCost(); if (G.credits >= c) { G.credits -= c; G.player.armor = G.player.maxArmor; G.player.hull = G.player.maxHull; } }
@@ -1656,7 +1662,7 @@ for (const id of ['dockleft', 'dockright']) {
         const old = fit[k][i], tf = cloneFit(fit);
         if (MOUNT_KEYS.includes(k)) tf[k][i] = null; else tf[k].splice(i, 1);
         if (old && !capOk(G.hull, tf)) { flashDockMsg('Active cargo or passengers need that module'); renderDock(); return; }
-        if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; G.owned[G.hull] = tf; D.preview = null; rebuildPlayer(); hangarShow(G.hull, true); }
+        if (old) { G.inventory[old] = (G.inventory[old] || 0) + 1; G.owned[G.hull] = tf; D.preview = null; rebuildPlayer(); hangarShow(G.hull, true); hangar.setOutfit(null); }
       }
       if (a === 'sell' && D.preview && G.inventory[D.preview] > 0) { G.inventory[D.preview]--; G.credits += OUTFITS[D.preview].price * 0.5; }
       audio.ui();
@@ -1668,6 +1674,7 @@ canvas.addEventListener('wheel', (ev) => { if (G.state === 'docked') { ev.preven
 
 function enterDocked() {
   G.state = 'docked';
+  G.autoRoute = null;
   const p = G.player;
   p.shield = p.maxShield; p.cap = p.maxCap;
   p.vel.set(0, 0, 0); p.throttle = 0;
@@ -1738,6 +1745,8 @@ function finishUndock() {
   G.state = 'flying';
   $('hud').classList.remove('hidden');
   hud.log(`${G.dockedAt.kind === 'port' ? 'Lifted off from' : 'Undocked from'} ${G.dockedAt.name}`, 'i');
+  const jd = jobDestHere();
+  if (jd && jd !== G.dockedAt && !G.autoRoute) { G.navTarget = G.selected = jd; hud.notice(`JOB DESTINATION: ${jd.name.toUpperCase()}`, 3); }
   const active = G.jobs.length;
   if (active) hud.log(`${active} active job${active > 1 ? 's' : ''}. Cargo ${usedCargo()} / ${shipCap().cargo} t, passengers ${usedBunks()} / ${shipCap().bunks}.`, 'i');
 }
@@ -1746,7 +1755,7 @@ function playerDied() {
   const p = G.player;
   p.obj.visible = false;
   G.state = 'dead';
-  G.warp = null; G.lock = null;
+  G.warp = null; G.lock = null; G.autoRoute = null;
   G.input.fire1 = G.input.fire2 = false;
   hud.log('Your ship has been destroyed!', 'd');
   const sv = readSave();
@@ -1863,8 +1872,24 @@ const camQuat = new THREE.Quaternion();
 const camPos = new THREE.Vector3();
 let fov = 68;
 const FLIP = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
+let bridge = null, bridgeOn = false;
+const bridgeHid = [];
+// the bridge interior replaces the player's own hull while flying from the cockpit
+function setBridge(on) {
+  if (on === bridgeOn || !bridge) return;
+  bridgeOn = on;
+  bridge.visible = on;
+  const p = G.player;
+  if (on) {
+    for (const c of p.obj.children) if (c.visible && c !== p.shieldMesh) { c.visible = false; bridgeHid.push(c); }
+  } else {
+    for (const c of bridgeHid) c.visible = true;
+    bridgeHid.length = 0;
+  }
+}
 function updateCamera(dt) {
   const p = G.player;
+  setBridge(G.camMode === 1 && (G.state === 'flying' || G.state === 'dead') && p.alive && !cine.mode);
   const warpI = G.warp && G.warp.phase === 'warp' ? Math.min(1, G.warp.speed / 20000) : 0;
   if (G.camMode === 1) camQuat.copy(p.obj.quaternion);
   else camQuat.slerp(p.obj.quaternion, 1 - Math.exp(-dt * (G.warp ? 3 : 5.5)));
@@ -2024,6 +2049,7 @@ function frame(now) {
   for (const l of LOCATIONS) { const d = l.pos.distanceTo(p.obj.position) - l.arrive; if (d < best) { best = d; G.nearestName = d < 30000 ? l.name : `Deep space near ${l.name}`; } }
   if (G.state === 'flying' || G.state === 'dead') hud.update(dt, G);
   if (G.autoJump && !G.warp) { const g = G.autoJump; G.autoJump = null; if (G.state === 'flying' && nearJump() === g) startJump(g); }
+  if (G.autoRoute && G.state === 'flying' && !G.warp) autoRouteStep(dt);
   const jp = G.state === 'flying' && !G.warp && nearJump();
   const jh = jp ? `JUMP GATE IN RANGE — H TO JUMP TO ${G.explored.has(jp.jump) ? SYSTEMS[jp.jump].name.toUpperCase() : 'UNCHARTED SYSTEM'}` : '';
   if ($('jumphint').textContent !== jh) $('jumphint').textContent = jh;
@@ -2102,10 +2128,11 @@ function nextHop() {
   return LOCATIONS.find((l) => l.jump === path[1]) || null;
 }
 starmap.onRoute = () => {
+  if (G.autoRoute) G.autoRoute = G.routeTo;
   const hop = nextHop();
   if (!hop) return;
   G.navTarget = hop; G.selected = hop; hud.ovT = 0;
-  hud.notice(`ROUTE SET: ${hop.name.toUpperCase()} — H TO JUMP`, 2.5);
+  hud.notice(G.autoRoute ? `ROUTE CHANGED: ${hop.name.toUpperCase()}` : `ROUTE SET: ${hop.name.toUpperCase()} — H TO AUTOPILOT`, 2.5);
 };
 
 function updateSysInfo(def) {
@@ -2145,7 +2172,8 @@ function enterSystem(to, from) {
   populate(def, from);
   if (from) jumpedInto(def);
   spawnBounties(def);
-  G.navTarget = nextHop() || jobDestHere() || LOCATIONS.find((l) => l.dock) || LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS[0];
+  G.navTarget = (G.autoRoute && nextHop()) || jobDestHere() || nextHop() || LOCATIONS.find((l) => l.dock) || LOCATIONS.find((l) => l.icon === 'belt') || LOCATIONS[0];
+  if (G.navTarget && G.navTarget === jobDestHere()) { G.selected = G.navTarget; if (from) hud.notice(`JOB DESTINATION: ${G.navTarget.name.toUpperCase()}`, 3.5); }
   updateSysInfo(def);
   hud.ovT = 0;
   if (starmap.isOpen) starmap.renderInfo();
@@ -2167,20 +2195,52 @@ function nearJump() {
 
 function warpKey() {
   if (G.state !== 'flying' || G.warp) return;
+  G.autoRoute = null;
   const jp = nearJump();
   if (jp && (!G.navTarget || G.navTarget === jp)) { hud.notice('IN JUMP RANGE — PRESS H TO JUMP', 1.6); return; }
   warpTo(G.navTarget);
 }
 
 function jumpKey() {
-  if (G.state !== 'flying' || G.warp) return;
-  const jp = nearJump();
-  if (jp) { startJump(jp); return; }
-  const gate = (G.navTarget && G.navTarget.jump && G.navTarget) || nextHop();
+  if (G.autoRoute && (G.state === 'jumpout' || G.state === 'jumpin')) { G.autoRoute = null; G.autoJump = null; hud.notice('ROUTE AUTOPILOT OFF', 1.8); audio.ui(); return; }
+  if (G.state !== 'flying') return;
+  if (G.autoRoute) { G.autoRoute = null; G.autoJump = null; hud.notice('ROUTE AUTOPILOT OFF', 1.8); audio.ui(); return; }
+  if (G.warp) return;
+  const jp = nearJump(), hop = nextHop();
+  const gate = jp || (G.navTarget && G.navTarget.jump && G.navTarget) || hop;
   if (!gate) { hud.notice('SELECT A JUMP GATE OR PLOT A ROUTE (M)', 1.8); audio.beep(220, 0.15); return; }
+  if (gate === hop) {
+    G.autoRoute = G.routeTo; G.autoT = 0;
+    hud.log(`Route autopilot engaged: ${SYSTEMS[G.routeTo].name}. Press H again to stop.`, 'i');
+  }
+  if (jp) { startJump(jp); return; }
   G.navTarget = gate; G.selected = gate; hud.ovT = 0;
   warpTo(gate);
   if (G.warp) G.autoJump = gate;
+}
+
+// Keeps warping to the next route gate and jumping until the plotted destination is reached. Waits out a low
+// capacitor or a warp disruptor rather than giving up.
+function autoRouteStep(dt) {
+  if ((G.autoT -= dt) > 0) return;
+  G.autoT = 1;
+  const dest = G.autoRoute;
+  if (G.system === dest) {
+    G.autoRoute = null;
+    hud.log(`Route complete: ${SYSTEMS[dest].name}`, 'i');
+    const jd = jobDestHere();
+    if (jd) { G.navTarget = G.selected = jd; hud.notice(`ARRIVED — JOB DESTINATION: ${jd.name.toUpperCase()}`, 3.5); } else hud.notice(`ARRIVED: ${SYSTEMS[dest].name.toUpperCase()}`, 3);
+    return;
+  }
+  const hop = nextHop();
+  if (!hop) { G.autoRoute = null; hud.notice('ROUTE AUTOPILOT OFF — NO ROUTE', 2); return; }
+  G.navTarget = hop; G.selected = hop;
+  const p = G.player, jp = nearJump();
+  if (jp === hop) { startJump(hop); return; }
+  if (p.obj.position.distanceTo(hop.pos) < hop.arrive + 8000) { G.autoRoute = null; hud.notice(`ROUTE AUTOPILOT OFF — FLY TO ${hop.name.toUpperCase()}`, 2.5); return; }
+  if (G.scrambled || p.cap < 250) { G.autoT = 2; hud.notice(G.scrambled ? 'AUTOPILOT: WARP DRIVE DISRUPTED' : 'AUTOPILOT: CHARGING CAPACITOR', 1.6); return; }
+  warpTo(hop);
+  if (G.warp) G.autoJump = hop;
 }
 
 function startJump(jp) {
@@ -2266,6 +2326,9 @@ async function boot() {
     fx = new Effects(scene);
     bolts = new Projectiles(scene, fx);
     missiles = new Missiles(scene, fx, world.env);
+    bridge = buildBridge(world.env);
+    camera.add(bridge);
+    scene.add(camera);
     await step('Assembling ships…');
     const save = readSave();
     if (save) applySave(save);
@@ -2285,6 +2348,7 @@ async function boot() {
     await step('Pressurising hangar bay…');
     await fonts;
     hangar = new Hangar(renderer);
+    hangar.bindPreview($('outprev'));
     applyGfx(settings.gfx);
     composer.render(0.016);
     msg.textContent = 'Systems online.';

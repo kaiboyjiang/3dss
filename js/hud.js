@@ -164,7 +164,7 @@ export class HUD {
     flags.push(G.flightAssist ? 'FA ON' : '<b>FA OFF</b>');
     if (G.boosting) flags.push('<b>AB</b>');
     if (G.scrambled) flags.push('<b>SCRAMBLED</b>');
-    flags.push(['CHASE', 'COCKPIT', 'TACTICAL'][G.camMode]);
+    flags.push(['CHASE', 'BRIDGE', 'TACTICAL'][G.camMode]);
     this.el.flags.innerHTML = flags.join(' · ');
     this.el.loc.textContent = G.nearestName;
     this.el.credits.textContent = Math.round(G.credits).toLocaleString();

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Kit, G, mat } from './geo.js';
-import { hullMaps, rng, glowTexture } from './textures.js';
+import { hullMaps, rng, glowTexture, engineCoreTexture } from './textures.js';
 import { LOGDEPTH_VERT_PARS, LOGDEPTH_VERT, LOGDEPTH_FRAG_PARS, LOGDEPTH_FRAG } from './shaders.js';
 
 // Ships face +Z, up is +Y. Port (left) is +X.
@@ -47,8 +47,8 @@ export function livery(name, env) {
     metal: new THREE.MeshStandardMaterial({ color: 0x8a8d92, metalness: 1.0, roughness: 0.28, envMap: env, envMapIntensity: 1.2 }),
     gun: new THREE.MeshStandardMaterial({ color: 0x2c2e31, metalness: 0.9, roughness: 0.35, envMap: env, envMapIntensity: 1.0 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0x0b1420, metalness: 0.2, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, envMap: env, envMapIntensity: 2.4, emissive: new THREE.Color(0.02, 0.05, 0.08) }),
-    nozzle: new THREE.MeshStandardMaterial({ color: 0x3a3632, metalness: 0.95, roughness: 0.4, envMap: env, side: THREE.DoubleSide }),
-    engine: new THREE.MeshBasicMaterial({ color: engColor.clone().multiplyScalar(1.15) }),
+    nozzle: nozzleMaterial(env, engColor),
+    engine: new THREE.MeshBasicMaterial({ color: engColor.clone().multiplyScalar(2.6), map: coreTex() }),
     light: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 5, 5) }),
     coil: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.4, 1.4, 4) }),
     plasma: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.2, 4.5, 2.4) }),
@@ -61,11 +61,38 @@ export function livery(name, env) {
   return M;
 }
 
-// ---------------------------------------------------------------- engine plume
+// ---------------------------------------------------------------- engine nozzles and plume
+let coreTexture = null;
+const coreTex = () => (coreTexture ||= engineCoreTexture());
+
+// Bell nozzles glow from the throat outwards on their inner wall; lathe profiles put the throat at uv.y = 1.
+function nozzleMaterial(env, engColor) {
+  const m = new THREE.MeshStandardMaterial({ color: 0x4a4540, metalness: 0.9, roughness: 0.34, envMap: env, side: THREE.DoubleSide });
+  const heat = new THREE.Color(1.0, 0.42, 0.12).lerp(engColor, 0.55).multiplyScalar(2.2);
+  m.defines = { USE_UV: '' };
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uHeat = { value: heat };
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uHeat;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        float hot = vUv.y * vUv.y * vUv.y;
+        totalEmissiveRadiance += uHeat * (gl_FrontFacing ? hot * hot * 0.06 : hot * (0.35 + 0.65 * hot));`);
+  };
+  m.customProgramCacheKey = () => 'nozzle-heat';
+  return m;
+}
+
+// Two nested shells in one draw: a wide, soft outer envelope and a narrow white-hot core with shock diamonds.
 const plumeGeo = (() => {
-  const g = new THREE.CylinderGeometry(1, 0.25, 1, 24, 8, true);
-  g.translate(0, -0.5, 0);
-  g.rotateX(Math.PI / 2); // tail now along -Z... (y=-1 -> z=-1)
+  const shell = (pts, id) => {
+    const g = new THREE.LatheGeometry(pts.map(([r, t]) => new THREE.Vector2(r, -t)).reverse(), 24);
+    g.setAttribute('shell', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count).fill(id), 1));
+    return g;
+  };
+  const outer = shell([[0.95, 0], [1.18, 0.08], [1.22, 0.2], [1.05, 0.45], [0.72, 0.75], [0.42, 1]], 0);
+  const core = shell([[0.62, 0], [0.55, 0.12], [0.44, 0.3], [0.28, 0.5], [0.1, 0.62]], 1);
+  const g = mergeGeometries([outer, core], false);
+  g.rotateX(Math.PI / 2);
   g.userData.shared = true;
   return g;
 })();
@@ -76,9 +103,10 @@ function plumeMaterial(color) {
     uniforms: { uColor: { value: color }, uPower: { value: 0.5 }, uTime: { value: 0 } },
     vertexShader: /* glsl */`
       ${LOGDEPTH_VERT_PARS}
-      varying float vT; varying vec3 vN; varying vec3 vV;
+      attribute float shell;
+      varying float vT; varying float vS; varying vec3 vN; varying vec3 vV;
       void main() {
-        vT = -position.z;
+        vT = -position.z; vS = shell;
         vec4 mv = modelViewMatrix * vec4(position, 1.0);
         vN = normalize(normalMatrix * normal);
         vV = normalize(-mv.xyz);
@@ -88,15 +116,22 @@ function plumeMaterial(color) {
     fragmentShader: /* glsl */`
       ${LOGDEPTH_FRAG_PARS}
       uniform vec3 uColor; uniform float uPower; uniform float uTime;
-      varying float vT; varying vec3 vN; varying vec3 vV;
+      varying float vT; varying float vS; varying vec3 vN; varying vec3 vV;
       void main() {
         ${LOGDEPTH_FRAG}
         float f = abs(dot(normalize(vN), normalize(vV)));
-        float core = pow(f, 2.0);
-        float fall = pow(1.0 - clamp(vT, 0.0, 1.0), 1.6);
-        float diamonds = 0.8 + 0.2 * sin(vT * 38.0 - uTime * 50.0);
-        vec3 c = mix(uColor, vec3(1.0, 0.95, 0.9), core * (1.0 - vT));
-        gl_FragColor = vec4(c * core * fall * diamonds * uPower * 1.5, 1.0);
+        float t = clamp(vT, 0.0, 1.0);
+        vec3 c;
+        if (vS < 0.5) {
+          float fall = pow(1.0 - t, 1.3);
+          float flick = 0.9 + 0.1 * sin(vT * 23.0 - uTime * 37.0);
+          c = mix(uColor, vec3(1.0, 0.94, 0.86), 0.2 * (1.0 - t)) * pow(f, 2.6) * fall * flick * 0.9;
+        } else {
+          float tc = clamp(vT / 0.62, 0.0, 1.0);
+          float diamonds = 0.65 + 0.35 * pow(0.5 + 0.5 * cos(tc * 25.0 - uTime * 18.0), 3.0);
+          c = mix(uColor * 1.6, vec3(1.0, 0.97, 0.92), 0.75 * (1.0 - tc)) * f * pow(1.0 - tc, 0.8) * diamonds * 2.6;
+        }
+        gl_FragColor = vec4(c * uPower, 1.0);
       }`,
   });
 }
@@ -108,8 +143,8 @@ function addEngine(ship, M, pos, radius, length) {
   plume.scale.set(radius, radius, length);
   plume.renderOrder = 10;
   ship.group.add(plume);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: M.engColor.clone().multiplyScalar(1.1), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
-  sp.position.copy(pos).add(new THREE.Vector3(0, 0, -radius * 0.4));
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glow, color: M.engColor.clone().lerp(new THREE.Color(1, 1, 1), 0.25).multiplyScalar(1.5), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+  sp.position.copy(pos).add(new THREE.Vector3(0, 0, -radius * 0.5));
   sp.scale.setScalar(radius * 5);
   ship.group.add(sp);
   ship.engines.push({ plume, sprite: sp, radius, length });
@@ -293,6 +328,143 @@ export function buildTurret(M, kind = 'laser', scale = 1, fixed = false) {
     muzzles.push(mz); barrels.push(b);
     kp.add('dark', G.rbox(1.1, 0.6, 0.8, 0.1), mat([0, 0, 0]));
     pitch.position.set(0, 0.88, 0.25);
+  } else if (kind === 'ion') {
+    // ion cannon: spherical capacitor feeding a forked emitter with blue field coils
+    kb.add('dark', G.cyl(1.0, 1.2, 0.38, 24), mat([0, 0.19, 0]));
+    kb.add('metal', G.cyl(0.75, 0.75, 0.18, 24), mat([0, 0.46, 0]));
+    ky.add('hull', G.rbox(1.7, 0.8, 1.7, 0.3), mat([0, 0.9, -0.3]));
+    ky.addMirrored('dark', G.rbox(0.3, 0.7, 1.2, 0.08), mat([0.95, 0.85, -0.3]));
+    ky.addMirrored('coil', G.box(0.04, 0.12, 0.9), mat([1.11, 1.0, -0.3]));
+    const b = new THREE.Group();
+    const k2 = new Kit();
+    k2.add('dark', G.sphere(0.62, 24, 16), mat([0, 0, 0.2]));
+    k2.add('coil', G.torus(0.63, 0.05, 8, 32), mat([0, 0, 0.2], [Math.PI / 2, 0, 0]));
+    k2.add('metal', G.torus(0.64, 0.07, 8, 32), mat([0, 0, 0.2], [0, Math.PI / 2, 0]));
+    k2.add('gun', G.cyl(0.2, 0.3, 1.0, 16), mat([0, 0, 1.0], [Math.PI / 2, 0, 0]));
+    for (const x of [-0.26, 0.26]) {
+      k2.add('gun', G.box(0.12, 0.34, 2.2), mat([x, 0, 2.3]));
+      k2.add('metal', G.box(0.16, 0.38, 0.14), mat([x, 0, 3.35]));
+    }
+    for (let i = 0; i < 3; i++) k2.add('coil', G.box(0.4, 0.06, 0.08), mat([0, 0.2, 1.7 + i * 0.5]));
+    k2.add('coil', G.sphere(0.12, 12, 8), mat([0, 0, 3.3]));
+    b.add(k2.build(M));
+    pitch.add(b);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 3.5); b.add(mz);
+    muzzles.push(mz); barrels.push(b);
+    kp.add('dark', G.rbox(1.0, 0.5, 0.8, 0.1), mat([0, -0.1, 0]));
+    pitch.position.set(0, 1.0, 0.3);
+  } else if (kind === 'pd') {
+    // point defense: squat dome, tracking dish and stubby twin barrels
+    kb.add('dark', G.cyl(0.8, 0.95, 0.3, 20), mat([0, 0.15, 0]));
+    ky.add('hull', G.lathe([[0.85, 0], [0.82, 0.25], [0.65, 0.55], [0.35, 0.75], [0, 0.8]], 24), mat([0, 0.3, 0]));
+    ky.add('dark', G.cyl(0.05, 0.05, 0.5, 6), mat([-0.45, 1.15, -0.3]));
+    ky.add('metal', G.cyl(0.32, 0.06, 0.12, 16), mat([-0.45, 1.42, -0.3], [-0.5, 0, 0]));
+    ky.add('amber', G.sphere(0.05, 8, 6), mat([-0.45, 1.5, -0.25]));
+    for (const x of [-0.2, 0.2]) {
+      const b = new THREE.Group();
+      const k2 = new Kit();
+      k2.add('gun', G.cyl(0.09, 0.09, 1.3, 10), mat([0, 0, 0.75], [Math.PI / 2, 0, 0]));
+      k2.add('dark', G.cyl(0.13, 0.13, 0.3, 10), mat([0, 0, 1.35], [Math.PI / 2, 0, 0]));
+      b.add(k2.build(M));
+      b.position.set(x, 0, 0.3);
+      pitch.add(b);
+      const mz = new THREE.Object3D(); mz.position.set(0, 0, 1.55); b.add(mz);
+      muzzles.push(mz); barrels.push(b);
+    }
+    kp.add('dark', G.rbox(0.7, 0.45, 0.6, 0.1), mat([0, 0, 0.15]));
+    kp.add('glass', G.sphere(0.12, 12, 8), mat([0, 0.18, 0.45]));
+    pitch.position.set(0, 0.85, 0.2);
+  } else if (kind === 'gatling') {
+    // heavy gatling: eight-barrel rotor, armoured shroud and drum magazine
+    kb.add('dark', G.cyl(1.05, 1.25, 0.38, 24), mat([0, 0.19, 0]));
+    kb.add('metal', G.cyl(0.75, 0.75, 0.2, 24), mat([0, 0.48, 0]));
+    ky.add('hull', G.rbox(1.8, 1.0, 1.7, 0.18), mat([0, 0.95, -0.2]));
+    ky.add('accent', G.rbox(1.85, 0.2, 0.9, 0.05), mat([0, 1.45, -0.4]));
+    ky.add('dark', G.cyl(0.6, 0.6, 0.55, 24), mat([1.25, 0.95, -0.4], [0, 0, Math.PI / 2]));
+    ky.add('metal', G.cyl(0.4, 0.4, 0.58, 16), mat([1.25, 0.95, -0.4], [0, 0, Math.PI / 2]));
+    ky.add('gun', G.box(0.7, 0.18, 0.25), mat([0.8, 1.15, 0.1], [0, 0.4, 0]));
+    const rotor = new THREE.Group();
+    const kr = new Kit();
+    for (let i = 0; i < 8; i++) {
+      const a = i / 8 * Math.PI * 2;
+      kr.add('gun', G.cyl(0.07, 0.07, 2.9, 8), mat([Math.cos(a) * 0.26, Math.sin(a) * 0.26, 1.55], [Math.PI / 2, 0, 0]));
+    }
+    kr.add('gun', G.cyl(0.1, 0.1, 3.0, 10), mat([0, 0, 1.5], [Math.PI / 2, 0, 0]));
+    for (const z of [0.7, 1.9, 2.85]) kr.add('metal', G.cyl(0.38, 0.38, 0.12, 20), mat([0, 0, z], [Math.PI / 2, 0, 0]));
+    rotor.add(kr.build(M));
+    rotor.position.set(0, 0, 0.35);
+    pitch.add(rotor);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 3.1); rotor.add(mz);
+    muzzles.push(mz); barrels.push(rotor);
+    kp.add('dark', G.cyl(0.5, 0.5, 0.8, 20), mat([0, 0, 0.2], [Math.PI / 2, 0, 0]));
+    kp.add('accent', G.rbox(1.1, 0.25, 0.8, 0.05), mat([0, 0.45, 0.1]));
+    pitch.position.set(0, 0.95, 0.2);
+  } else if (kind === 'clan') {
+    // clan scrap gun: mismatched welded barrels, bolted plates and a hazard-taped feed
+    kb.add('dark', G.cyl(0.95, 1.2, 0.4, 7), mat([0, 0.2, 0], [0, 0.3, 0]));
+    kb.add('metal', G.box(1.4, 0.12, 0.3), mat([0, 0.45, 0.4], [0, 0.2, 0.06]));
+    ky.add('hull', G.box(1.6, 0.8, 1.5), mat([0.05, 0.85, -0.25], [0.04, 0.08, -0.05]));
+    ky.add('accent', G.box(0.9, 0.5, 0.7), mat([-0.55, 1.35, -0.5], [0, -0.25, 0.1]));
+    ky.add('dark', G.box(0.25, 0.9, 1.1), mat([0.95, 0.9, -0.1], [0, 0, 0.12]));
+    ky.add('gun', G.cyl(0.08, 0.08, 1.4, 6), mat([0.3, 1.3, -0.6], [0.3, 0, 1.2]));
+    const b = new THREE.Group();
+    const k2 = new Kit();
+    k2.add('dark', G.box(0.9, 0.7, 0.9), mat([0, 0, 0.3], [0, 0, 0.05]));
+    for (const [x, y, L, r] of [[-0.24, 0.16, 2.6, 0.12], [0.24, 0.18, 2.0, 0.15], [0, -0.2, 2.3, 0.1]]) {
+      k2.add('gun', G.cyl(r, r * 1.15, L, 8), mat([x, y, 0.7 + L / 2], [Math.PI / 2, 0, 0]));
+      k2.add('metal', G.cyl(r + 0.05, r + 0.05, 0.16, 8), mat([x, y, 0.75 + L], [Math.PI / 2, 0, 0]));
+    }
+    k2.add('hull', G.box(0.75, 0.08, 0.6), mat([0, 0.38, 1.3], [0.08, 0, 0.1]));
+    k2.add('amber', G.box(0.06, 0.06, 0.4), mat([0.44, 0, 0.5]));
+    b.add(k2.build(M));
+    pitch.add(b);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 3.4); b.add(mz);
+    muzzles.push(mz); barrels.push(b);
+    kp.add('dark', G.box(1.0, 0.5, 0.7), mat([0, -0.1, 0]));
+    pitch.position.set(0, 0.95, 0.3);
+  } else if (kind === 'driver') {
+    // mass driver: open four-rail accelerator cage around a bore, amber drive rings
+    kb.add('dark', G.cyl(1.1, 1.3, 0.4, 24), mat([0, 0.2, 0]));
+    kb.add('metal', G.cyl(0.8, 0.8, 0.18, 24), mat([0, 0.47, 0]));
+    ky.add('hull', G.rbox(2.0, 0.95, 2.2, 0.2), mat([0, 0.95, -0.4]));
+    ky.add('accent', G.rbox(2.05, 0.2, 1.0, 0.05), mat([0, 1.42, -0.7]));
+    ky.addMirrored('dark', G.cyl(0.35, 0.35, 1.6, 16), mat([1.2, 0.9, -0.4], [Math.PI / 2, 0, 0]));
+    const b = new THREE.Group();
+    const k2 = new Kit();
+    k2.add('dark', G.rbox(1.0, 1.0, 1.2, 0.1), mat([0, 0, 0.4]));
+    k2.add('gun', G.cyl(0.14, 0.14, 4.6, 12), mat([0, 0, 3.0], [Math.PI / 2, 0, 0]));
+    for (const [x, y] of [[0.36, 0.36], [-0.36, 0.36], [0.36, -0.36], [-0.36, -0.36]]) k2.add('gun', G.box(0.12, 0.12, 4.4), mat([x, y, 3.1]));
+    for (let i = 0; i < 5; i++) {
+      k2.add('metal', G.torus(0.52, 0.06, 6, 4), mat([0, 0, 1.4 + i * 0.85], [0, 0, Math.PI / 4]));
+      k2.add('amber', G.torus(0.44, 0.025, 4, 4), mat([0, 0, 1.4 + i * 0.85], [0, 0, Math.PI / 4]));
+    }
+    k2.add('dark', G.rbox(0.9, 0.9, 0.35, 0.06), mat([0, 0, 5.3]));
+    b.add(k2.build(M));
+    pitch.add(b);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 5.6); b.add(mz);
+    muzzles.push(mz); barrels.push(b);
+    kp.add('dark', G.rbox(1.3, 0.8, 1.2, 0.1), mat([0, 0, 0]));
+    pitch.position.set(0, 1.05, 0.35);
+  } else if (kind === 'neutron') {
+    // neutron blaster: armoured reaction chamber with green vents and a flared bell muzzle
+    kb.add('dark', G.cyl(1.3, 1.5, 0.45, 24), mat([0, 0.22, 0]));
+    kb.add('metal', G.cyl(1.0, 1.0, 0.18, 24), mat([0, 0.52, 0]));
+    ky.add('hull', G.rbox(2.3, 1.1, 2.4, 0.3), mat([0, 1.05, -0.5]));
+    ky.addMirrored('accent', G.rbox(0.4, 0.9, 1.8, 0.1), mat([1.3, 1.0, -0.5]));
+    const b = new THREE.Group();
+    const k2 = new Kit();
+    k2.add('dark', G.cyl(0.75, 0.75, 1.8, 8), mat([0, 0, 0.6], [Math.PI / 2, 0, 0]));
+    for (let i = 0; i < 4; i++) k2.add('plasma', G.box(0.06, 1.3, 0.12), mat([0, 0, 0.1 + i * 0.35], [0, 0, i * 0.8]));
+    k2.add('metal', G.cyl(0.78, 0.78, 0.12, 8), mat([0, 0, 1.5], [Math.PI / 2, 0, 0]));
+    k2.add('gun', G.cyl(0.36, 0.5, 2.0, 16), mat([0, 0, 2.5], [Math.PI / 2, 0, 0]));
+    k2.add('dark', G.lathe([[0.32, 0], [0.4, 0.3], [0.6, 0.7], [0.72, 0.9], [0.62, 0.95]], 20), mat([0, 0, 3.4], [Math.PI / 2, 0, 0]));
+    k2.add('plasma', G.cyl(0.3, 0.3, 0.04, 16), mat([0, 0, 3.6], [Math.PI / 2, 0, 0]));
+    b.add(k2.build(M));
+    pitch.add(b);
+    const mz = new THREE.Object3D(); mz.position.set(0, 0, 4.4); b.add(mz);
+    muzzles.push(mz); barrels.push(b);
+    kp.add('dark', G.rbox(1.6, 1.0, 1.4, 0.12), mat([0, 0, 0.1]));
+    pitch.position.set(0, 1.15, 0.3);
   } else {
     // railgun: long twin-rail barrel with glowing magnetic coils
     kb.add('dark', G.cyl(1.3, 1.5, 0.45, 24), mat([0, 0.22, 0]));
@@ -322,14 +494,14 @@ export function buildTurret(M, kind = 'laser', scale = 1, fixed = false) {
   if (Object.keys(ky.parts).length) yaw.add(ky.build(M));
   pitch.add(kp.build(M));
   root.scale.setScalar(scale);
-  const recoilDist = { laser: 0.35, rail: 0.8, auto: 0.06, plasma: 0.55, flak: 0.25, beam: 0.15, gauss: 0.9, scatter: 0.4 }[kind];
-  return { root, yaw, pitch, muzzles, barrels, kind, recoil: barrels.map(() => 0), baseZ: barrels.map((b) => b.position.z), recoilDist, rotor: kind === 'auto' ? barrels[0] : null, spin: 0, next: 0, fixed };
+  const recoilDist = { laser: 0.35, rail: 0.8, auto: 0.06, plasma: 0.55, flak: 0.25, beam: 0.15, gauss: 0.9, scatter: 0.4, ion: 0.3, pd: 0.15, gatling: 0.05, clan: 0.45, driver: 0.7, neutron: 0.6 }[kind] ?? 0.3;
+  return { root, yaw, pitch, muzzles, barrels, kind, recoil: barrels.map(() => 0), baseZ: barrels.map((b) => b.position.z), recoilDist, rotor: kind === 'auto' || kind === 'gatling' ? barrels[0] : null, spin: 0, next: 0, fixed };
 }
 
 // Fixed gun: a low armoured casing faired into the hull; only the barrels gimbal a few degrees inside it.
 function gunCasing(kind, h) {
   const k = new Kit();
-  const heavy = kind === 'gauss' || kind === 'plasma' || kind === 'rail';
+  const heavy = kind === 'gauss' || kind === 'plasma' || kind === 'rail' || kind === 'driver' || kind === 'neutron';
   const w = heavy ? 2.1 : 1.6, L = heavy ? 4.4 : 3.4, z0 = -L * 0.62;
   k.add('hull', G.loft([[z0, w * 0.55, h * 0.45, 0.02, 0, 2.6], [z0 + L * 0.3, w, h + 0.32, 0.02, 0, 3.2], [z0 + L * 0.78, w, h + 0.28, 0.02, 0, 3.2], [z0 + L, w * 0.62, h + 0.12, 0.02, 0, 2.6]], 20), mat());
   k.add('accent', G.box(w * 0.28, 0.06, L * 0.5), mat([0, h + 0.33, z0 + L * 0.5]));
@@ -371,7 +543,7 @@ export function buildMissileBay(M, O, scale = 1) {
 }
 
 function shipBase(name, M) {
-  return { name, group: new THREE.Group(), turrets: [], guns: [], launchers: [], gunMounts: [], turretMounts: [], missileBays: [], slots: null, style: 'std', engines: [], navLights: [], M, radius: 10, hitSpheres: [], hardpoints: [], utilMounts: [], cockpit: new THREE.Vector3(0, 2, 6) };
+  return { name, group: new THREE.Group(), turrets: [], guns: [], launchers: [], gunMounts: [], turretMounts: [], missileBays: [], slots: null, style: 'std', engines: [], navLights: [], M, radius: 10, hitSpheres: [], hardpoints: [], cockpit: new THREE.Vector3(0, 2, 6) };
 }
 
 function scatterGreebles(k, r, n, box, keys = ['dark', 'metal', 'gun']) {
@@ -478,7 +650,6 @@ function makeGreebles(ship, S) {
   const excl = [
     ...ship.hardpoints.map((h) => [new THREE.Vector3().fromArray(h.p), 2.6 * h.s + base]),
     ...(ship.slots ? ship.slots.m.map((h) => [new THREE.Vector3().fromArray(h.p), 3 * h.s + base]) : []),
-    ...ship.utilMounts.map((h) => [new THREE.Vector3().fromArray(h.p), 2.2 * h.s + base]),
     ...ship.launchers.map((o) => [o.position.clone(), base * 4]),
     ...ship.engines.map((e) => [e.plume.position.clone(), e.radius * 1.8]),
   ];
@@ -677,7 +848,6 @@ export function buildFrigate(env, liv = 'player') {
   ship.group.add(k.build(M, { uvTile: { hull: 9, accent: 6, dark: 6 } }));
 
   ship.hardpoints = [{ p: [0, 3.5, 1.2], flip: 0, s: 1 }, { p: [0, 4.1, -5.6], flip: 0, s: 1 }, { p: [0, -2.7, -2.0], flip: 1, s: 0.9 }];
-  ship.utilMounts = [{ p: [9.5, -0.55, -5.5], flip: 0, s: 0.55 }, { p: [-9.5, -0.55, -5.5], flip: 0, s: 0.55 }, { p: [0, -2.85, -10], flip: 1, s: 0.6 }];
   ship.cockpit.set(0, 2.75, 8.4);
   for (const x of [15.4, -15.4]) {
     for (const [dx, dy] of [[-0.28, -0.25], [0.28, 0.25]]) {
@@ -742,7 +912,6 @@ export function buildRaider(env) {
   ship.radius = 10;
   ship.hitSpheres = [[0, 0, 4, 2.2], [0, 0, -2, 2.6], [0, 0, -7, 2.0], [4.5, -0.2, 0, 2.2], [-4.5, -0.2, 0, 2.2]];
   ship.hardpoints = [{ p: [0, 1.75, -3.4], flip: 0, s: 0.55 }, { p: [0, -1.25, -2.0], flip: 1, s: 0.55 }];
-  ship.utilMounts = [{ p: [0, 1.75, 0.6], flip: 0, s: 0.32 }];
   return addGreebles(ship);
 }
 
@@ -789,7 +958,6 @@ export function buildCruiser(env, fitted = false) {
   const mounts = [[0, 15, 20, 0], [0, 15, 42, 0], [0, -19, 10, 1], [12, 8, -55, 0], [-12, 8, -55, 0]];
   if (fitted) {
     ship.hardpoints = mounts.map(([x, y, z, flip]) => ({ p: [x, y, z], flip, s: 2.6 }));
-    ship.utilMounts = [[5, 14.6, -10], [-5, 14.6, -10], [5, 14.6, -55], [-5, 14.6, -55], [0, -19.6, -30]].map(([x, y, z]) => ({ p: [x, y, z], flip: y < 0 ? 1 : 0, s: 1.8 }));
   }
   for (const [x, y, z, flip] of fitted ? [] : mounts) {
     const t = buildTurret(M, 'laser', 3.2);
@@ -854,7 +1022,6 @@ export function buildCutlass(env, liv = 'cutlass') {
   ship.cockpit.set(0, 2.2, 4);
   ship.hitSpheres = [[0, 0, 5, 2.0], [0, 0, 0, 2.6], [0, 0, -6, 2.4], [4.5, -0.4, -1.5, 2.2], [-4.5, -0.4, -1.5, 2.2]];
   ship.hardpoints = [{ p: [0, 2.2, -2.6], flip: 0, s: 0.6 }, { p: [0, -1.95, -1.8], flip: 1, s: 0.6 }];
-  ship.utilMounts = [{ p: [0, 1.75, -5.6], flip: 0, s: 0.36 }, { p: [0, -1.95, -5.8], flip: 1, s: 0.36 }];
   return addGreebles(ship);
 }
 
@@ -912,7 +1079,6 @@ export function buildReaver(env, liv = 'reaver') {
   ship.cockpit.set(0, 8, 2);
   ship.hitSpheres = [[0, -0.5, 24, 3.5], [0, 0, 14, 5.5], [0, 0, 3, 6.5], [0, 0, -8, 7], [0, 0, -19, 7], [0, 6, -4, 4]];
   ship.hardpoints = [{ p: [0, 5.8, 9], flip: 0, s: 1.1 }, { p: [0, 8.6, -10.5], flip: 0, s: 1.0 }, { p: [0, -6.4, 2], flip: 1, s: 1.0 }, { p: [0, -6.4, -12], flip: 1, s: 1.0 }];
-  ship.utilMounts = [{ p: [2.6, 5.2, -15], flip: 0, s: 0.75 }, { p: [-2.6, 5.2, -15], flip: 0, s: 0.75 }, { p: [0, 5.6, 16], flip: 0, s: 0.6 }];
   return addGreebles(ship);
 }
 
@@ -979,7 +1145,6 @@ export function buildRavager(env, liv = 'ravager') {
     { p: [-6, 17.6, 32], flip: 0, s: 2.8 }, { p: [0, -25.6, 30], flip: 1, s: 3.0 }, { p: [0, -26, -10], flip: 1, s: 3.0 },
     { p: [0, -26, -50], flip: 1, s: 2.8 }, { p: [11, 10, 70], flip: 0, s: 2.0 },
   ];
-  ship.utilMounts = [[10, 19, -30], [-14, 19, 8], [-14, 19, -12], [12, -25.5, 10], [-12, -25.5, -30], [0, 19, 52]].map(([x, y, z]) => ({ p: [x, y, z], flip: y < 0 ? 1 : 0, s: 2.0 }));
   return addGreebles(ship);
 }
 
@@ -1145,7 +1310,7 @@ function batchGlows(ship) {
     list.push([sp, maxScale]);
     return list.length - 1;
   };
-  const engines = ship.engines.map((e) => take(e.sprite, e.radius * 3.2));
+  const engines = ship.engines.map((e) => take(e.sprite, e.radius * 4.8));
   const lights = ship.navLights.map((l) => take(l.sp, l.size));
   if (list.length < 2) return;
   const n = list.length;
@@ -1183,11 +1348,11 @@ function batchGlows(ship) {
 export function animateShip(ship, dt, time, throttle) {
   const gl = ship.glow;
   ship.engines.forEach((e, i) => {
-    const p = 0.12 + throttle * 0.9;
+    const p = 0.2 + throttle * 0.95;
     e.plume.material.uniforms.uPower.value = p * (0.95 + Math.random() * 0.1);
     e.plume.material.uniforms.uTime.value = time;
-    e.plume.scale.z = e.length * (0.25 + throttle * 0.9);
-    const sc = e.radius * (1.4 + throttle * 1.8), op = 0.25 + throttle * 0.45, j = gl ? gl.engines[i] : -1;
+    e.plume.scale.z = e.length * (0.3 + throttle * 0.95);
+    const sc = e.radius * (2.2 + throttle * 2.6), op = 0.35 + throttle * 0.55, j = gl ? gl.engines[i] : -1;
     if (j < 0) { e.sprite.scale.setScalar(sc); e.sprite.material.opacity = op; return; }
     gl.scale.array[j] = sc;
     gl.color.array[j * 4 + 3] = op;
@@ -1387,7 +1552,6 @@ export function buildMule(env, liv = 'mule') {
   addLight(ship, new THREE.Vector3(1.6, 9.1, 18), 0xffffff, 1.6, 1.0, 0);
   addLight(ship, new THREE.Vector3(0, 5.2, -16), 0xffa020, 1.4, 0.7, 0.4);
   ship.hardpoints = [{ p: [0, 5.3, 17], flip: 0, s: 0.85 }, { p: [0, 5.05, -20.5], flip: 0, s: 0.85 }];
-  ship.utilMounts = [{ p: [2.2, 5.97, 7], flip: 0, s: 0.6 }, { p: [-2.2, 5.97, 7], flip: 0, s: 0.6 }, { p: [2.2, 5.97, -9], flip: 0, s: 0.6 }, { p: [-2.2, 5.97, -9], flip: 0, s: 0.6 }];
   ship.cockpit.set(0, 4.6, 21);
   ship.radius = 25;
   ship.hitSpheres = [[0, 2, 20, 4], [0, 2, 11, 5], [0, 2, 3, 5], [0, 2, -5, 5], [0, 2, -13, 5], [0, 2, -19.5, 4.5]];
@@ -1442,7 +1606,6 @@ export function buildAtlas(env, liv = 'atlas') {
   addLight(ship, new THREE.Vector3(3, 22.2, 52), 0xffffff, 3.2, 0.9, 0);
   for (const z of [34, 10, -14, -38]) addLight(ship, new THREE.Vector3(0, 8, z), 0xffa020, 2.2, 0.6, z * 0.01);
   ship.hardpoints = [{ p: [0, 12.05, 53], flip: 0, s: 1.3 }, { p: [0, 9.15, -56], flip: 0, s: 1.3 }, { p: [0, -9.05, -57], flip: 1, s: 1.3 }];
-  ship.utilMounts = [5.2, -5.2].flatMap((x) => [28, 4, -20].map((z) => ({ p: [x, 7.72, z], flip: 0, s: 1.0 })));
   ship.cockpit.set(0, 11, 58);
   ship.radius = 72;
   ship.hitSpheres = [[0, 0, 64, 9], [0, 0, 50, 10], [0, 0, 34, 10], [0, 0, 16, 10], [0, 0, -2, 10], [0, 0, -20, 10], [0, 0, -38, 10], [0, 0, -56, 13], [19, 0, -52, 7], [-19, 0, -52, 7]];
@@ -1477,35 +1640,30 @@ const COMBINE = {
     segs: [[2.0, 1.4, 4, 2.5], [2.4, 1.6, 4, -1.5]], nose: [1.4, 0.9, 2.4, 5.6], bridge: [1.2, 0.5, 1.6, 3.2, 0.7],
     wings: { span: 8, t: 0.22, chord: 2.6, z: -1.5 }, engines: { R: 0.45, xs: [0.7, -0.7], ys: [0], z: -4.3 },
     hp: [{ p: [0, 0.72, 2.2], flip: 0, s: 0.5 }, { p: [0, -0.82, -1.5], flip: 1, s: 0.5 }],
-    util: [{ p: [0, 0.82, -2.6], flip: 0, s: 0.32 }],
   },
   enforcer: {
     name: 'Enforcer', radius: 18, cockpit: [0, 3.1, 9],
     segs: [[5, 3.4, 7, 9], [6, 4, 7, 2], [6, 4, 7, -5], [5, 3.6, 5, -11]], nose: [3.4, 2.2, 5, 14.5], bridge: [3, 1.2, 3, 9, 1.7],
     sponsons: { x: 3.9, w: 1.8, h: 2.4, l: 12, z: -2 }, engines: { R: 0.9, xs: [1.4, -1.4], ys: [1.0, -1.0], z: -14.2 },
     hp: [{ p: [0, 2.02, 4], flip: 0, s: 0.75 }, { p: [0, 2.02, -4], flip: 0, s: 0.75 }, { p: [0, -2.02, 0], flip: 1, s: 0.75 }],
-    util: [{ p: [3.9, 1.22, -5], flip: 0, s: 0.45 }, { p: [-3.9, 1.22, -5], flip: 0, s: 0.45 }],
   },
   compliance: {
     name: 'Compliance', radius: 50, cockpit: [0, 15, -9],
     segs: [[14, 10, 16, 30], [18, 12, 18, 13], [18, 12, 18, -6], [16, 11, 16, -24]], nose: [10, 6, 14, 44], bridge: [8, 8, 10, -10, 6], tower: true,
     sponsons: { x: 12, w: 5, h: 8, l: 40, z: -4 }, engines: { R: 2.2, xs: [5, 0, -5], ys: [2.6, -2.6], z: -34.5 },
     hp: [{ p: [0, 5.05, 30], flip: 0, s: 1.4 }, { p: [0, 6.05, 8], flip: 0, s: 1.6 }, { p: [12, 4.05, 6], flip: 0, s: 1.2 }, { p: [-12, 4.05, 6], flip: 0, s: 1.2 }, { p: [0, -6.05, 0], flip: 1, s: 1.4 }],
-    util: [{ p: [12, 4.05, -14], flip: 0, s: 0.9 }, { p: [-12, 4.05, -14], flip: 0, s: 0.9 }, { p: [0, -6.05, -16], flip: 1, s: 0.9 }],
   },
   crate: {
     name: 'Crate', radius: 46, cockpit: [0, 5, 38],
     segs: [[10, 8, 10, 38], [12, 10, 8, -34]], spine: [3, 3, 66, 2], nose: [7, 5, 4, 44.5], bridge: [8, 0.8, 0.3, 42.6, 2.2],
     containers: { zs: [24, 12, 0, -12, -24], size: [6.4, 6.4, 11] }, engines: { R: 2.4, xs: [3, -3], ys: [0], z: -38.5 },
     hp: [{ p: [0, 4.05, 37], flip: 0, s: 1.1 }, { p: [0, 5.05, -34], flip: 0, s: 1.1 }],
-    util: [{ p: [3.4, 6.65, 12], flip: 0, s: 0.8 }, { p: [-3.4, 6.65, -12], flip: 0, s: 0.8 }, { p: [3.4, 6.65, -24], flip: 0, s: 0.8 }],
   },
   commuter: {
     name: 'Commuter', radius: 58, cockpit: [0, 4.5, 50],
     segs: [[12, 10, 90, 0], [13, 11, 8, -49]], nose: [9, 7, 10, 50], bridge: [7, 1.4, 0.3, 54.6, 1.8], decks: true,
     engines: { R: 2.4, xs: [4, 0, -4], ys: [0], z: -53.5 },
     hp: [{ p: [0, 5.05, 32], flip: 0, s: 1.1 }, { p: [0, 5.05, -32], flip: 0, s: 1.1 }],
-    util: [{ p: [0, 5.05, 12], flip: 0, s: 0.8 }, { p: [0, 5.05, -12], flip: 0, s: 0.8 }, { p: [0, -5.05, 4], flip: 1, s: 0.8 }, { p: [0, -5.05, -20], flip: 1, s: 0.8 }],
   },
 };
 
@@ -1588,7 +1746,6 @@ export function buildCombine(env, variant, liv = 'combine') {
   if (C.radius > 20) for (let i = 0; i < 3; i++) launcherAt(ship, (i - 1) * C.radius * 0.08, -top - 0.5, C.segs[0][3] - i * 2);
   else launcherAt(ship, 0, -top - 0.3, C.segs[0][3]);
   ship.hardpoints = C.hp;
-  ship.utilMounts = C.util;
   ship.cockpit.set(...C.cockpit);
   ship.radius = C.radius;
   return addGreebles(ship);
@@ -1667,9 +1824,8 @@ function design(env, liv, D) {
     const h = grid && grid.cast(1, side, z, x);
     return { p: [x, h ? h.p.y - side * 0.04 * sc : 0, z], flip: side < 0 ? 1 : 0, s: sc, miss: !h };
   };
-  ship.slots = { g: (D.slots.g || []).map(snap), t: (D.slots.t || []).map(snap), m: (D.slots.m || []).map(snap), u: (D.slots.u || []).map(snap) };
+  ship.slots = { g: (D.slots.g || []).map(snap), t: (D.slots.t || []).map(snap), m: (D.slots.m || []).map(snap) };
   ship.hardpoints = [...ship.slots.g, ...ship.slots.t];
-  ship.utilMounts = ship.slots.u;
   for (const b of ship.slots.m) {
     const o = new THREE.Object3D(); o.position.fromArray(b.p); ship.group.add(o); ship.launchers.push(o);
   }
@@ -1720,7 +1876,7 @@ const DESIGNS = {
       k.add('metal', G.lathe([[0.02, 0], [0.6, 0.18], [0.85, 0.4], [0.9, 0.44]], 18), mat([0, 2.85, -4.2], [-0.5, 0, 0]));
       k.add('metal', G.cyl(0.03, 0.03, 2.4, 6), mat([0, 0, 11.6], ALONG_Z));
     },
-    slots: { g: [[0, 7.4, 1, 0.42]], t: [[0, -2.5, -1, 0.5]], m: [[0, 1.6, -1, 0.36]], u: [[4.7, -4, 1, 0.3], [-4.7, -4, 1, 0.3]] },
+    slots: { g: [[0, 7.4, 1, 0.42]], t: [[0, -2.5, -1, 0.5]], m: [[0, 1.6, -1, 0.36]] },
   },
   // light fighter: blended bat wing, wingtip fins, two big drives
   hornet: {
@@ -1733,7 +1889,7 @@ const DESIGNS = {
     ],
     fins: [{ pts: [[-6, 0], [-4.4, 1.6], [-3.2, 1.6], [-3.6, 0]], t: 0.18, at: [5.85, 0.12, 0], roll: -0.25, mirror: true, key: 'accent' }],
     engines: [{ p: [1.1, 0.05, -6.4], r: 0.62, len: 9, mirror: true }],
-    slots: { g: [[2.6, -2, 1, 0.42], [-2.6, -2, 1, 0.42]], t: [], m: [[0, -1.5, -1, 0.4]], u: [[0, -3.8, 1, 0.32]] },
+    slots: { g: [[2.6, -2, 1, 0.42], [-2.6, -2, 1, 0.42]], t: [], m: [[0, -1.5, -1, 0.4]] },
   },
   // interceptor: slim pod slung between two huge engine nacelles
   kestrel: {
@@ -1747,7 +1903,7 @@ const DESIGNS = {
     ],
     fins: [{ pts: [[-10, 0], [-8.2, 1.9], [-6.8, 1.9], [-6.6, 0]], t: 0.16, at: [3.6, 0.9, 0], roll: -0.18, mirror: true, key: 'accent' }],
     engines: [{ p: [3.6, -0.1, -10.2], r: 0.92, len: 13, mirror: true }, { p: [0, 0, -7.5], r: 0.5, len: 6 }],
-    slots: { g: [[3.6, 1, 1, 0.42], [-3.6, 1, 1, 0.42]], t: [[0, -2, 1, 0.5]], m: [[0, -1, -1, 0.4]], u: [[0, -5.8, 1, 0.32], [0, 4.5, -1, 0.32]] },
+    slots: { g: [[3.6, 1, 1, 0.42], [-3.6, 1, 1, 0.42]], t: [[0, -2, 1, 0.5]], m: [[0, -1, -1, 0.4]] },
   },
   // stealth corvette: faceted low-observable wedge with canted V-tails
   corvid: {
@@ -1759,7 +1915,7 @@ const DESIGNS = {
     ],
     fins: [{ pts: [[-9, 0], [-7.2, 2.6], [-5.8, 2.6], [-6, 0]], t: 0.14, at: [2.4, 0.6, 0], roll: -0.5, mirror: true, key: 'dark' }],
     engines: [{ p: [1.8, 0, -9], r: 0.58, len: 8, mirror: true }],
-    slots: { g: [[1.4, 4, -1, 0.42], [-1.4, 4, -1, 0.42]], t: [[0, -3.5, -1, 0.5]], m: [[0, 0.5, -1, 0.38]], u: [[2.6, -4.5, 1, 0.3], [-2.6, -4.5, 1, 0.3], [0, -5.5, 1, 0.3]] },
+    slots: { g: [[1.4, 4, -1, 0.42], [-1.4, 4, -1, 0.42]], t: [[0, -3.5, -1, 0.5]], m: [[0, 0.5, -1, 0.38]] },
   },
   // heavy gunship: hunched body with forward-reaching gun sponsons
   mantis: {
@@ -1775,7 +1931,7 @@ const DESIGNS = {
       for (const z of [-9, -3]) k.addMirrored('dark', G.rbox(0.5, 3.6, 5, 0.12), mat([3.9, 0.3, z], [0, 0, -0.12]));
     },
     engines: [{ p: [0, 0.3, -15], r: 1.6, len: 12 }, { p: [6.6, -0.8, -7], r: 1.0, len: 8, mirror: true }],
-    slots: { g: [[6.6, 12, 1, 0.55], [-6.6, 12, 1, 0.55]], t: [[0, -11, 1, 0.8], [0, 3, -1, 0.8]], m: [[6.6, 3, -1, 0.5], [-6.6, 3, -1, 0.5]], u: [[3.2, 6, 1, 0.5], [-3.2, 6, 1, 0.5], [0, -2, 1, 0.45]] },
+    slots: { g: [[6.6, 12, 1, 0.55], [-6.6, 12, 1, 0.55]], t: [[0, -11, 1, 0.8], [0, 3, -1, 0.8]], m: [[6.6, 3, -1, 0.5], [-6.6, 3, -1, 0.5]] },
   },
   // destroyer: flat, wide armoured slab with bolted-on side skirts
   warden: {
@@ -1791,7 +1947,7 @@ const DESIGNS = {
       for (const z of [-22, -12, -2, 8]) k.addMirrored('dark', G.rbox(1.4, 5.4, 8.6, 0.25), mat([12.1, 0, z], [0, 0, -0.18]));
     },
     engines: [{ p: [3.6, 0, -31], r: 1.9, len: 14, mirror: true }, { p: [7.4, 0, -30.5], r: 1.25, len: 9, mirror: true }],
-    slots: { g: [[2.5, 24, 1, 0.8], [-2.5, 24, 1, 0.8]], t: [[0, -5, 1, 1.1], [0, 7, 1, 1.1], [0, -6, -1, 1.0]], m: [[8.5, -6, 1, 0.8], [-8.5, -6, 1, 0.8]], u: [[8.5, 10, 1, 0.7], [-8.5, 10, 1, 0.7], [6, -22, -1, 0.7], [-6, -22, -1, 0.7]] },
+    slots: { g: [[2.5, 24, 1, 0.8], [-2.5, 24, 1, 0.8]], t: [[0, -5, 1, 1.1], [0, 7, 1, 1.1], [0, -6, -1, 1.0]], m: [[8.5, -6, 1, 0.8], [-8.5, -6, 1, 0.8]] },
   },
   // light cruiser: long blade hull, swept wings and a raked tail fin
   sabre: {
@@ -1805,7 +1961,7 @@ const DESIGNS = {
     ],
     fins: [{ pts: [[-40, 0], [-34, 8], [-30, 8.2], [-24, 0]], t: 0.6, at: [0, 4.2, 0], key: 'accent' }, { pts: [[-38, 0], [-34, -4.6], [-31, -4.6], [-28, 0]], t: 0.5, at: [0, -3.2, 0], key: 'dark' }],
     engines: [{ p: [0, 0.3, -40], r: 2.4, len: 20 }, { p: [4.4, -0.2, -39.5], r: 1.5, len: 12, mirror: true }, { p: [17.6, -0.6, -36], r: 1.0, len: 8, mirror: true }],
-    slots: { g: [[2.2, 32, -1, 0.8], [-2.2, 32, -1, 0.8]], t: [[0, -16, 1, 1.2], [0, 2, 1, 1.0], [0, -4, -1, 1.0]], m: [[9, -20, 1, 0.7], [-9, -20, 1, 0.7]], u: [[2.6, -30, 1, 0.6], [-2.6, -30, 1, 0.6], [2.6, 12, -1, 0.6], [-2.6, 12, -1, 0.6]] },
+    slots: { g: [[2.2, 32, -1, 0.8], [-2.2, 32, -1, 0.8]], t: [[0, -16, 1, 1.2], [0, 2, 1, 1.0], [0, -4, -1, 1.0]], m: [[9, -20, 1, 0.7], [-9, -20, 1, 0.7]] },
   },
   // passenger liner: smooth white cigar, deck after deck of windows, glass observation blister
   aurora: {
@@ -1820,7 +1976,7 @@ const DESIGNS = {
     fins: [{ pts: [[-58, 0], [-50, 10], [-44, 10], [-36, 0]], t: 1, at: [0, 11, 0], key: 'accent' }],
     windows: [{ part: 0, ys: [-6, -2.5, 1, 4.5, 8], z0: -44, z1: 46, step: 2.4, h: 0.8 }],
     engines: [{ p: [0, 0, -58], r: 4, len: 26 }, { p: [16, -2, -56], r: 2.2, len: 16, mirror: true }],
-    slots: { g: [], t: [[0, -30, 1, 1.2], [0, 8, -1, 1.2], [0, -36, -1, 1.0]], m: [], u: [[4, 0, 1, 0.8], [-4, 0, 1, 0.8], [4, -14, 1, 0.8], [-4, -14, 1, 0.8], [0, -46, -1, 0.8]] },
+    slots: { g: [], t: [[0, -30, 1, 1.2], [0, 8, -1, 1.2], [0, -36, -1, 1.0]], m: [] },
   },
   // heavy cruiser: faceted, stepped fortress hull with armour belts down both flanks
   bastion: {
@@ -1836,7 +1992,7 @@ const DESIGNS = {
       for (const z of [-36, -24, -12, 0, 12]) k.addMirrored('dark', G.rbox(2.2, 8, 11, 0.3), mat([18.2, 0, z], [0, 0, -0.25]));
     },
     engines: [{ p: [5, 0, -48], r: 2.6, len: 18, mirror: true }, { p: [10.5, 0, -47.5], r: 1.8, len: 12, mirror: true }],
-    slots: { g: [[3, 40, 1, 1.0], [-3, 40, 1, 1.0]], t: [[15, -8, 1, 1.1], [-15, -8, 1, 1.1], [0, 6, 1, 1.3], [0, -10, -1, 1.2]], m: [[8, 24, 1, 0.9], [-8, 24, 1, 0.9]], u: [[15, -30, 1, 0.8], [-15, -30, 1, 0.8], [10, -30, -1, 0.8], [-10, -30, -1, 0.8], [0, 28, -1, 0.8]] },
+    slots: { g: [[3, 40, 1, 1.0], [-3, 40, 1, 1.0]], t: [[15, -8, 1, 1.1], [-15, -8, 1, 1.1], [0, 6, 1, 1.3], [0, -10, -1, 1.2]], m: [[8, 24, 1, 0.9], [-8, 24, 1, 0.9]] },
   },
   // battlecruiser: refined long hull ending in a split spinal-lance bow, swept sponson wings
   paladin: {
@@ -1857,7 +2013,7 @@ const DESIGNS = {
       k.add('coil', G.sphere(0.8, 14, 10), mat([0, -0.5, 54.6]));
     },
     engines: [{ p: [0, 0, -56], r: 3.2, len: 24 }, { p: [5.6, 0, -55.5], r: 2.2, len: 16, mirror: true }, { p: [26, -1, -48], r: 1.6, len: 10, mirror: true }],
-    slots: { g: [[6.5, 50, 1, 1.0], [-6.5, 50, 1, 1.0], [6.5, 30, -1, 1.0], [-6.5, 30, -1, 1.0]], t: [[0, 0, 1, 1.4], [0, 14, 1, 1.3], [12, -28, 1, 1.1], [-12, -28, 1, 1.1]], m: [[0, -20, -1, 1.0], [0, 4, -1, 1.0]], u: [[5, -44, 1, 0.9], [-5, -44, 1, 0.9], [18, -34, -1, 0.8], [-18, -34, -1, 0.8], [0, -40, -1, 0.9]] },
+    slots: { g: [[6.5, 50, 1, 1.0], [-6.5, 50, 1, 1.0], [6.5, 30, -1, 1.0], [-6.5, 30, -1, 1.0]], t: [[0, 0, 1, 1.4], [0, 14, 1, 1.3], [12, -28, 1, 1.1], [-12, -28, 1, 1.1]], m: [[0, -20, -1, 1.0], [0, 4, -1, 1.0]] },
   },
   // battleship: tiered arrowhead with flanking engine nacelles and a command tower
   sovereign: {
@@ -1874,7 +2030,7 @@ const DESIGNS = {
     extra: (k) => { k.add('glass', G.box(6, 1, 0.3), mat([0, 25.5, -31.9])); },
     windows: [{ part: 0, ys: [-3, 2], z0: -60, z1: 20, step: 3, h: 0.7 }],
     engines: [{ p: [0, 0, -84], r: 5, len: 34 }, { p: [9.5, 0, -83.5], r: 3.4, len: 22, mirror: true }, { p: [24, -2, -86], r: 4, len: 26, mirror: true }],
-    slots: { g: [[4, 72, 1, 1.2], [-4, 72, 1, 1.2]], t: [[0, 0, 1, 1.8], [0, 24, 1, 1.6], [0, 46, 1, 1.5], [24, -54, 1, 1.3], [-24, -54, 1, 1.3], [14, -10, -1, 1.3], [-14, -10, -1, 1.3]], m: [[10, 30, 1, 1.1], [-10, 30, 1, 1.1], [0, -30, -1, 1.2]], u: [[16, -30, 1, 1], [-16, -30, 1, 1], [8, -58, 1, 1], [-8, -58, 1, 1], [14, -60, -1, 1], [-14, -60, -1, 1]] },
+    slots: { g: [[4, 72, 1, 1.2], [-4, 72, 1, 1.2]], t: [[0, 0, 1, 1.8], [0, 24, 1, 1.6], [0, 46, 1, 1.5], [24, -54, 1, 1.3], [-24, -54, 1, 1.3], [14, -10, -1, 1.3], [-14, -10, -1, 1.3]], m: [[10, 30, 1, 1.1], [-10, 30, 1, 1.1], [0, -30, -1, 1.2]] },
   },
   // dreadnought: armoured spine, hammerhead prow, six-drive engine block and gun sponsons
   leviathan: {
@@ -1891,6 +2047,6 @@ const DESIGNS = {
       for (const z of [-80, -40, 0, 40]) k.addMirrored('dark', G.rbox(3, 14, 20, 0.5), mat([39.5, -2, z], [0, 0, -0.15]));
     },
     engines: [{ p: [9, 6, -120], r: 5.6, len: 40, mirror: true }, { p: [9, -6, -120], r: 5.6, len: 40, mirror: true }, { p: [0, 0, -120], r: 3.6, len: 26 }, { p: [30, -2, -90], r: 5, len: 28, mirror: true }],
-    slots: { g: [[14, 118, 1, 2.0], [-14, 118, 1, 2.0], [14, 118, -1, 1.8], [-14, 118, -1, 1.8]], t: [[0, -20, 1, 2.2], [0, 10, 1, 2.2], [0, 40, 1, 2.2], [0, 66, 1, 2.0], [30, -70, 1, 1.8], [-30, -70, 1, 1.8], [30, 0, -1, 1.6], [-30, 0, -1, 1.6]], m: [[14, 100, 1, 1.6], [-14, 100, 1, 1.6], [0, -60, -1, 1.8], [0, 20, -1, 1.8]], u: [[12, -96, 1, 1.4], [-12, -96, 1, 1.4], [0, -90, -1, 1.4], [0, 60, -1, 1.4], [30, -40, 1, 1.4], [-30, -40, 1, 1.4], [0, -20, -1, 1.4]] },
+    slots: { g: [[14, 118, 1, 2.0], [-14, 118, 1, 2.0], [14, 118, -1, 1.8], [-14, 118, -1, 1.8]], t: [[0, -20, 1, 2.2], [0, 10, 1, 2.2], [0, 40, 1, 2.2], [0, 66, 1, 2.0], [30, -70, 1, 1.8], [-30, -70, 1, 1.8], [30, 0, -1, 1.6], [-30, 0, -1, 1.6]], m: [[14, 100, 1, 1.6], [-14, 100, 1, 1.6], [0, -60, -1, 1.8], [0, 20, -1, 1.8]] },
   },
 };
