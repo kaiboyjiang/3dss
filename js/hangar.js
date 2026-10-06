@@ -326,6 +326,7 @@ export class Hangar {
         c.onBeforeCompile = m.onBeforeCompile;
         c.customProgramCacheKey = m.customProgramCacheKey;
         c.defines = { ...m.defines };
+        c.defaultAttributeValues = m.defaultAttributeValues;
         if (m.envMap) c.envMap = this.env;
         c.userData.bayCopy = true;
         copies.set(m, c);

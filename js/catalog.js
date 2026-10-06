@@ -1,7 +1,7 @@
 import {
   buildFrigate, buildKestrel, buildWarden, buildPaladin, buildMantis, buildCorvid, buildBastion,
   buildHornet, buildWisp, buildMule, buildAtlas, buildAurora, buildSabre, buildSovereign, buildLeviathan,
-  buildTurret, buildGun, buildMissileBay, buildOutfitModel, buildRaider, buildCruiser, buildCutlass, buildReaver, buildRavager, buildCombine,
+  buildTurret, buildGun, buildMissileBay, buildOutfitModel, buildRaider, buildCruiser, buildCutlass, buildReaver, buildRavager, buildCombine, paintStripes,
 } from './ships.js';
 import { Kit, G, mat } from './geo.js';
 
@@ -436,6 +436,7 @@ export function mountSlots(ship, hullId) {
 export function buildFitted(hullId, fit0, env, liv) {
   const fit = fit0 && Array.isArray(fit0.g) && Array.isArray(fit0.e) && fit0.r ? fit0 : normFit(hullId, fit0);
   const ship = HULLS[hullId].build(env, liv);
+  paintStripes(ship);
   const S = mountSlots(ship, hullId);
   for (const k of ['g', 't']) {
     fit[k].forEach((id, i) => {

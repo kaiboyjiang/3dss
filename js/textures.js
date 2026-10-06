@@ -80,6 +80,7 @@ export function hullMaps(opts = {}) {
   const darkChance = opts.darkChance ?? 0.1;
   const wear = opts.wear ?? 0.4;
   const hazardChance = opts.hazardChance ?? 0.03;
+  const dark = base.map((v) => v * (opts.darkScale ?? 0.35));
 
   const col = canvas(size), hgt = canvas(size), rough = canvas(size);
   const c = col.getContext('2d'), h = hgt.getContext('2d', { willReadFrequently: true }), ro = rough.getContext('2d');
@@ -106,12 +107,12 @@ export function hullMaps(opts = {}) {
 
   const seam = Math.max(2, size / 400);
   for (const [x, y, w, hh] of panels) {
-    const v = (r() - 0.5) * 22;
+    const v = (r() - 0.5) * (opts.toneVar ?? 22);
     let pc = base.map((b) => Math.max(0, Math.min(255, b + v)));
     const roll = r();
     let kind = 1;
     if (roll < accentChance) { pc = accent.map((a) => a + (r() - 0.5) * 12); kind = 2; }
-    else if (roll < accentChance + darkChance) { pc = base.map((b) => b * 0.35); kind = 3; }
+    else if (roll < accentChance + darkChance) { pc = dark; kind = 3; }
     c.fillStyle = `rgb(${pc.map(Math.round)})`;
     c.fillRect(x + seam, y + seam, w - seam * 2, hh - seam * 2);
     const hv = 128 + (r() - 0.5) * 40;
@@ -222,7 +223,7 @@ export function hullMaps(opts = {}) {
     map: toTexture(col, true),
     normalMap: toTexture(nrm, false),
     roughnessMap: toTexture(rough, false),
-    tint: { base, accent, dark: base.map((b) => b * 0.35), accentChance, darkChance },
+    tint: { base, accent, dark, accentChance, darkChance },
   };
 }
 
@@ -417,6 +418,7 @@ export function engineCoreTexture(size = 128) {
 // and sits under a slow grime field, so no two neighbouring tiles read the same.
 const UNTILE = /* glsl */`
 uniform vec3 utBase, utAccent, utDark; uniform vec2 utChance;
+float utAA(float d, float w, float f) { return w > 0.0 ? 1.0 - smoothstep(w - f, w + f, d) : 0.0; }
 float utHash(vec2 c) { return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453); }
 mat2 utRot(vec2 c) {
   float k = floor(utHash(c) * 4.0);
@@ -431,16 +433,27 @@ float utNoise(vec2 p) {
 
 const lin = (c) => new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
 
-export function untile(m, maps) {
+// stripe: { s: [band centre, band half-width, spine half-width, pinstripe half-width], color, pin } in units of
+// half the ship's length, read from the livP attribute that paintStripes() bakes into ship hulls
+export function untile(m, maps, stripe) {
   const t = maps.tint;
   const U = {
     utBase: { value: lin(t.base) }, utAccent: { value: lin(t.accent) }, utDark: { value: lin(t.dark) },
     utChance: { value: new THREE.Vector2(t.accentChance, t.darkChance) },
   };
+  if (stripe) {
+    Object.assign(U, { utStripe: { value: new THREE.Vector4(...stripe.s) }, utStripeCol: { value: lin(stripe.color) }, utPinCol: { value: lin(stripe.pin) } });
+    m.defaultAttributeValues = { livP: [0, 0, 0, 0] };
+  }
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U);
+    if (stripe) {
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec4 livP;\nvarying vec4 vLivP;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLivP = livP;');
+    }
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\n' + UNTILE)
+      .replace('#include <common>', '#include <common>\n' + UNTILE + (stripe ? '\nvarying vec4 vLivP; uniform vec4 utStripe; uniform vec3 utStripeCol, utPinCol;' : ''))
       .replace('#include <map_fragment>', `
         float utN = 0.5;
         #ifdef USE_MAP
@@ -462,6 +475,17 @@ export function untile(m, maps) {
             }
           #endif
           diffuseColor *= utC;
+          ${stripe ? `
+          vec3 utF = max(fwidth(vLivP.xyz), vec3(1e-4));
+          float utDb = abs(vLivP.x - utStripe.x), utDs = abs(vLivP.y);
+          float utTop = smoothstep(0.0, 0.03, vLivP.z);
+          float utM = max(utAA(utDb, utStripe.y, utF.x), utAA(utDs, utStripe.z, utF.y) * utTop);
+          float utPin = utStripe.w > 0.0 ? max(utStripe.y > 0.0 ? utAA(abs(utDb - utStripe.y - utStripe.w * 2.0), utStripe.w, utF.x) : 0.0,
+            utStripe.z > 0.0 ? utAA(abs(utDs - utStripe.z - utStripe.w * 2.0), utStripe.w, utF.y) * utTop : 0.0) * (1.0 - utM) : 0.0;
+          vec3 utDet = clamp(utC.rgb / max(utBase, vec3(0.02)), 0.0, 1.6);
+          float utOn = step(0.5, vLivP.w);
+          diffuseColor.rgb = mix(diffuseColor.rgb, utStripeCol * utDet, utM * utOn);
+          diffuseColor.rgb = mix(diffuseColor.rgb, utPinCol * utDet, utPin * utOn);` : ''}
           utN = utNoise(vMapUv * 0.23) * 0.6 + utNoise(vMapUv * 0.61 + 5.3) * 0.4;
           diffuseColor.rgb *= (0.93 + 0.14 * utHash(utCell + 17.0)) * mix(0.8, 1.06, utN);
         #endif`)
@@ -479,6 +503,6 @@ export function untile(m, maps) {
           normal = normalize(tbn * mapN);
         #endif`);
   };
-  m.customProgramCacheKey = () => 'untile';
+  m.customProgramCacheKey = () => (stripe ? 'untile-stripe' : 'untile');
   return m;
 }

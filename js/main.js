@@ -5,7 +5,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { buildWorld, LOCATIONS } from './world.js';
 import { SYSTEMS, GOVS, systemDef, route, allPorts, hops, fullRoute } from './systems.js';
 import { StarMap } from './map.js';
-import { buildRaider, buildCruiser, buildHauler, animateShip, mergeStatic } from './ships.js';
+import { buildRaider, buildCruiser, buildHauler, animateShip, mergeStatic, paintStripes } from './ships.js';
 import { HULLS, OUTFITS, YARDS, emptyFit, bareFit, normFit, cloneFit, fitItems, roleOf, slotAccepts, SLOT_KEYS, MOUNT_KEYS, OUTFIT_CATS, CAP_NAME, catOf, fitLoad, fitProblem, buildFitted, outfitPreview, fittedStats } from './catalog.js';
 import { Hangar } from './hangar.js';
 import { buildBridge } from './bridge.js';
@@ -158,7 +158,10 @@ function makeEntity(kind, faction, pos, name, civHull) {
   } else if (NAVY_HULL[kind]) ship = buildFitted(NAVY_HULL[kind], emptyFit(NAVY_HULL[kind]), env, 'navy');
   else if (civHull) ship = buildFitted(civHull, bareFit(civHull), env);
   else if (s.hullId) ship = buildFitted(s.hullId, emptyFit(s.hullId), env);
-  else ship = kind === 'raider' ? buildRaider(env) : kind === 'cruiser' ? buildCruiser(env) : buildHauler(env, 1 + Math.floor(Math.random() * 50));
+  else {
+    ship = kind === 'raider' ? buildRaider(env) : kind === 'cruiser' ? buildCruiser(env) : buildHauler(env, 1 + Math.floor(Math.random() * 50));
+    paintStripes(ship);
+  }
   setShadows(ship.group);
   mergeStatic(ship);
   ship.group.position.copy(pos);

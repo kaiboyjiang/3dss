@@ -12,36 +12,38 @@ const liveryCache = {};
 export function livery(name, env) {
   if (liveryCache[name]) return liveryCache[name];
   const L = {
-    player: { base: [214, 216, 218], accent: [228, 106, 22], second: [36, 38, 42], eng: [0.55, 0.75, 1.0], labels: ['UNS', 'VALKYRIE', 'FA-31', 'NO STEP', 'RCS', '0731', 'DANGER'], seed: 3, wear: 0.35 },
-    pirate: { base: [74, 76, 80], accent: [168, 28, 22], second: [24, 24, 26], eng: [1.0, 0.45, 0.2], labels: ['XX', 'KILL', 'CR-9', '666', 'RCS'], seed: 9, wear: 0.85, rust: 0.9 },
-    cruiser: { base: [96, 84, 74], accent: [176, 34, 26], second: [30, 28, 28], eng: [1.0, 0.4, 0.18], labels: ['CORSAIR', 'BAY', 'C-01', 'HAZARD'], seed: 13, wear: 1.0, rust: 1.0 },
-    hauler: { base: [190, 176, 120], accent: [60, 90, 140], second: [50, 52, 56], eng: [0.6, 0.8, 1.0], labels: ['KALTOS LOG.', 'CARGO', 'H-220', 'HEAVY'], seed: 17, wear: 0.6 },
-    kestrel: { base: [62, 64, 68], accent: [40, 190, 210], second: [22, 22, 24], eng: [0.6, 0.85, 1.0], labels: ['KESTREL', 'K-7', 'NO STEP', 'RCS', '0117'], seed: 41, wear: 0.3 },
-    warden: { base: [124, 126, 120], accent: [226, 178, 32], second: [40, 42, 44], eng: [0.5, 0.7, 1.0], labels: ['WARDEN', 'DD-4', 'HAZARD', '0442', 'RCS'], seed: 51, wear: 0.5 },
-    paladin: { base: [222, 224, 228], accent: [40, 84, 170], second: [52, 56, 64], eng: [0.55, 0.8, 1.0], labels: ['PALADIN', 'BC-1', 'HELION YARDS', 'DANGER', 'VENT'], seed: 61, wear: 0.2 },
-    mantis: { base: [104, 112, 92], accent: [212, 74, 36], second: [34, 36, 32], eng: [1.0, 0.7, 0.35], labels: ['MANTIS', 'GS-9', 'NO STEP', 'HAZARD', '0912'], seed: 81, wear: 0.55 },
-    corvid: { base: [38, 40, 46], accent: [150, 50, 210], second: [18, 18, 22], eng: [0.85, 0.55, 1.0], labels: ['CORVID', 'X-2', 'RCS', '0023'], seed: 91, wear: 0.15 },
-    bastion: { base: [118, 122, 128], accent: [198, 60, 32], second: [42, 44, 48], eng: [0.55, 0.75, 1.0], labels: ['BASTION', 'CA-6', 'HELION YARDS', 'DANGER', 'BAY 2'], seed: 101, wear: 0.45 },
-    hornet: { base: [178, 182, 186], accent: [222, 178, 30], second: [30, 32, 36], eng: [0.6, 0.8, 1.0], labels: ['HORNET', 'F-3', 'RCS', 'NO STEP', '0303'], seed: 111, wear: 0.4 },
-    wisp: { base: [204, 208, 212], accent: [56, 168, 92], second: [40, 44, 48], eng: [0.6, 0.9, 1.0], labels: ['WISP', 'SCOUT', 'PF-2', 'SENSOR', 'RCS'], seed: 121, wear: 0.25 },
-    mule: { base: [176, 150, 96], accent: [40, 70, 120], second: [52, 50, 48], eng: [1.0, 0.75, 0.45], labels: ['MULE', 'CARGO', 'LF-40', 'HEAVY', 'NO STEP'], seed: 131, wear: 0.75 },
-    atlas: { base: [196, 122, 40], accent: [60, 64, 70], second: [44, 44, 46], eng: [0.9, 0.75, 0.5], labels: ['ATLAS', 'BULK', 'AT-900', 'HAZARD', 'CARGO'], seed: 141, wear: 0.7 },
-    aurora: { base: [236, 236, 232], accent: [30, 120, 190], second: [70, 74, 80], eng: [0.55, 0.8, 1.0], labels: ['AURORA', 'STARLINES', 'DECK 4', 'EXIT'], seed: 151, wear: 0.08 },
-    sabre: { base: [96, 104, 112], accent: [200, 40, 40], second: [32, 34, 38], eng: [0.55, 0.75, 1.0], labels: ['SABRE', 'CL-3', 'DANGER', 'RCS'], seed: 161, wear: 0.4 },
-    sovereign: { base: [150, 154, 160], accent: [210, 170, 50], second: [44, 46, 52], eng: [0.55, 0.75, 1.0], labels: ['SOVEREIGN', 'BB-1', 'HELION YARDS', 'DANGER', 'VENT'], seed: 171, wear: 0.35 },
-    leviathan: { base: [58, 60, 66], accent: [200, 30, 30], second: [24, 24, 28], eng: [0.7, 0.6, 1.0], labels: ['LEVIATHAN', 'DN-0', 'HELION YARDS', 'DANGER', 'RADIATION'], seed: 181, wear: 0.3 },
-    cutlass: { base: [88, 82, 74], accent: [214, 160, 30], second: [26, 24, 22], eng: [1.0, 0.5, 0.22], labels: ['CUTLASS', 'XX', 'SCRAP', '13', 'NO STEP'], seed: 191, wear: 1.0, rust: 1.0 },
-    reaver: { base: [40, 40, 42], accent: [190, 24, 20], second: [16, 16, 18], eng: [1.0, 0.36, 0.16], labels: ['REAVER', 'BLOOD', 'R-66', 'RAM', 'HAZARD'], seed: 201, wear: 0.9, rust: 0.7 },
-    ravager: { base: [70, 62, 56], accent: [150, 120, 96], second: [22, 20, 20], eng: [1.0, 0.32, 0.14], labels: ['RAVAGER', 'WARLORD', 'CLAN', 'KILL', 'HAZARD', '0666'], seed: 211, wear: 1.0, rust: 0.9 },
-    combine: { base: [62, 64, 68], accent: [206, 168, 38], second: [26, 26, 28], eng: [1.0, 0.82, 0.42], labels: ['VANTA', 'COMBINE', 'PROPERTY OF VANTA', 'ASSET 00417', 'COMPLY', 'UNIT'], seed: 221, wear: 0.12 },
-    navy: { base: [72, 84, 98], accent: [230, 232, 236], second: [28, 32, 38], eng: [0.5, 0.8, 1.0], labels: ['HELION', 'NAVY', 'HN-12', 'RCS'], seed: 71, wear: 0.35 },
+    player: { base: [214, 216, 218], accent: [228, 106, 22], second: [36, 38, 42], eng: [0.55, 0.75, 1.0], labels: ['UNS', 'VALKYRIE', 'FA-31', 'NO STEP', 'RCS', '0731', 'DANGER'], seed: 3, wear: 0.35, stripes: [0.3, 0.05, 0.035, 0.008] },
+    pirate: { base: [74, 76, 80], accent: [168, 28, 22], second: [24, 24, 26], eng: [1.0, 0.45, 0.2], labels: ['XX', 'KILL', 'CR-9', '666', 'RCS'], seed: 9, wear: 0.85, rust: 0.9, stripes: [0.1, 0.06, 0, 0] },
+    cruiser: { base: [96, 84, 74], accent: [176, 34, 26], second: [30, 28, 28], eng: [1.0, 0.4, 0.18], labels: ['CORSAIR', 'BAY', 'C-01', 'HAZARD'], seed: 13, wear: 1.0, rust: 1.0, stripes: [-0.2, 0.07, 0, 0] },
+    hauler: { base: [190, 176, 120], accent: [60, 90, 140], second: [50, 52, 56], eng: [0.6, 0.8, 1.0], labels: ['KALTOS LOG.', 'CARGO', 'H-220', 'HEAVY'], seed: 17, wear: 0.6, stripes: [0, 0.08, 0, 0.01] },
+    kestrel: { base: [62, 64, 68], accent: [40, 190, 210], second: [22, 22, 24], eng: [0.6, 0.85, 1.0], labels: ['KESTREL', 'K-7', 'NO STEP', 'RCS', '0117'], seed: 41, wear: 0.3, stripes: [0.45, 0.03, 0.02, 0.006] },
+    warden: { base: [124, 126, 120], accent: [226, 178, 32], second: [40, 42, 44], eng: [0.5, 0.7, 1.0], labels: ['WARDEN', 'DD-4', 'HAZARD', '0442', 'RCS'], seed: 51, wear: 0.5, stripes: [0.2, 0.06, 0, 0.01] },
+    paladin: { base: [222, 224, 228], accent: [40, 84, 170], second: [52, 56, 64], eng: [0.55, 0.8, 1.0], labels: ['PALADIN', 'BC-1', 'HELION YARDS', 'DANGER', 'VENT'], seed: 61, wear: 0.2, stripes: [0.35, 0.05, 0.03, 0.008] },
+    mantis: { base: [104, 112, 92], accent: [212, 74, 36], second: [34, 36, 32], eng: [1.0, 0.7, 0.35], labels: ['MANTIS', 'GS-9', 'NO STEP', 'HAZARD', '0912'], seed: 81, wear: 0.55, stripes: [0.25, 0.05, 0.03, 0] },
+    corvid: { base: [38, 40, 46], accent: [150, 50, 210], second: [18, 18, 22], eng: [0.85, 0.55, 1.0], labels: ['CORVID', 'X-2', 'RCS', '0023'], seed: 91, wear: 0.15, stripes: [0.5, 0.03, 0.015, 0] },
+    bastion: { base: [118, 122, 128], accent: [198, 60, 32], second: [42, 44, 48], eng: [0.55, 0.75, 1.0], labels: ['BASTION', 'CA-6', 'HELION YARDS', 'DANGER', 'BAY 2'], seed: 101, wear: 0.45, stripes: [0.15, 0.07, 0, 0.012] },
+    hornet: { base: [178, 182, 186], accent: [222, 178, 30], second: [30, 32, 36], eng: [0.6, 0.8, 1.0], labels: ['HORNET', 'F-3', 'RCS', 'NO STEP', '0303'], seed: 111, wear: 0.4, stripes: [0.4, 0.05, 0.03, 0.008] },
+    wisp: { base: [204, 208, 212], accent: [56, 168, 92], second: [40, 44, 48], eng: [0.6, 0.9, 1.0], labels: ['WISP', 'SCOUT', 'PF-2', 'SENSOR', 'RCS'], seed: 121, wear: 0.25, stripes: [0.3, 0.04, 0.025, 0] },
+    mule: { base: [176, 150, 96], accent: [40, 70, 120], second: [52, 50, 48], eng: [1.0, 0.75, 0.45], labels: ['MULE', 'CARGO', 'LF-40', 'HEAVY', 'NO STEP'], seed: 131, wear: 0.75, stripes: [0, 0.07, 0, 0.01] },
+    atlas: { base: [196, 122, 40], accent: [60, 64, 70], second: [44, 44, 46], eng: [0.9, 0.75, 0.5], labels: ['ATLAS', 'BULK', 'AT-900', 'HAZARD', 'CARGO'], seed: 141, wear: 0.7, stripes: [0.6, 0.05, 0, 0.01] },
+    aurora: { base: [236, 236, 232], accent: [30, 120, 190], second: [70, 74, 80], eng: [0.55, 0.8, 1.0], labels: ['AURORA', 'STARLINES', 'DECK 4', 'EXIT'], seed: 151, wear: 0.08, stripes: [0.5, 0.06, 0, 0.012] },
+    sabre: { base: [96, 104, 112], accent: [200, 40, 40], second: [32, 34, 38], eng: [0.55, 0.75, 1.0], labels: ['SABRE', 'CL-3', 'DANGER', 'RCS'], seed: 161, wear: 0.4, stripes: [0.35, 0.04, 0.025, 0.008] },
+    sovereign: { base: [150, 154, 160], accent: [40, 58, 98], second: [44, 46, 52], pin: [206, 166, 64], eng: [0.55, 0.75, 1.0], labels: ['SOVEREIGN', 'BB-1', 'HELION YARDS', 'DANGER', 'VENT'], seed: 171, wear: 0.35, stripes: [0.25, 0.06, 0.03, 0.007] },
+    leviathan: { base: [58, 60, 66], accent: [200, 30, 30], second: [24, 24, 28], eng: [0.7, 0.6, 1.0], labels: ['LEVIATHAN', 'DN-0', 'HELION YARDS', 'DANGER', 'RADIATION'], seed: 181, wear: 0.3, stripes: [0.3, 0.05, 0, 0.01] },
+    cutlass: { base: [88, 82, 74], accent: [214, 160, 30], second: [26, 24, 22], eng: [1.0, 0.5, 0.22], labels: ['CUTLASS', 'XX', 'SCRAP', '13', 'NO STEP'], seed: 191, wear: 1.0, rust: 1.0, stripes: [0.2, 0.06, 0, 0] },
+    reaver: { base: [40, 40, 42], accent: [190, 24, 20], second: [16, 16, 18], eng: [1.0, 0.36, 0.16], labels: ['REAVER', 'BLOOD', 'R-66', 'RAM', 'HAZARD'], seed: 201, wear: 0.9, rust: 0.7, stripes: [0.3, 0.05, 0.04, 0] },
+    ravager: { base: [70, 62, 56], accent: [150, 120, 96], second: [22, 20, 20], eng: [1.0, 0.32, 0.14], labels: ['RAVAGER', 'WARLORD', 'CLAN', 'KILL', 'HAZARD', '0666'], seed: 211, wear: 1.0, rust: 0.9, stripes: [0, 0.08, 0, 0] },
+    combine: { base: [62, 64, 68], accent: [206, 168, 38], second: [26, 26, 28], eng: [1.0, 0.82, 0.42], labels: ['VANTA', 'COMBINE', 'PROPERTY OF VANTA', 'ASSET 00417', 'COMPLY', 'UNIT'], seed: 221, wear: 0.12, stripes: [0, 0, 0, 0] },
+    navy: { base: [72, 84, 98], accent: [230, 232, 236], second: [28, 32, 38], eng: [0.5, 0.8, 1.0], labels: ['HELION', 'NAVY', 'HN-12', 'RCS'], seed: 71, wear: 0.35, stripes: [0.3, 0.04, 0.02, 0.008] },
   }[name];
-  const h = hullMaps({ seed: L.seed, base: L.base, accent: L.accent, accentChance: 0.05, darkChance: 0.08, wear: L.wear, labels: L.labels, rust: L.rust || 0 });
-  const a = hullMaps({ seed: L.seed + 1, base: L.accent, accent: L.base, accentChance: 0.0, darkChance: 0.05, wear: L.wear * 0.8, labels: L.labels, size: 512, rust: (L.rust || 0) * 0.7 });
-  const d = hullMaps({ seed: L.seed + 2, base: L.second, accent: [80, 80, 80], accentChance: 0.1, darkChance: 0.2, wear: L.wear, size: 512, rust: (L.rust || 0) * 0.5 });
+  // one paint colour per material; colour accents come from the painted stripes and trim parts, not random panels
+  const h = hullMaps({ seed: L.seed, base: L.base, accentChance: 0, darkChance: 0, hazardChance: 0, toneVar: 10, wear: L.wear, labels: L.labels, rust: L.rust || 0 });
+  const a = hullMaps({ seed: L.seed + 1, base: L.accent, accentChance: 0, darkChance: 0, hazardChance: 0, toneVar: 10, wear: L.wear * 0.8, labels: L.labels, size: 512, rust: (L.rust || 0) * 0.7 });
+  const d = hullMaps({ seed: L.seed + 2, base: L.second, accentChance: 0, darkChance: 0, hazardChance: 0, toneVar: 14, wear: L.wear, size: 512, rust: (L.rust || 0) * 0.5 });
+  const stripe = { s: L.stripes, color: L.accent, pin: L.pin || L.second };
   const engColor = new THREE.Color(L.eng[0], L.eng[1], L.eng[2]);
   const M = {
-    hull: untile(new THREE.MeshStandardMaterial({ map: h.map, normalMap: h.normalMap, roughnessMap: h.roughnessMap, metalness: 0.35, roughness: 0.55, envMap: env, envMapIntensity: 0.9 }), h),
+    hull: untile(new THREE.MeshStandardMaterial({ map: h.map, normalMap: h.normalMap, roughnessMap: h.roughnessMap, metalness: 0.35, roughness: 0.55, envMap: env, envMapIntensity: 0.9 }), h, stripe),
     accent: untile(new THREE.MeshStandardMaterial({ map: a.map, normalMap: a.normalMap, roughnessMap: a.roughnessMap, metalness: 0.3, roughness: 0.5, envMap: env, envMapIntensity: 0.9 }), a),
     dark: untile(new THREE.MeshStandardMaterial({ map: d.map, normalMap: d.normalMap, roughnessMap: d.roughnessMap, metalness: 0.75, roughness: 0.45, envMap: env, envMapIntensity: 1.0 }), d),
     metal: new THREE.MeshStandardMaterial({ color: 0x8a8d92, metalness: 1.0, roughness: 0.28, envMap: env, envMapIntensity: 1.2 }),
@@ -1195,11 +1197,36 @@ function skinMat(m) {
     s.onBeforeCompile = m.onBeforeCompile;
     s.customProgramCacheKey = m.customProgramCacheKey;
     s.defines = { ...m.defines };
+    s.defaultAttributeValues = m.defaultAttributeValues;
     skinMats.set(m, s);
   }
   return s;
 }
 const _pv = new THREE.Vector3();
+
+// Bakes each hull vertex's ship-space position, scaled by half the hull length, so the livery shader can paint
+// bands and spine stripes that run across the whole ship instead of repeating with the panel texture.
+export function paintStripes(ship) {
+  const g = ship.group, list = [], box = new THREE.Box3();
+  g.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+  g.traverse((o) => {
+    if (!o.isMesh || o.material !== ship.M.hull || o.geometry.userData.shared) return;
+    const xf = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) box.expandByPoint(_pv.fromBufferAttribute(p, i).applyMatrix4(xf));
+    list.push([o, xf]);
+  });
+  if (!list.length) return;
+  const c = box.getCenter(new THREE.Vector3()), h = Math.max(box.max.z - c.z, 1e-3);
+  for (const [o, xf] of list) {
+    const p = o.geometry.attributes.position, out = new Float32Array(p.count * 4);
+    for (let i = 0; i < p.count; i++) {
+      _pv.fromBufferAttribute(p, i).applyMatrix4(xf);
+      out.set([(_pv.z - c.z) / h, _pv.x / h, (_pv.y - c.y) / h, 1], i * 4);
+    }
+    o.geometry.setAttribute('livP', new THREE.Float32BufferAttribute(out, 4));
+  }
+}
 
 // Bakes a ship's opaque parts into one mesh per material and shadow setting, so a ship costs a handful of
 // draw calls instead of dozens. Hull parts become plain meshes; turret and gun parts become skinned meshes
@@ -1216,7 +1243,8 @@ export function mergeStatic(ship) {
     if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.renderOrder || !o.visible || Array.isArray(o.material)) return;
     const m = o.material, a = o.geometry.attributes;
     if (m.transparent || !(m.isMeshStandardMaterial || m.isMeshBasicMaterial)) return;
-    if (o.geometry.index || o.geometry.morphAttributes.position || Object.keys(a).sort().join() !== 'normal,position,uv') return;
+    const ak = Object.keys(a).sort().join();
+    if (o.geometry.index || o.geometry.morphAttributes.position || (ak !== 'normal,position,uv' && ak !== 'livP,normal,position,uv')) return;
     let bone = null;
     for (let p = o.parent; p !== g; p = p.parent) {
       if (!p || !p.visible) return;
@@ -1247,6 +1275,9 @@ export function mergeStatic(ship) {
       reach = Math.max(reach, geo.boundingSphere.center.distanceTo(_pv) + geo.boundingSphere.radius);
       return geo;
     });
+    if (geos.some((x) => x.attributes.livP)) {
+      for (const x of geos) if (!x.attributes.livP) x.setAttribute('livP', new THREE.Float32BufferAttribute(new Float32Array(x.attributes.position.count * 4), 4));
+    }
     const geo = mergeGeometries(geos, false);
     if (!geo) return;
     geo.computeBoundingSphere();
