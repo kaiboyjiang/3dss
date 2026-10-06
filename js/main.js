@@ -1903,8 +1903,7 @@ function updateCamera(dt) {
   else off = _v.copy(p.ship.cockpit);
   if (G.camMode === 1) {
     camPos.copy(off).applyQuaternion(p.obj.quaternion).add(p.obj.position);
-    const lq = _q.copy(p.obj.quaternion).multiply(lookQ);
-    camera.quaternion.copy(lq).multiply(FLIP);
+    camera.quaternion.copy(q).multiply(FLIP);
   } else {
     camPos.copy(off).applyQuaternion(q).add(p.obj.position);
     // a slight velocity lag sells acceleration
