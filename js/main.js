@@ -1876,6 +1876,11 @@ let bridge = null, bridgeOn = false;
 const bridgeHid = [];
 // the bridge interior replaces the player's own hull while flying from the cockpit
 function setBridge(on) {
+  if (on && (!bridge || bridge.userData.hull !== G.hull || bridge.userData.env !== world.env)) {
+    if (bridge) { if (bridgeOn) setBridge(false); camera.remove(bridge); bridge.userData.dispose(); }
+    bridge = buildBridge(G.hull, world.env);
+    camera.add(bridge);
+  }
   if (on === bridgeOn || !bridge) return;
   bridgeOn = on;
   bridge.visible = on;
@@ -1890,6 +1895,7 @@ function setBridge(on) {
 function updateCamera(dt) {
   const p = G.player;
   setBridge(G.camMode === 1 && (G.state === 'flying' || G.state === 'dead') && p.alive && !cine.mode);
+  if (bridgeOn) bridge.userData.update(G.time, dt, G.time - p.lastHit < 4 || p.hull < p.maxHull * 0.3 ? 1 : 0);
   const warpI = G.warp && G.warp.phase === 'warp' ? Math.min(1, G.warp.speed / 20000) : 0;
   if (G.camMode === 1) camQuat.copy(p.obj.quaternion);
   else camQuat.slerp(p.obj.quaternion, 1 - Math.exp(-dt * (G.warp ? 3 : 5.5)));
@@ -2325,8 +2331,6 @@ async function boot() {
     fx = new Effects(scene);
     bolts = new Projectiles(scene, fx);
     missiles = new Missiles(scene, fx, world.env);
-    bridge = buildBridge(world.env);
-    camera.add(bridge);
     scene.add(camera);
     await step('Assembling ships…');
     const save = readSave();
