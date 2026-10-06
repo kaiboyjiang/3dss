@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { SimplexNoise } from 'three/addons/math/SimplexNoise.js';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { NOISE, LOGDEPTH_VERT_PARS, LOGDEPTH_VERT, LOGDEPTH_FRAG_PARS, LOGDEPTH_FRAG } from './shaders.js';
-import { hullMaps, rockMaps, windowMaps, solarPanelMaps, glowTexture, rng } from './textures.js';
+import { hullMaps, rockMaps, windowMaps, solarPanelMaps, glowTexture, rng, untile } from './textures.js';
 import { Kit, G, mat, boxUV } from './geo.js';
 import { SYSTEMS } from './systems.js';
 
@@ -414,8 +414,8 @@ export function stationMaterials(env) {
   const dark = hullMaps({ seed: 22, base: [70, 72, 76], accent: [140, 40, 30], accentChance: 0.02, darkChance: 0.2, wear: 0.5 });
   const win = windowMaps(23);
   const m = {
-    hull: new THREE.MeshStandardMaterial({ map: hull.map, normalMap: hull.normalMap, roughnessMap: hull.roughnessMap, metalness: 0.55, roughness: 0.6, envMap: env, envMapIntensity: 0.6 }),
-    dark: new THREE.MeshStandardMaterial({ map: dark.map, normalMap: dark.normalMap, roughnessMap: dark.roughnessMap, metalness: 0.8, roughness: 0.5, envMap: env, envMapIntensity: 0.6 }),
+    hull: untile(new THREE.MeshStandardMaterial({ map: hull.map, normalMap: hull.normalMap, roughnessMap: hull.roughnessMap, metalness: 0.55, roughness: 0.6, envMap: env, envMapIntensity: 0.6 }), hull),
+    dark: untile(new THREE.MeshStandardMaterial({ map: dark.map, normalMap: dark.normalMap, roughnessMap: dark.roughnessMap, metalness: 0.8, roughness: 0.5, envMap: env, envMapIntensity: 0.6 }), dark),
     window: new THREE.MeshStandardMaterial({ map: win.map, emissiveMap: win.emissiveMap, emissive: new THREE.Color(2.2, 2.0, 1.7), metalness: 0.5, roughness: 0.4, envMap: env, envMapIntensity: 0.5 }),
     solar: new THREE.MeshStandardMaterial({ map: solarPanelMaps(), metalness: 0.7, roughness: 0.18, envMap: env, envMapIntensity: 1.2, side: THREE.DoubleSide }),
     light: new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 5.5, 4.5) }),
@@ -1298,7 +1298,7 @@ export function buildWorld(renderer, scene, skySize = 512) {
 
   const SM = stationMaterials(env);
   const rustMaps = hullMaps({ seed: 31, base: [92, 62, 48], accent: [150, 40, 25], accentChance: 0.08, darkChance: 0.25, wear: 1.0 });
-  SM.rust = new THREE.MeshStandardMaterial({ map: rustMaps.map, normalMap: rustMaps.normalMap, roughnessMap: rustMaps.roughnessMap, metalness: 0.6, roughness: 0.75, envMap: env, envMapIntensity: 0.4 });
+  SM.rust = untile(new THREE.MeshStandardMaterial({ map: rustMaps.map, normalMap: rustMaps.normalMap, roughnessMap: rustMaps.roughnessMap, metalness: 0.6, roughness: 0.75, envMap: env, envMapIntensity: 0.4 }), rustMaps);
   const keepMats = new Set(Object.values(SM));
 
   const dust = makeDust();

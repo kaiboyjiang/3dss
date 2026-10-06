@@ -12,7 +12,7 @@ export class StarMap {
     this.el = $('map'); this.cv = $('mapc'); this.info = $('mapinfo');
     this.g = this.cv.getContext('2d');
     this.isOpen = false; this.sel = null; this.zoom = 1.5; this.pan = [0, 0];
-    this.onRoute = null;
+    this.onRoute = null; this.onToggle = null;
     let down = null;
     this.cv.addEventListener('mousedown', (ev) => { down = { x: ev.clientX, y: ev.clientY, moved: 0 }; });
     window.addEventListener('mousemove', (ev) => {
@@ -28,7 +28,9 @@ export class StarMap {
     $('mapclose').addEventListener('click', () => this.toggle(false));
   }
   toggle(on = !this.isOpen) {
+    if (on === this.isOpen) return;
     this.isOpen = on;
+    if (this.onToggle) this.onToggle(on);
     this.el.classList.toggle('hidden', !on);
     if (on) { this.pan = [0, 0]; this.sel = this.G.routeTo || this.G.system; this.renderInfo(); }
   }

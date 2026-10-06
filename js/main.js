@@ -689,6 +689,8 @@ function buildEncounters(def) {
 
 function updateEncounters(dt) {
   const pp = G.player.obj.position;
+  // while a bounty target is alive the hunt is just it and its escorts
+  const hunt = G.entities.some((e) => e.alive && e.ai.bountyJob && e.faction === 'pirate');
   for (const enc of encounters) {
     enc.ships = enc.ships.filter((s) => s.alive);
     const d = pp.distanceTo(enc.loc.pos);
@@ -699,7 +701,7 @@ function updateEncounters(dt) {
       hud.notice('SITE CLEARED — REINFORCEMENTS INBOUND', 3);
     }
     enc.timer -= dt;
-    if (!enc.active && enc.timer <= 0 && d < 45000 && !G.warp) {
+    if (!enc.active && !hunt && enc.timer <= 0 && d < 45000 && !G.warp) {
       enc.active = true;
       const spec = enc.spawn();
       const center = enc.loc.pos.clone().lerp(pp, 0.25);
@@ -1703,7 +1705,7 @@ function undock() {
   const p = G.player;
   const dock = world.docks[G.dockedAt.id];
   const b = bayWorld(dock, Math.floor(Math.random() * dock.bays.length));
-  if (hangar) { hangar.restoreEnv(); hangar.setOutfit(null); }
+  if (hangar) hangar.setOutfit(null);
   $('docked').classList.add('hidden');
   const r = p.ship.radius;
   let start, exit, end;
@@ -1871,7 +1873,7 @@ $('help').addEventListener('mousedown', () => $('help').classList.add('hidden'))
 const camQuat = new THREE.Quaternion();
 const camPos = new THREE.Vector3();
 let fov = 68;
-const FLIP = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI);
+const FLIP = new THREE.Quaternion().setFromAxisAngle(Y, Math.PI), _bq = new THREE.Quaternion();
 let bridge = null, bridgeOn = false;
 const bridgeHid = [];
 // the bridge interior replaces the player's own hull while flying from the cockpit
@@ -1910,6 +1912,8 @@ function updateCamera(dt) {
   if (G.camMode === 1) {
     camPos.copy(off).applyQuaternion(p.obj.quaternion).add(p.obj.position);
     camera.quaternion.copy(q).multiply(FLIP);
+    // free look turns the head, not the bridge
+    if (bridge) bridge.quaternion.copy(FLIP).multiply(_bq.copy(lookQ).invert()).multiply(FLIP);
   } else {
     camPos.copy(off).applyQuaternion(q).add(p.obj.position);
     // a slight velocity lag sells acceleration
@@ -1939,7 +1943,7 @@ let last = performance.now();
 const perf = { acc: 0, n: 0 };
 const fpsMeter = { n: 0, t: 0 };
 // menu and pause screens only redraw when something changed
-let staticDrawn = false, menuAcc = 0;
+let staticDrawn = false, menuAcc = 0, mapTime = 0;
 let msaa = 0;
 function setMsaa(n) {
   msaa = n;
@@ -1981,8 +1985,13 @@ function frame(now) {
   else adaptResolution(ms);
   if (world) world.stars.material.uniforms.uPixel.value = pixelRatio;
   if (!world || !G.player) return;
+  if (starmap.isOpen) {
+    mapTime += dt;
+    starmap.draw(mapTime);
+    // the map pauses the game while you are out in space
+    if (G.state !== 'docked' && G.state !== 'menu') { if (!staticDrawn) { composer.render(0); staticDrawn = true; } return; }
+  }
   G.time += dt;
-  if (starmap.isOpen) starmap.draw(G.time);
   const p = G.player;
   if (document.body.dataset.state !== G.state) document.body.dataset.state = G.state;
   G.following = G.state === 'flying' && (G.input.mmb || G.followToggle);
@@ -2064,6 +2073,13 @@ function frame(now) {
 
 // ---------------------------------------------------------------- star systems
 const starmap = new StarMap(G);
+starmap.onToggle = (on) => {
+  if (G.state === 'docked' || G.state === 'menu') return;
+  G.input.keys = {}; G.input.fire1 = G.input.fire2 = G.input.mmb = false;
+  if (on) { G.followToggle = false; document.exitPointerLock?.(); audio.ctx?.suspend(); }
+  else if (G.state !== 'paused') audio.ctx?.resume();
+  staticDrawn = false;
+};
 const NAVY_NAMES = ['HNS Vigilant', 'HNS Swift', 'HNS Harrier', 'HNS Bulwark', 'HNS Talon', 'HNS Resolute', 'HNS Aegis', 'HNS Lancer', 'HNS Sentinel', 'HNS Valor'];
 const HAULER_LINES = ['Orca Logistics', 'Kaltos Freight', 'Vexal Trading Co.', 'Helion Supply', 'Aster Bulk Lines'];
 // civilian traffic: the classic hauler plus catalogue freighters and liners

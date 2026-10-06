@@ -155,10 +155,11 @@ body[data-state="docked"] #c:active { cursor: grabbing; }
 .dpanel { position: absolute; top: 74px; width: 330px; max-height: calc(100vh - 110px); overflow-y: auto; background: rgba(9, 10, 11, 0.82); border: 1px solid rgba(164, 169, 176, 0.25); padding: 14px 16px; font-size: 12px; }
 #dockleft { left: 16px; }
 #dockright { right: 16px; width: 300px; }
-#outprev { position: absolute; top: 74px; right: 332px; width: clamp(200px, calc(100vw - 740px), 340px); aspect-ratio: 5 / 4; border: 1px solid rgba(164, 169, 176, 0.3); cursor: grab; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.6); }
+#outprev { position: absolute; top: 74px; right: 332px; width: clamp(150px, calc(100vw - 900px), 210px); aspect-ratio: 5 / 4; cursor: grab; border-top: 1px solid rgba(164, 169, 176, 0.18); }
 #outprev:active { cursor: grabbing; }
-#outprev .nm { position: absolute; left: 10px; top: 8px; right: 10px; font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: #e8eaec; pointer-events: none; }
-#outprev .ph { position: absolute; left: 10px; bottom: 7px; font-size: 10px; letter-spacing: 1px; color: #8a9096; pointer-events: none; }
+#outprev .nm { position: absolute; left: 6px; top: 6px; right: 6px; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; text-align: right; color: #c8ccd0; text-shadow: 0 1px 2px #000; pointer-events: none; }
+#outprev .ph { position: absolute; right: 6px; bottom: 4px; font-size: 9px; letter-spacing: 1px; color: #7a8086; text-shadow: 0 1px 2px #000; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+#outprev:hover .ph { opacity: 1; }
 .dpanel h3 { margin: 4px 0 8px; font-weight: normal; letter-spacing: 2px; color: #adb2b8; font-size: 12px; text-transform: uppercase; }
 .dpanel h2 { margin: 0 0 2px; font-weight: 300; letter-spacing: 3px; color: #fff; font-size: 20px; }
 .dpanel p { margin: 4px 0 10px; line-height: 1.5; color: #b6bac0; }

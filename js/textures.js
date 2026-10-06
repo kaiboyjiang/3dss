@@ -85,7 +85,8 @@ export function hullMaps(opts = {}) {
   const c = col.getContext('2d'), h = hgt.getContext('2d', { willReadFrequently: true }), ro = rough.getContext('2d');
   c.fillStyle = `rgb(${base})`; c.fillRect(0, 0, size, size);
   h.fillStyle = '#808080'; h.fillRect(0, 0, size, size);
-  ro.fillStyle = '#8c8c8c'; ro.fillRect(0, 0, size, size);
+  ro.fillStyle = 'rgb(0,140,0)'; ro.fillRect(0, 0, size, size);
+  const rid = rng((opts.seed || 1) * 7 + 3);
 
   const panels = [];
   const split = (x, y, w, hh, depth) => {
@@ -108,15 +109,17 @@ export function hullMaps(opts = {}) {
     const v = (r() - 0.5) * 22;
     let pc = base.map((b) => Math.max(0, Math.min(255, b + v)));
     const roll = r();
-    if (roll < accentChance) pc = accent.map((a) => a + (r() - 0.5) * 12);
-    else if (roll < accentChance + darkChance) pc = base.map((b) => b * 0.35);
+    let kind = 1;
+    if (roll < accentChance) { pc = accent.map((a) => a + (r() - 0.5) * 12); kind = 2; }
+    else if (roll < accentChance + darkChance) { pc = base.map((b) => b * 0.35); kind = 3; }
     c.fillStyle = `rgb(${pc.map(Math.round)})`;
     c.fillRect(x + seam, y + seam, w - seam * 2, hh - seam * 2);
     const hv = 128 + (r() - 0.5) * 40;
     h.fillStyle = `rgb(${hv},${hv},${hv})`;
     h.fillRect(x + seam, y + seam, w - seam * 2, hh - seam * 2);
     const rv = 110 + r() * 80;
-    ro.fillStyle = `rgb(${rv},${rv},${rv})`;
+    // r: per-panel id, g: roughness, b: panel kind (lets untile() recolour panels per tile)
+    ro.fillStyle = `rgb(${Math.floor(rid() * 256)},${Math.round(rv)},${kind * 85})`;
     ro.fillRect(x + seam, y + seam, w - seam * 2, hh - seam * 2);
 
     // bevel highlight on panel edges in height map
@@ -219,6 +222,7 @@ export function hullMaps(opts = {}) {
     map: toTexture(col, true),
     normalMap: toTexture(nrm, false),
     roughnessMap: toTexture(rough, false),
+    tint: { base, accent, dark: base.map((b) => b * 0.35), accentChance, darkChance },
   };
 }
 
@@ -406,4 +410,75 @@ export function engineCoreTexture(size = 128) {
   }
   ctx.putImageData(img, 0, 0);
   return toTexture(c, false, false);
+}
+
+// Breaks up visible tiling of hullMaps plating. Every texture tile gets a random quarter-turn (tile edges
+// are panel seams, so they still line up), re-rolls which of its panels are base, accent or dark plating,
+// and sits under a slow grime field, so no two neighbouring tiles read the same.
+const UNTILE = /* glsl */`
+uniform vec3 utBase, utAccent, utDark; uniform vec2 utChance;
+float utHash(vec2 c) { return fract(sin(dot(c, vec2(127.1, 311.7))) * 43758.5453); }
+mat2 utRot(vec2 c) {
+  float k = floor(utHash(c) * 4.0);
+  return k < 1.0 ? mat2(1.0) : k < 2.0 ? mat2(0.0, 1.0, -1.0, 0.0) : k < 3.0 ? mat2(-1.0) : mat2(0.0, -1.0, 1.0, 0.0);
+}
+vec2 utUv(vec2 uv) { vec2 c = floor(uv); return c + utRot(c) * (uv - c - 0.5) + 0.5; }
+vec4 utTex(sampler2D t, vec2 uv) { mat2 R = utRot(floor(uv)); return textureGrad(t, utUv(uv), R * dFdx(uv), R * dFdy(uv)); }
+float utNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(utHash(i), utHash(i + vec2(1.0, 0.0)), f.x), mix(utHash(i + vec2(0.0, 1.0)), utHash(i + vec2(1.0, 1.0)), f.x), f.y);
+}`;
+
+const lin = (c) => new THREE.Color().setRGB(c[0] / 255, c[1] / 255, c[2] / 255, THREE.SRGBColorSpace);
+
+export function untile(m, maps) {
+  const t = maps.tint;
+  const U = {
+    utBase: { value: lin(t.base) }, utAccent: { value: lin(t.accent) }, utDark: { value: lin(t.dark) },
+    utChance: { value: new THREE.Vector2(t.accentChance, t.darkChance) },
+  };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, U);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + UNTILE)
+      .replace('#include <map_fragment>', `
+        float utN = 0.5;
+        #ifdef USE_MAP
+          vec4 utC = utTex(map, vMapUv);
+          vec2 utCell = floor(vMapUv);
+          #ifdef USE_ROUGHNESSMAP
+            vec2 utS = vec2(textureSize(roughnessMap, 0));
+            vec2 utW = fwidth(vRoughnessMapUv * utS);
+            // panel ids are point-sampled, so the recolour fades out once panels shrink below a pixel
+            float utFade = 1.0 - smoothstep(0.5, 1.25, max(utW.x, utW.y));
+            vec4 utP = texelFetch(roughnessMap, ivec2(fract(utUv(vRoughnessMapUv)) * utS), 0);
+            float utK = floor(utP.b * 3.0 + 0.5);
+            if (utK > 0.5 && utFade > 0.0) {
+              float v = fract(utP.r * 7.31 + utHash(utCell + 3.7));
+              vec3 cur = utK < 1.5 ? utBase : utK < 2.5 ? utAccent : utDark;
+              vec3 nxt = v < utChance.x ? utAccent : v < utChance.x + utChance.y ? utDark : utBase;
+              vec3 utR = clamp(nxt / max(cur, vec3(0.02)), 0.3, 3.0) * (0.94 + 0.12 * fract(v * 13.7));
+              utC.rgb *= mix(vec3(1.0), utR, utFade);
+            }
+          #endif
+          diffuseColor *= utC;
+          utN = utNoise(vMapUv * 0.23) * 0.6 + utNoise(vMapUv * 0.61 + 5.3) * 0.4;
+          diffuseColor.rgb *= (0.93 + 0.14 * utHash(utCell + 17.0)) * mix(0.8, 1.06, utN);
+        #endif`)
+      .replace('#include <roughnessmap_fragment>', `
+        float roughnessFactor = roughness;
+        #ifdef USE_ROUGHNESSMAP
+          roughnessFactor *= utTex(roughnessMap, vRoughnessMapUv).g;
+        #endif
+        roughnessFactor = clamp(roughnessFactor * mix(1.18, 0.92, utN), 0.0, 1.0);`)
+      .replace('#include <normal_fragment_maps>', `
+        #ifdef USE_NORMALMAP_TANGENTSPACE
+          vec3 mapN = utTex(normalMap, vNormalMapUv).xyz * 2.0 - 1.0;
+          mapN.xy = transpose(utRot(floor(vNormalMapUv))) * mapN.xy;
+          mapN.xy *= normalScale;
+          normal = normalize(tbn * mapN);
+        #endif`);
+  };
+  m.customProgramCacheKey = () => 'untile';
+  return m;
 }

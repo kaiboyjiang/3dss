@@ -22,27 +22,27 @@ const STYLE = {
   fighter: {
     frame: [0x30343a, 0.85, 0.35], panel: [0x1b1e22, 0.55, 0.6], ink: [150, 205, 235], label: 'ARMED',
     accent: col(0.25, 0.75, 1.0), warn: col(1.0, 0.55, 0.12), keys: [col(0.3, 0.8, 1), col(0.25, 0.9, 0.5), col(1, 0.6, 0.15)], glass: col(0.03, 0.09, 0.07),
-    lights: [[[0, -0.25, -0.85], col(0.25, 0.6, 0.9), 1.4], [[-0.9, -0.3, -0.6], col(0.15, 0.3, 0.9), 0.9], [[0.9, -0.3, -0.6], col(0.15, 0.3, 0.9), 0.9], [[0, 0.7, -0.2], col(0.5, 0.55, 0.6), 0.45]]
+    lights: [[[0, -0.25, -0.85], col(0.25, 0.6, 0.9), 1.4], [[-0.9, -0.3, -0.6], col(0.15, 0.3, 0.9), 0.9], [[0.9, -0.3, -0.6], col(0.15, 0.3, 0.9), 0.9], [[0, 0.7, -0.2], col(0.5, 0.55, 0.6), 0.45], [[0, -0.75, -0.2], col(0.15, 0.4, 0.7), 0.45], [[0, 0.35, 0.5], col(0.35, 0.4, 0.46), 0.3]]
   },
   command: {
     frame: [0x2c3036, 0.85, 0.35], panel: [0x22252a, 0.5, 0.55], ink: [170, 200, 240], label: 'COND GREEN',
     accent: col(0.45, 0.7, 1.0), warn: col(1.0, 0.25, 0.15), keys: [col(0.4, 0.7, 1), col(0.9, 0.9, 1), col(1, 0.35, 0.2)], glass: col(0.05, 0.12, 0.25),
-    lights: [[[0, 1.0, -1.6], col(0.55, 0.62, 0.78), 1.1], [[0, -0.8, -2.0], col(0.2, 0.5, 1.0), 1.0], [[-2.2, 0.1, -2.0], col(0.7, 0.14, 0.1), 0.7], [[2.2, 0.1, -2.0], col(0.7, 0.14, 0.1), 0.7]]
+    lights: [[[0, 1.0, -1.6], col(0.55, 0.62, 0.78), 1.1], [[0, -0.8, -2.0], col(0.2, 0.5, 1.0), 1.0], [[-2.2, 0.1, -2.0], col(0.7, 0.14, 0.1), 0.7], [[2.2, 0.1, -2.0], col(0.7, 0.14, 0.1), 0.7], [[0, 0.95, 1.2], col(0.5, 0.56, 0.7), 0.9], [[0, -1.3, 0.4], col(0.15, 0.35, 0.8), 0.45]]
   },
   civil: {
     frame: [0x55534d, 0.6, 0.45], panel: [0x80786a, 0.2, 0.7], ink: [150, 230, 160], label: 'CARGO OK',
     accent: col(1.0, 0.7, 0.3), warn: col(1.0, 0.3, 0.15), keys: [col(1, 0.7, 0.25), col(0.5, 1, 0.5), col(0.95, 0.9, 0.8)], glass: col(0.08, 0.07, 0.04),
-    lights: [[[0, 0.7, -1.2], col(0.95, 0.65, 0.35), 0.8], [[0, -0.35, -1.2], col(0.5, 0.75, 0.45), 0.6], [[-1.6, -0.1, -1.0], col(0.9, 0.55, 0.25), 0.5], [[1.6, -0.1, -1.0], col(0.9, 0.55, 0.25), 0.5]]
+    lights: [[[0, 0.7, -1.2], col(0.95, 0.65, 0.35), 0.8], [[0, -0.35, -1.2], col(0.5, 0.75, 0.45), 0.6], [[-1.6, -0.1, -1.0], col(0.9, 0.55, 0.25), 0.5], [[1.6, -0.1, -1.0], col(0.9, 0.55, 0.25), 0.5], [[-1.2, 0.85, 0.8], col(1.0, 0.78, 0.5), 0.6], [[1.2, 0.85, 0.8], col(1.0, 0.78, 0.5), 0.6]]
   },
   clan: {
     frame: [0x3a2c22, 0.6, 0.75], panel: [0x4a3123, 0.4, 0.85], ink: [235, 120, 80], label: 'NO MERCY',
     accent: col(1.0, 0.3, 0.1), warn: col(1.0, 0.15, 0.05), keys: [col(1, 0.25, 0.1), col(1, 0.6, 0.1), col(0.4, 1, 0.3)], glass: col(0.1, 0.03, 0.02),
-    lights: [[[0.58, 0.38, -1.1], col(1.0, 0.35, 0.12), 0.9], [[-0.8, -0.3, -0.8], col(0.85, 0.42, 0.1), 0.55], [[0, -0.3, -1.0], col(0.7, 0.15, 0.1), 0.5], [[0, 0.8, 0], col(0.35, 0.22, 0.15), 0.3]]
+    lights: [[[0.58, 0.38, -1.1], col(1.0, 0.35, 0.12), 0.9], [[-0.8, -0.3, -0.8], col(0.85, 0.42, 0.1), 0.55], [[0, -0.3, -1.0], col(0.7, 0.15, 0.1), 0.5], [[0, 0.8, 0], col(0.35, 0.22, 0.15), 0.3], [[0, 0.5, 0.6], col(0.6, 0.3, 0.12), 0.35], [[-0.8, -0.9, 0.3], col(0.8, 0.1, 0.05), 0.3]]
   },
   combine: {
     frame: [0x2c2d2a, 0.7, 0.5], panel: [0x3e403b, 0.35, 0.65], ink: [235, 195, 90], label: 'QUOTA 97%',
     accent: col(1.0, 0.78, 0.25), warn: col(1.0, 0.4, 0.1), keys: [col(1, 0.8, 0.25), col(1, 0.8, 0.25), col(0.9, 0.95, 0.9)], glass: col(0.06, 0.06, 0.03),
-    lights: [[[0, 0.62, -1.15], col(0.7, 0.85, 0.72), 1.0], [[0, -0.4, -1.1], col(0.85, 0.65, 0.2), 0.5], [[-1.1, -0.2, -0.9], col(0.45, 0.5, 0.45), 0.35], [[1.1, -0.2, -0.9], col(0.45, 0.5, 0.45), 0.35]]
+    lights: [[[0, 0.62, -1.15], col(0.7, 0.85, 0.72), 1.0], [[0, -0.4, -1.1], col(0.85, 0.65, 0.2), 0.5], [[-1.1, -0.2, -0.9], col(0.45, 0.5, 0.45), 0.35], [[1.1, -0.2, -0.9], col(0.45, 0.5, 0.45), 0.35], [[0, 0.8, 0.35], col(0.7, 0.85, 0.72), 0.8], [[0, -0.6, 0.8], col(0.4, 0.42, 0.38), 0.25]]
   }
 };
 
@@ -83,6 +83,52 @@ class Kit {
     this.add('panel', new THREE.BoxGeometry(w, h, d), m.clone());
     this.box('frame', w + 0.02, 0.018, d + 0.02, [0, h / 2, 0], [0, 0, 0], m);
     return mat([0, 0, d / 2], [0, 0, 0], m);
+  }
+  // plated deck over a frame-coloured sub-floor; jitter(i, j) may return false (missing plate) or [dy, rx, rz]
+  deck(x0, x1, z0, z1, y, step, list = 'panel', jitter) {
+    this.box('frame', x1 - x0, 0.04, z1 - z0, [(x0 + x1) / 2, y - 0.035, (z0 + z1) / 2]);
+    const nx = Math.max(1, Math.round((x1 - x0) / step)), nz = Math.max(1, Math.round((z1 - z0) / step));
+    const sx = (x1 - x0) / nx, sz = (z1 - z0) / nz;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) {
+      const q = jitter ? jitter(i, j) : null;
+      if (q === false) continue;
+      this.box(list, sx - 0.03, 0.025, sz - 0.03, [x0 + (i + 0.5) * sx, y + (q ? q[0] : 0), z0 + (j + 0.5) * sz], q ? [q[1], 0, q[2]] : [0, 0, 0]);
+    }
+  }
+  // side wall at x = s * x with vertical ribs and a kick plate
+  wallX(s, x, z0, z1, y0, y1, rib) {
+    this.box('panel', 0.04, y1 - y0, z1 - z0, [s * x, (y0 + y1) / 2, (z0 + z1) / 2]);
+    const n = Math.max(1, Math.round((z1 - z0) / rib));
+    for (let i = 0; i <= n; i++) this.box('frame', 0.06, y1 - y0, 0.07, [s * (x - 0.04), (y0 + y1) / 2, z0 + i * (z1 - z0) / n]);
+    this.box('frame', 0.05, 0.14, z1 - z0, [s * (x - 0.03), y0 + 0.07, (z0 + z1) / 2]);
+  }
+  // fore or aft wall at z, ribs and kick plate on the cabin side
+  wallZ(z, x0, x1, y0, y1, rib) {
+    const d = -Math.sign(z);
+    this.box('panel', x1 - x0, y1 - y0, 0.04, [(x0 + x1) / 2, (y0 + y1) / 2, z]);
+    const n = Math.max(1, Math.round((x1 - x0) / rib));
+    for (let i = 0; i <= n; i++) this.box('frame', 0.07, y1 - y0, 0.06, [x0 + i * (x1 - x0) / n, (y0 + y1) / 2, z + d * 0.04]);
+    this.box('frame', x1 - x0, 0.14, 0.05, [(x0 + x1) / 2, y0 + 0.07, z + d * 0.03]);
+  }
+  door(z, x, y0, w, h) {
+    const d = -Math.sign(z);
+    this.box('frame', w + 0.2, h + 0.1, 0.04, [x, y0 + (h + 0.1) / 2, z + d * 0.07]);
+    this.box('panel', w, h, 0.04, [x, y0 + h / 2, z + d * 0.1]);
+    this.box('frame', 0.03, h - 0.1, 0.02, [x, y0 + h / 2, z + d * 0.125]);
+    for (const s of [-1, 1]) this.box('lit', 0.02, h - 0.2, 0.01, [x + s * (w / 2 + 0.05), y0 + h / 2, z + d * 0.095]);
+    this.box('lit', 0.12, 0.03, 0.01, [x, y0 + h + 0.02, z + d * 0.095], [0, 0, 0], null, this.S.keys[1]);
+  }
+  // seat facing -Z: back at z, pan at yPan, pedestal down to the floor at y
+  seat(x, z, y, yPan, w) {
+    this.box('panel', w, 0.1, 0.48, [x, yPan, z - 0.25]);
+    this.box('panel', w, 0.78, 0.1, [x, yPan + 0.42, z], [-0.1, 0, 0]);
+    this.box('panel', w * 0.55, 0.2, 0.1, [x, yPan + 0.9, z + 0.07]);
+    this.cyl('frame', 0.07, 0.1, yPan - y, [x, (yPan + y) / 2, z - 0.25]);
+    this.box('frame', w * 0.8, 0.03, 0.4, [x, y + 0.015, z - 0.25]);
+    for (const s of [-1, 1]) {
+      this.box('frame', 0.07, 0.06, 0.4, [x + s * (w / 2 + 0.04), yPan + 0.22, z - 0.24]);
+      this.box('frame', 0.04, 0.22, 0.04, [x + s * (w / 2 + 0.04), yPan + 0.1, z - 0.06]);
+    }
   }
   screen(face, x, y, w, h, idx) {
     const g = new THREE.PlaneGeometry(w, h), uv = g.attributes.uv;
@@ -180,10 +226,10 @@ function interiorMat([color, metalness, roughness], env, U) {
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uLP = U.pos; sh.uniforms.uLC = U.col;
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uLP[4];\nuniform vec3 uLC[4];')
+      .replace('#include <common>', '#include <common>\nuniform vec3 uLP[6];\nuniform vec3 uLC[6];')
       .replace('#include <opaque_fragment>', `
         vec3 ipos = -vViewPosition, iv = normalize(vViewPosition), il = vec3(0.0), isp = vec3(0.0);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 6; i++) {
           vec3 d = uLP[i] - ipos; float r2 = dot(d, d); vec3 l = d * inversesqrt(r2);
           float att = 1.0 / (1.0 + r2 * 3.0);
           il += uLC[i] * att * (max(dot(normal, l), 0.0) * 0.85 + 0.15);
@@ -227,6 +273,24 @@ function fighter(K) {
   K.bar('frame', [-0.78, -0.58, -0.66], [-0.77, -0.47, -0.74], 0.025, 0.025);
   K.box('panel', 0.07, 0.05, 0.09, [-0.77, -0.45, -0.75], [0.3, 0.3, 0]);
   K.box('lit', 0.02, 0.012, 0.02, [-0.77, -0.423, -0.76], [0, 0, 0], null, S.warn);
+  // cockpit tub: floor, side walls, footwell, seat and the bulkhead behind it
+  K.deck(-1.0, 1.0, -1.15, 0.7, -1.05, 0.33);
+  for (const s of [-1, 1]) {
+    K.wallX(s, 1.06, -1.15, 0.7, -1.05, -0.42, 0.37);
+    K.box('lit', 0.012, 0.008, 1.7, [s * 0.92, -1.03, -0.25], [0, 0, 0], null, S.accent.clone().multiplyScalar(0.6));
+    const sc = K.cons(0.32, 0.62, 0.08, [s * 0.66, -0.66, -0.1], [-Math.PI / 2, 0, 0]);
+    K.keys(sc, -0.1, -0.22, 3, 6, 0.1, 0.08, 0.022);
+    K.box('panel', 0.3, 0.35, 0.6, [s * 0.66, -0.875, -0.1]);
+    K.box('frame', 0.12, 0.035, 0.22, [s * 0.2, -0.95, -0.92], [0.6, 0, 0]);
+  }
+  K.wallZ(-1.15, -1.06, 1.06, -1.05, -0.62, 0.35);
+  K.wallZ(0.7, -1.1, 1.1, -1.05, 0.5, 0.44);
+  K.tube('frame', arch.map(([x, y]) => [x, y * 0.82 - 0.05, 0.64]), 0.05, 48);
+  K.seat(0, 0.42, -1.05, -0.62, 0.56);
+  K.box('frame', 0.16, 0.06, 0.16, [0, -1.0, -0.45]);
+  K.bar('frame', [0, -0.98, -0.45], [0, -0.66, -0.5], 0.035, 0.035);
+  K.box('panel', 0.06, 0.12, 0.06, [0, -0.6, -0.51], [-0.2, 0, 0]);
+  K.box('lit', 0.02, 0.012, 0.02, [0, -0.535, -0.52], [0, 0, 0], null, S.warn);
 }
 
 function command(K, lux) {
@@ -238,11 +302,20 @@ function command(K, lux) {
   K.bar('lit', [-3.4, -0.66, -2.47], [3.4, -0.66, -2.47], 0.012, 0.012, S.warn.clone().multiplyScalar(0.6));
   // ceiling: panels, ribs and light strips running toward the window
   K.box('panel', 7.4, 0.08, 3.0, [0, 1.24, -1.5]);
+  K.box('panel', 6.0, 0.08, 2.7, [0, 1.24, 1.35]);
+  for (const z of [0.6, 1.8]) K.box('frame', 5.9, 0.14, 0.12, [0, 1.16, z]);
+  for (const x of [-1.5, 0, 1.5]) K.box('lit', 0.05, 0.015, 2.6, [x, 1.19, 1.35], [0, 0, 0], null, x ? S.accent.clone().multiplyScalar(0.8) : col(0.95, 0.97, 1));
   for (const z of [-1.9, -2.4]) K.box('frame', 7.4, 0.14, 0.12, [0, 1.16, z]);
   for (const x of [-1.5, 0, 1.5]) K.box('lit', 0.05, 0.015, 2.4, [x, 1.19, -1.5], [0, 0, 0], null, x ? S.accent.clone().multiplyScalar(0.8) : col(0.95, 0.97, 1));
   for (const s of [-1, 1]) {
     for (const z of [-1.0, -1.8, -2.45]) K.bar('frame', [s * 2.9, -1.6, z], [s * 2.78, 1.2, z], 0.16, 0.16);
-    K.box('panel', 0.06, 2.8, 2.4, [s * 2.95, -0.2, -1.5]);
+    K.wallX(s, 2.97, -2.7, 2.7, -1.75, 1.24, 0.9);
+    K.bar('lit', [s * 2.89, 0.75, -0.3], [s * 2.89, 0.75, 2.6], 0.015, 0.015);
+    K.mfd(mat([s * 2.88, 0.1, 1.35], [0, -s * Math.PI / 2, 0]), 0, 0, 0.8, 0.5, s < 0 ? 6 : 2, 4);
+    // crew seats and desk pedestals
+    K.box('panel', 0.5, 0.08, 0.3, [s * 0.95, -1.4, -1.62]);
+    K.cyl('frame', 0.06, 0.09, 0.35, [s * 0.95, -1.575, -1.62]);
+    K.box('panel', 0.55, 0.22, 0.3, [s * 0.95, -1.64, -2.0]);
     K.bar('lit', [s * 2.84, -0.6, -2.2], [s * 2.78, 1.0, -2.2], 0.02, 0.02);
     // crew stations in the lower pit
     K.box('panel', 0.5, 0.62, 0.14, [s * 0.95, -1.15, -1.5], [0.12, 0, 0]);
@@ -258,7 +331,19 @@ function command(K, lux) {
     K.mfd(f, -0.12, 0.02, 0.34, 0.22, [5, 0, 7, 3, 1][i + 2], 3);
     K.keys(f, 0.14, -0.13, 3, 6, 0.04, 0.05, 0.022);
     K.box('lit', 0.76, 0.01, 0.01, [0, 0.2, 0.01], [0, 0, 0], f);
+    K.box('panel', 0.6, 0.6, 0.35, [Math.sin(a) * R * 1.04, -1.45, -Math.cos(a) * R * 1.04], [0, -a, 0]);
   }
+  // deck, fore and aft walls, lift doors and the captain's chair on a lit dais
+  K.deck(-2.95, 2.95, -2.5, 2.7, -1.75, 0.6);
+  K.wallZ(-2.5, -2.95, 2.95, -1.75, -0.8, 0.9);
+  K.wallZ(2.7, -2.95, 2.95, -1.75, 1.24, 0.9);
+  K.door(2.7, 0, -1.75, 1.1, 2.1);
+  for (const s of [-1, 1]) K.mfd(mat([s * 1.9, -0.3, 2.62], [0, Math.PI, 0]), 0, 0, 0.7, 0.45, s < 0 ? 0 : 5, 3);
+  K.cyl('frame', 0.34, 0.42, 0.24, [0, -1.64, -2.0], [0, 0, 0], null, null, 20);
+  K.cyl('panel', 1.0, 1.05, 0.18, [0, -1.66, 0.2], [0, 0, 0], null, null, 32);
+  K.torus('lit', 1.02, 0.012, [0, -1.57, 0.2], [Math.PI / 2, 0, 0], null, S.accent.clone().multiplyScalar(0.7));
+  K.seat(0, 0.45, -1.57, -0.78, 0.7);
+  for (const s of [-1, 1]) for (let j = 0; j < 4; j++) K.box('lit', 0.025, 0.01, 0.03, [s * 0.39, -0.525, 0.12 - j * 0.07], [0, 0, 0], null, S.keys[j % 3]);
   // holotable with a rotating projection
   K.cyl('panel', 0.3, 0.38, 0.45, [0, -1.3, -2.0], [0, 0, 0], null, null, 20);
   K.torus('lit', 0.29, 0.014, [0, -1.075, -2.0], [Math.PI / 2, 0, 0]);
@@ -299,6 +384,28 @@ function civil(K) {
   // a mug on the dash
   K.cyl('panel', 0.045, 0.04, 0.1, [1.6, -0.42, -1.5], [0, 0, 0], null, null, 14);
   K.torus('panel', 0.03, 0.008, [1.65, -0.42, -1.5], [0, 0, 0]);
+  // deck, walls, ceiling lamps, pilot seat, lockers and a galley counter
+  K.deck(-2.55, 2.55, -1.62, 2.0, -1.35, 0.52);
+  K.box('panel', 3.4, 0.62, 0.3, [0, -1.04, -1.42]);
+  K.wallZ(-1.62, -2.55, 2.55, -1.35, -0.56, 0.72);
+  K.wallZ(2.0, -2.55, 2.55, -1.35, 1.12, 0.72);
+  K.door(2.0, 0.9, -1.35, 0.9, 2.05);
+  for (const s of [-1, 1]) K.wallX(s, 2.57, -1.65, 2.0, -1.35, 1.12, 0.72);
+  K.box('panel', 5.1, 0.06, 3.7, [0, 1.12, 0.15]);
+  for (const z of [0.0, 1.0]) K.box('frame', 5.0, 0.1, 0.1, [0, 1.06, z]);
+  for (const x of [-1.0, 1.0]) K.box('lit', 0.6, 0.012, 0.25, [x, 1.085, 0.6], [0, 0, 0], null, col(1.0, 0.85, 0.6));
+  K.seat(0, 0.4, -1.35, -0.8, 0.62);
+  for (let i = 0; i < 4; i++) {
+    const z = 0.55 + i * 0.44;
+    K.box('panel', 0.4, 1.8, 0.42, [-2.32, -0.45, z]);
+    K.box('frame', 0.02, 0.22, 0.03, [-2.11, -0.3, z + 0.14]);
+    for (let j = 0; j < 3; j++) K.box('frame', 0.01, 0.015, 0.26, [-2.115, 0.25 + j * 0.05, z]);
+  }
+  K.box('panel', 0.6, 0.9, 1.2, [2.22, -0.9, 1.1]);
+  K.box('frame', 0.64, 0.04, 1.24, [2.22, -0.43, 1.1]);
+  K.box('frame', 0.3, 0.42, 0.3, [2.32, -0.2, 1.45]);
+  K.box('lit', 0.03, 0.03, 0.01, [2.16, -0.1, 1.45], [0, Math.PI / 2, 0], null, S.warn);
+  K.cyl('panel', 0.045, 0.04, 0.1, [2.12, -0.36, 0.8], [0, 0, 0], null, null, 14);
 }
 
 function clan(K) {
@@ -336,6 +443,29 @@ function clan(K) {
   // pressure gauge bolted to the left pipe
   K.cyl('frame', 0.06, 0.06, 0.04, [-1.02, -0.36, -1.0], [Math.PI / 2, 0.5, 0]);
   K.cyl('lit', 0.045, 0.045, 0.01, [-1.0, -0.36, -0.975], [Math.PI / 2, 0.5, 0], null, col(0.3, 0.17, 0.05));
+  // warped deck plates (one missing, grating showing), patched walls, pipes, a hatch and clutter
+  K.deck(-1.22, 1.22, -1.2, 1.25, -1.15, 0.49, 'panel', (i, j) => (i === 3 && j === 1 ? false : [(r() - 0.5) * 0.03, (r() - 0.5) * 0.07, (r() - 0.5) * 0.07]));
+  for (let i = 0; i < 5; i++) K.box('frame', 0.02, 0.02, 0.44, [0.27 + i * 0.1, -1.17, -0.47]);
+  K.wallZ(-1.2, -1.22, 1.22, -1.15, -0.42, 0.5);
+  K.wallZ(1.25, -1.22, 1.22, -1.15, 1.0, 0.5);
+  for (const s of [-1, 1]) {
+    K.wallX(s, 1.24, -1.25, 1.25, -1.15, 1.0, 0.5);
+    for (let k = 0; k < 4; k++) K.box('panel', 0.03, 0.25 + r() * 0.3, 0.25 + r() * 0.35, [s * 1.18, -0.7 + r() * 1.3, -0.9 + r() * 1.9], [r() * 0.12, 0, r() * 0.12]);
+    K.tube('frame', [[s * 1.13, 0.8, -1.2], [s * 1.1, 0.74, 0], [s * 1.13, 0.8, 1.2]], 0.04, 10);
+    K.tube('frame', [[s * 1.15, -0.95, -1.1], [s * 1.12, -0.9, 0.2], [s * 1.0, -1.1, 1.1]], 0.025, 10);
+  }
+  K.box('panel', 2.5, 0.05, 2.6, [0, 1.0, 0.05], [0, 0, 0.02]);
+  for (const z of [-0.3, 0.6]) K.box('frame', 2.4, 0.08, 0.08, [0, 0.95, z], [0, 0, 0.02]);
+  K.torus('frame', 0.42, 0.06, [0.3, -0.35, 1.2], [0, 0, 0]);
+  K.cyl('panel', 0.4, 0.4, 0.05, [0.3, -0.35, 1.2], [Math.PI / 2, 0, 0], null, null, 20);
+  K.torus('frame', 0.14, 0.02, [0.3, -0.35, 1.16], [0, 0, 0]);
+  for (const t of [0, Math.PI / 2]) K.box('frame', 0.28, 0.02, 0.02, [0.3, -0.35, 1.16], [0, 0, t]);
+  K.seat(0, 0.42, -1.15, -0.72, 0.55);
+  K.box('frame', 0.3, 0.06, 0.11, [0.05, -0.1, 0.42], [0, 0, 0.4]);
+  K.box('panel', 0.45, 0.35, 0.4, [0.78, -0.97, 0.7], [0, 0.4, 0]);
+  K.box('frame', 0.3, 0.22, 0.3, [0.72, -0.68, 0.72], [0, -0.2, 0]);
+  K.cyl('frame', 0.035, 0.035, 0.22, [-0.8, -1.02, 0.85], [0, 0, 0], null, null, 8);
+  K.cyl('frame', 0.035, 0.035, 0.22, [-0.95, -1.1, 0.6], [0, 0.5, Math.PI / 2], null, null, 8);
 }
 
 function combine(K) {
@@ -363,6 +493,23 @@ function combine(K) {
     K.keys(f, 0.21, -0.1, 1, 5, 0, 0.05, 0.024, (a, j) => (j === 4 ? S.warn : S.accent));
     K.box('frame', 0.12, 0.04, 0.01, [-0.2, -0.145, 0.006], [0, 0, 0], f);
   }
+  // standard-issue deck, wall and ceiling modules, a second tube light and a hazard-striped door
+  K.deck(-1.44, 1.44, -1.42, 1.3, -1.0, 0.48);
+  K.wallZ(-1.42, -1.44, 1.44, -1.0, -0.55, 0.48);
+  K.wallZ(1.3, -1.44, 1.44, -1.0, 1.0, 0.48);
+  K.door(1.3, 0, -1.0, 0.8, 1.85);
+  for (let i = -4; i <= 4; i++) K.box('lit', 0.05, 0.004, 0.16, [i * 0.1, -0.984, 1.08], [0, 0.6, 0], null, col(0.32, 0.24, 0.03));
+  for (const s of [-1, 1]) {
+    K.wallX(s, 1.46, -1.5, 1.3, -1.0, 1.0, 0.47);
+    for (const z of [-0.3, 0.4]) K.box('lit', 0.005, 0.12, 0.2, [s * 1.4, 0.35, z], [0, 0, 0], null, col(0.3, 0.24, 0.04));
+  }
+  K.mfd(mat([1.4, 0.0, 0.75], [0, -Math.PI / 2, 0]), 0, 0, 0.36, 0.24, 7, 3);
+  K.box('panel', 2.95, 0.05, 2.9, [0, 1.02, -0.1]);
+  for (const x of [-0.96, -0.48, 0, 0.48, 0.96]) K.box('frame', 0.03, 0.03, 2.8, [x, 0.99, -0.1]);
+  for (const z of [-1.0, -0.4, 0.2, 0.8]) K.box('frame', 2.9, 0.03, 0.03, [0, 0.99, z]);
+  K.box('frame', 1.6, 0.04, 0.1, [0, 0.985, 0.35]);
+  K.cyl('lit', 0.018, 0.018, 1.5, [0, 0.95, 0.35], [0, 0, Math.PI / 2], null, col(0.5, 0.55, 0.5), 8);
+  K.seat(0, 0.4, -1.0, -0.62, 0.5);
 }
 
 const LAYOUT = { fighter, command, civil, clan, combine };

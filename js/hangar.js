@@ -110,7 +110,6 @@ export class Hangar {
     this.target = new THREE.Vector3(0, 8, 0); this.targetWant = new THREE.Vector3(0, 8, 0);
     this.focus = 'ship';
     this.ship = null; this.outfit = null; this.cradle = null;
-    this.swapped = new Map();
     this.time = 0;
     this.buildRoom();
     this.pv = this.buildPreview();
@@ -134,15 +133,17 @@ export class Hangar {
     scene.add(holder);
     const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: rt.texture } }, depthTest: false, depthWrite: false,
+      uniforms: { tDiffuse: { value: rt.texture } }, depthTest: false, depthWrite: false, transparent: true, premultipliedAlpha: true,
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
       fragmentShader: /* glsl */`
         uniform sampler2D tDiffuse; varying vec2 vUv;
         void main(){
-          vec2 d = vUv - 0.5;
-          gl_FragColor = vec4(max(texture2D(tDiffuse, vUv).rgb, 0.0) * (1.0 - dot(d, d) * 0.9), 1.0);
+          vec4 c = texture2D(tDiffuse, vUv);
+          float a = clamp(c.a, 0.0, 1.0);
+          gl_FragColor = vec4(max(c.rgb, 0.0) / max(a, 1e-3), 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
+          gl_FragColor = vec4(gl_FragColor.rgb * a, a);
         }`,
     }));
     quad.frustumCulled = false;
@@ -312,25 +313,31 @@ export class Hangar {
     this.scene.add(rim);
   }
 
-  swapEnv(obj) {
+  // the bay draws its own copies of a ship's materials, lit by the bay's environment, so nothing shared with
+  // the ships in flight is ever changed here
+  ownMaterials(obj) {
+    const copies = new Map();
     obj.traverse((o) => {
-      if (!o.isMesh) return;
-      const m = o.material;
-      if (!m || !('envMap' in m) || !m.envMap) return;
-      if (!this.swapped.has(m)) this.swapped.set(m, m.envMap);
-      m.envMap = this.env;
+      const m = o.isMesh && o.material;
+      if (!m || !m.isMeshStandardMaterial) return;
+      let c = copies.get(m);
+      if (!c) {
+        c = m.clone();
+        c.onBeforeCompile = m.onBeforeCompile;
+        c.customProgramCacheKey = m.customProgramCacheKey;
+        c.defines = { ...m.defines };
+        if (m.envMap) c.envMap = this.env;
+        c.userData.bayCopy = true;
+        copies.set(m, c);
+      }
+      o.material = c;
     });
-  }
-
-  restoreEnv() {
-    for (const [m, e] of this.swapped) m.envMap = e;
-    this.swapped.clear();
   }
 
   dispose(obj) {
     obj.traverse((o) => {
       if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
-      if (o.material && (o.material.isShaderMaterial || o.material.isSpriteMaterial)) o.material.dispose();
+      if (o.material && (o.material.isShaderMaterial || o.material.isSpriteMaterial || o.material.userData.bayCopy)) o.material.dispose();
     });
   }
 
@@ -393,7 +400,7 @@ export class Hangar {
     const sc = Math.min(1, 68 / ship.radius);
     g.scale.setScalar(sc);
     g.traverse((o) => { if (o.isMesh && o.material && o.material.isMeshStandardMaterial) { o.castShadow = true; o.receiveShadow = true; } });
-    this.swapEnv(g);
+    this.ownMaterials(g);
     this.scene.add(g);
     g.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(g, true);
@@ -445,7 +452,7 @@ export class Hangar {
       P.el.querySelector('.nm').textContent = label;
     }
     if (!obj) return;
-    this.swapEnv(obj);
+    this.ownMaterials(obj);
     obj.traverse((o) => { if (o.isMesh) o.castShadow = true; });
     const box = new THREE.Box3().setFromObject(obj);
     const size = box.getSize(new THREE.Vector3());
@@ -544,7 +551,7 @@ export class Hangar {
     if (Math.abs(P.camera.aspect - r.width / r.height) > 1e-3) { P.camera.aspect = r.width / r.height; P.camera.updateProjectionMatrix(); }
     const cc = R.getClearColor(_cc), ca = R.getClearAlpha();
     R.setRenderTarget(P.rt);
-    R.setClearColor(0x07090c, 1);
+    R.setClearColor(0x000000, 0);
     R.clear();
     R.render(P.scene, P.camera);
     R.setRenderTarget(null);
@@ -552,7 +559,10 @@ export class Hangar {
     R.setScissorTest(true);
     R.setScissor(r.left, _sz.y - r.bottom, r.width, r.height);
     R.setViewport(r.left, _sz.y - r.bottom, r.width, r.height);
+    const ac = R.autoClear;
+    R.autoClear = false;
     R.render(P.quad, P.qcam);
+    R.autoClear = ac;
     R.setScissorTest(false);
     R.setViewport(0, 0, _sz.x, _sz.y);
     R.setClearColor(cc, ca);

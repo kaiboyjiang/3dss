@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Kit, G, mat } from './geo.js';
-import { hullMaps, rng, glowTexture, engineCoreTexture } from './textures.js';
+import { hullMaps, rng, glowTexture, engineCoreTexture, untile } from './textures.js';
 import { LOGDEPTH_VERT_PARS, LOGDEPTH_VERT, LOGDEPTH_FRAG_PARS, LOGDEPTH_FRAG } from './shaders.js';
 
 // Ships face +Z, up is +Y. Port (left) is +X.
@@ -41,9 +41,9 @@ export function livery(name, env) {
   const d = hullMaps({ seed: L.seed + 2, base: L.second, accent: [80, 80, 80], accentChance: 0.1, darkChance: 0.2, wear: L.wear, size: 512, rust: (L.rust || 0) * 0.5 });
   const engColor = new THREE.Color(L.eng[0], L.eng[1], L.eng[2]);
   const M = {
-    hull: new THREE.MeshStandardMaterial({ map: h.map, normalMap: h.normalMap, roughnessMap: h.roughnessMap, metalness: 0.35, roughness: 0.55, envMap: env, envMapIntensity: 0.9 }),
-    accent: new THREE.MeshStandardMaterial({ map: a.map, normalMap: a.normalMap, roughnessMap: a.roughnessMap, metalness: 0.3, roughness: 0.5, envMap: env, envMapIntensity: 0.9 }),
-    dark: new THREE.MeshStandardMaterial({ map: d.map, normalMap: d.normalMap, roughnessMap: d.roughnessMap, metalness: 0.75, roughness: 0.45, envMap: env, envMapIntensity: 1.0 }),
+    hull: untile(new THREE.MeshStandardMaterial({ map: h.map, normalMap: h.normalMap, roughnessMap: h.roughnessMap, metalness: 0.35, roughness: 0.55, envMap: env, envMapIntensity: 0.9 }), h),
+    accent: untile(new THREE.MeshStandardMaterial({ map: a.map, normalMap: a.normalMap, roughnessMap: a.roughnessMap, metalness: 0.3, roughness: 0.5, envMap: env, envMapIntensity: 0.9 }), a),
+    dark: untile(new THREE.MeshStandardMaterial({ map: d.map, normalMap: d.normalMap, roughnessMap: d.roughnessMap, metalness: 0.75, roughness: 0.45, envMap: env, envMapIntensity: 1.0 }), d),
     metal: new THREE.MeshStandardMaterial({ color: 0x8a8d92, metalness: 1.0, roughness: 0.28, envMap: env, envMapIntensity: 1.2 }),
     gun: new THREE.MeshStandardMaterial({ color: 0x2c2e31, metalness: 0.9, roughness: 0.35, envMap: env, envMapIntensity: 1.0 }),
     glass: new THREE.MeshPhysicalMaterial({ color: 0x0b1420, metalness: 0.2, roughness: 0.04, clearcoat: 1, clearcoatRoughness: 0.02, envMap: env, envMapIntensity: 2.4, emissive: new THREE.Color(0.02, 0.05, 0.08) }),
@@ -1190,7 +1190,13 @@ export function buildHauler(env, seed = 1) {
 const skinMats = new WeakMap();
 function skinMat(m) {
   let s = skinMats.get(m);
-  if (!s) { s = m.clone(); skinMats.set(m, s); }
+  if (!s) {
+    s = m.clone();
+    s.onBeforeCompile = m.onBeforeCompile;
+    s.customProgramCacheKey = m.customProgramCacheKey;
+    s.defines = { ...m.defines };
+    skinMats.set(m, s);
+  }
   return s;
 }
 const _pv = new THREE.Vector3();
@@ -1478,14 +1484,18 @@ export function buildOutfitModel(id, M) {
       k.add('metal', G.cyl(0.74, 0.74, 0.12, 20), mat([1.0, 0.95, 0], [0, 0, Math.PI / 2]));
       k.add('metal', G.cyl(0.74, 0.74, 0.12, 20), mat([-1.0, 0.95, 0], [0, 0, Math.PI / 2]));
       break;
-    case 'engine':
-      k.add('dark', G.rbox(2.0, 0.35, 3.0, 0.08), mat([0, 0.18, 0]));
-      k.add('hull', G.cyl(0.7, 0.8, 2.0, 24), mat([0, 0.95, 0.4], [Math.PI / 2, 0, 0]));
-      for (let i = 0; i < 3; i++) k.add('metal', G.torus(0.78, 0.06, 8, 28), mat([0, 0.95, -0.2 + i * 0.5]));
-      k.add('nozzle', G.lathe([[0.55, 0.4], [0.6, 0], [0.8, -0.5], [0.9, -0.9]], 28), mat([0, 0.95, -0.7], [Math.PI / 2, 0, 0]));
-      k.add('amber', G.cyl(0.55, 0.55, 0.04, 24), mat([0, 0.95, -0.72], [Math.PI / 2, 0, 0]));
-      k.add('accent', G.rbox(0.8, 0.3, 0.9, 0.06), mat([0, 1.75, 0.6]));
+    case 'engine': {
+      // drive body on a short saddle; the bell overhangs the rear of the base plate so nothing intersects it
+      const cy = 1.3;
+      k.add('dark', G.rbox(2.0, 0.35, 1.9, 0.08), mat([0, 0.18, 0.5]));
+      for (const z of [0.0, 1.0]) k.add('gun', G.rbox(1.1, cy - 0.35, 0.3, 0.05), mat([0, 0.35 + (cy - 0.35) / 2, z]));
+      k.add('hull', G.cyl(0.7, 0.8, 2.0, 24), mat([0, cy, 0.4], [Math.PI / 2, 0, 0]));
+      for (let i = 0; i < 3; i++) k.add('metal', G.torus(0.78, 0.06, 8, 28), mat([0, cy, -0.2 + i * 0.5]));
+      k.add('nozzle', G.lathe([[0.55, 0.4], [0.6, 0], [0.8, -0.5], [0.9, -0.9]], 28), mat([0, cy, -0.7], [Math.PI / 2, 0, 0]));
+      k.add('amber', G.cyl(0.55, 0.55, 0.04, 24), mat([0, cy, -0.72], [Math.PI / 2, 0, 0]));
+      k.add('accent', G.rbox(0.8, 0.3, 0.9, 0.06), mat([0, cy + 0.8, 0.6]));
       break;
+    }
     default:
       k.add('dark', G.box(1, 1, 1), mat(up));
   }
