@@ -133,4 +133,4 @@ vec3 upscale(sampler2D t, vec2 uv) {
 }
 `;
 // sharpening strength for a render drawn at `scale` of the canvas resolution
-export const upscaleSharp = (scale) => Math.min(0.6, Math.max(0, (1 / scale - 1) * 0.8));
+export const upscaleSharp = (scale, base = 0) => Math.min(0.6, Math.max(base, (1 / scale - 1) * 0.8));

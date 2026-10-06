@@ -447,13 +447,13 @@ export class Hangar {
     this.distWant = THREE.MathUtils.clamp(this.distWant * Math.pow(1.0015, dy), min, max);
   }
 
-  resize(w, h, pr, out) {
+  resize(w, h, pr, out, base = 0) {
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     this.composer.setPixelRatio(pr);
     this.composer.setSize(w, h);
     this.final.uniforms.uTexel.value.set(1 / this.composer.renderTarget1.width, 1 / this.composer.renderTarget1.height);
-    this.final.uniforms.uSharp.value = upscaleSharp(pr / out);
+    this.final.uniforms.uSharp.value = upscaleSharp(pr / out, base);
   }
 
   update(dt) {

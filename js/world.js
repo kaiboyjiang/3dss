@@ -1270,10 +1270,10 @@ let rockGeos = null;
 const sharedRockGeos = () => rockGeos || (rockGeos = { hi: makeAsteroidGeometries(5, 5), lo: makeAsteroidGeometries(5, 2) });
 const ROCK_Q = { belt: 1, lod: 1 };
 
-export function buildWorld(renderer, scene) {
+export function buildWorld(renderer, scene, skySize = 512) {
   // sky is baked to a cubemap per system; the PMREM env is re-rendered into the same target so materials keep their reference
   const cubeOpts = { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter };
-  let cube = new THREE.WebGLCubeRenderTarget(512, cubeOpts);
+  let cube = new THREE.WebGLCubeRenderTarget(skySize, cubeOpts);
   const envCube = new THREE.WebGLCubeRenderTarget(256, cubeOpts);
   const pmrem = new THREE.PMREMGenerator(renderer);
   let envTarget = bakeSky(renderer, cube, envCube, pmrem, null);

@@ -26,9 +26,9 @@ const canvas = $('c');
 // MSAA happens in the composer's render target, so the canvas itself needs none
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, logarithmicDepthBuffer: true, powerPreference: 'high-performance' });
 const GFX = {
-  min: { label: 'Min', desc: 'For low-end hardware: renders at reduced resolution and sharpens it up to full screen, no shadows, thinner asteroid belts and dust.', prMax: 0.75, prMin: 0.5, msaa: 0, shadow: 0, soft: false, sky: 512, detail: -2, clouds: false, belt: 0.45, rockLod: 0.35, dust: 0.35, stars: 0.6 },
-  normal: { label: 'Normal', desc: 'A balance of looks and speed.', prMax: 1, prMin: 0.6, msaa: 4, shadow: 1024, soft: false, sky: 512, detail: 0, clouds: true, belt: 0.8, rockLod: 1, dust: 0.7, stars: 1 },
-  max: { label: 'Max', desc: 'Maximum graphics: full display resolution, 8× MSAA, soft high-resolution shadows, full asteroid belts.', prMax: 2, prMin: 0.85, msaa: 8, shadow: 2048, soft: true, sky: 1024, detail: 1, clouds: true, belt: 1, rockLod: 2.5, dust: 1, stars: 1 },
+  min: { label: 'Min', desc: 'For low-end hardware: renders at reduced resolution and sharpens it up to full screen, no shadows, thinner asteroid belts and dust.', prMax: 0.75, prMin: 0.5, msaa: 0, shadow: 0, soft: false, sky: 512, detail: -2, clouds: false, belt: 0.45, rockLod: 0.35, dust: 0.35, stars: 0.6, sharp: 0 },
+  normal: { label: 'Normal', desc: 'A balance of looks and speed: 4× MSAA, shadows, sharp sky, light sharpening.', prMax: 1, prMin: 0.6, msaa: 4, shadow: 1024, soft: false, sky: 1024, detail: 0, clouds: true, belt: 0.8, rockLod: 1, dust: 0.7, stars: 1, sharp: 0.25 },
+  max: { label: 'Max', desc: 'Maximum graphics: full display resolution, 8× MSAA, soft high-resolution shadows, ultra-sharp sky, full asteroid belts.', prMax: 2, prMin: 0.85, msaa: 8, shadow: 2048, soft: true, sky: 2048, detail: 1, clouds: true, belt: 1, rockLod: 2.5, dust: 1, stars: 1, sharp: 0.2 },
 };
 const SETTINGS_KEY = 'gvcsg-settings-v1';
 const FPS_CAPS = [30, 60];
@@ -89,11 +89,11 @@ function resize() {
   composer.setPixelRatio(pixelRatio);
   composer.setSize(w, h);
   lensPass.uniforms.uTexel.value.set(1 / composer.renderTarget1.width, 1 / composer.renderTarget1.height);
-  lensPass.uniforms.uSharp.value = upscaleSharp(pixelRatio / outRatio());
+  lensPass.uniforms.uSharp.value = upscaleSharp(pixelRatio / outRatio(), GFX[settings.gfx].sharp);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   lensPass.uniforms.uAspect.value = w / h;
-  if (hangar) hangar.resize(w, h, pixelRatio, outRatio());
+  if (hangar) hangar.resize(w, h, pixelRatio, outRatio(), GFX[settings.gfx].sharp);
   staticDrawn = false;
 }
 window.addEventListener('resize', resize);
@@ -2262,7 +2262,7 @@ async function boot() {
   const step = (t) => new Promise((r) => { msg.textContent = t; setTimeout(r, 30); });
   try {
     await step('Generating star system…');
-    world = buildWorld(renderer, scene);
+    world = buildWorld(renderer, scene, GFX[settings.gfx].sky);
     fx = new Effects(scene);
     bolts = new Projectiles(scene, fx);
     missiles = new Missiles(scene, fx, world.env);
